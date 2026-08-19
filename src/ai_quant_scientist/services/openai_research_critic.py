@@ -164,7 +164,21 @@ class OpenAIResearchCritic(ResearchCritic):
                 pass
 
         # SDK v3.3.0: use the parsed result returned by responses.parse()
-        parsed = getattr(response, "parsed", None)
+        # The Responses API places structured outputs inside `response.output` messages.
+        parsed = None
+        outputs = getattr(response, "output", None) or []
+        for out in outputs:
+            # expect message type
+            if getattr(out, "type", None) != "message":
+                continue
+            content = getattr(out, "content", []) or []
+            for item in content:
+                if getattr(item, "type", None) == "output_text":
+                    parsed = getattr(item, "parsed", None)
+                    if parsed is not None:
+                        break
+            if parsed is not None:
+                break
         if not parsed:
             raise ValueError("Structured output missing or unparseable")
 

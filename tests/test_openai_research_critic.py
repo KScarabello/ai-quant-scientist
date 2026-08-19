@@ -19,14 +19,22 @@ class DummyResponse:
 
 def make_client_that_returns(parsed: dict, usage: dict | None = None):
     client = MagicMock()
-    resp = DummyResponse(parsed=parsed, usage=usage)
+    # build response.output structure: list of message objects with content items
+    from types import SimpleNamespace
+
+    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=None)
+    message = SimpleNamespace(type="message", content=[output_item])
+    resp = SimpleNamespace(output=[message], usage=usage or {})
     client.responses.parse.return_value = resp
     return client
 
 
 def make_client_that_raises_then_returns(parsed: dict):
     client = MagicMock()
-    resp = DummyResponse(parsed=parsed, usage={"input_tokens": 10, "output_tokens": 20})
+    from types import SimpleNamespace
+    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=None)
+    message = SimpleNamespace(type="message", content=[output_item])
+    resp = SimpleNamespace(output=[message], usage={"input_tokens": 10, "output_tokens": 20})
     client.responses.parse.side_effect = [RuntimeError("429"), resp]
     return client
 
