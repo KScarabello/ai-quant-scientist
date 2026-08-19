@@ -30,6 +30,7 @@ class ResearchOrchestrator:
         research_tool: ResearchTool,
         result_evaluator: ResultEvaluator,
         evaluation_policy: ResultEvaluationPolicy,
+        research_critic=None,
     ) -> None:
         self.store = store
         self.transition_policy = transition_policy
@@ -37,6 +38,7 @@ class ResearchOrchestrator:
         self.research_tool = research_tool
         self.result_evaluator = result_evaluator
         self.evaluation_policy = evaluation_policy
+        self.research_critic = research_critic
 
     def create_research(
         self,
@@ -152,6 +154,7 @@ class ResearchOrchestrator:
         # If evaluator recommended ITERATE but iterations remain, require an explicit spec revision
         if decision.recommendation == EvaluationRecommendation.ITERATE and run.iteration_count + 1 < run.max_iterations:
             next_run = replace(next_run, next_required_action=ResearchAction.REVISION_REQUIRED)
+            # do not auto-invoke critic; critic invocation is a supervised action via CLI or services
         next_run = replace(next_run, updated_at=utcnow())
 
         audit_event = AuditEvent(

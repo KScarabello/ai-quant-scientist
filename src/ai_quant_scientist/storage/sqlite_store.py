@@ -22,9 +22,10 @@ from ..models.research import (
 )
 from ..models.research import new_id
 from ..models.enums import ResearchAction, SpecRevisionProposalStatus
+from ..models.critic import CriticInvocation, CriticDecision
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class SQLiteStore:
@@ -157,6 +158,24 @@ class SQLiteStore:
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (research_run_id) REFERENCES research_runs(id)
                 );
+                CREATE TABLE IF NOT EXISTS critic_invocations (
+                    id TEXT PRIMARY KEY,
+                    research_run_id TEXT NOT NULL,
+                    evaluation_id TEXT,
+                    parent_spec_id TEXT,
+                    context_version TEXT NOT NULL,
+                    prompt_version TEXT,
+                    provider TEXT,
+                    model TEXT,
+                    context_snapshot_json TEXT,
+                    raw_response_text TEXT,
+                    parsed_decision_json TEXT,
+                    validation_status TEXT,
+                    validation_errors_json TEXT,
+                    resulting_proposal_id TEXT,
+                    created_at TEXT NOT NULL,
+                    completed_at TEXT
+                );
                 """
             )
             current_version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
@@ -174,7 +193,8 @@ class SQLiteStore:
                     pass
                 elif v == 1:
                     # legacy upgrade path from 1 -> current
-                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
+                    # set to intermediate v3 after applying v2->v3 migrations
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (3,))
                 elif v == 2:
                     # migrate from v2 -> v3: add new columns and tables if missing
                     # research_runs.next_required_action
@@ -203,6 +223,32 @@ class SQLiteStore:
                             accepted_spec_id TEXT,
                             created_at TEXT NOT NULL,
                             decided_at TEXT
+                        );
+                        """
+                    )
+                    # record migration to v3
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (3,))
+                elif v == 3:
+                    # migrate v3 -> v4: add critic_invocations table
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS critic_invocations (
+                            id TEXT PRIMARY KEY,
+                            research_run_id TEXT NOT NULL,
+                            evaluation_id TEXT,
+                            parent_spec_id TEXT,
+                            context_version TEXT NOT NULL,
+                            prompt_version TEXT,
+                            provider TEXT,
+                            model TEXT,
+                            context_snapshot_json TEXT,
+                            raw_response_text TEXT,
+                            parsed_decision_json TEXT,
+                            validation_status TEXT,
+                            validation_errors_json TEXT,
+                            resulting_proposal_id TEXT,
+                            created_at TEXT NOT NULL,
+                            completed_at TEXT
                         );
                         """
                     )
@@ -382,6 +428,64 @@ class SQLiteStore:
             ),
         )
 
+    def _insert_critic_invocation(self, connection: sqlite3.Connection, inv: CriticInvocation) -> None:
+        connection.execute(
+            """
+            INSERT INTO critic_invocations (
+                id, research_run_id, evaluation_id, parent_spec_id, context_version, prompt_version,
+                provider, model, context_snapshot_json, raw_response_text, parsed_decision_json,
+                validation_status, validation_errors_json, resulting_proposal_id, created_at, completed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                inv.id,
+                inv.research_run_id,
+                inv.evaluation_id,
+                inv.parent_spec_id,
+                inv.context_version,
+                inv.prompt_version,
+                inv.provider,
+                inv.model,
+                None if inv.context_snapshot is None else self._dumps(inv.context_snapshot),
+                inv.raw_response,
+                None if inv.parsed_decision is None else self._dumps(inv.parsed_decision),
+                inv.validation_status,
+                None if inv.validation_errors is None else self._dumps(inv.validation_errors),
+                inv.resulting_proposal_id,
+                inv.created_at.isoformat(),
+                None if inv.completed_at is None else inv.completed_at.isoformat(),
+            ),
+        )
+
+    def _update_critic_invocation(self, connection: sqlite3.Connection, inv: CriticInvocation) -> None:
+        connection.execute(
+            """
+            UPDATE critic_invocations
+            SET research_run_id = ?, evaluation_id = ?, parent_spec_id = ?, context_version = ?, prompt_version = ?,
+                provider = ?, model = ?, context_snapshot_json = ?, raw_response_text = ?, parsed_decision_json = ?,
+                validation_status = ?, validation_errors_json = ?, resulting_proposal_id = ?, created_at = ?, completed_at = ?
+            WHERE id = ?
+            """,
+            (
+                inv.research_run_id,
+                inv.evaluation_id,
+                inv.parent_spec_id,
+                inv.context_version,
+                inv.prompt_version,
+                inv.provider,
+                inv.model,
+                None if inv.context_snapshot is None else self._dumps(inv.context_snapshot),
+                inv.raw_response,
+                None if inv.parsed_decision is None else self._dumps(inv.parsed_decision),
+                inv.validation_status,
+                None if inv.validation_errors is None else self._dumps(inv.validation_errors),
+                inv.resulting_proposal_id,
+                inv.created_at.isoformat(),
+                None if inv.completed_at is None else inv.completed_at.isoformat(),
+                inv.id,
+            ),
+        )
+
     def save_hypothesis(self, hypothesis: Hypothesis) -> Hypothesis:
         with self.connect() as connection:
             self._insert_hypothesis(connection, hypothesis)
@@ -412,7 +516,7 @@ class SQLiteStore:
             connection.execute(
                 """
                 UPDATE research_runs
-                SET stage = ?, status = ?, hypothesis_id = ?, active_spec_id = ?,
+                SET stage = ?, status = ?, hypothesis_id = ?, active_spec_id = ?, next_required_action = ?,
                     iteration_count = ?, max_iterations = ?, updated_at = ?
                 WHERE id = ?
                 """,
@@ -421,6 +525,7 @@ class SQLiteStore:
                     run.status.value,
                     run.hypothesis_id,
                     run.active_spec_id,
+                    run.next_required_action.value,
                     run.iteration_count,
                     run.max_iterations,
                     run.updated_at.isoformat(),
@@ -444,6 +549,40 @@ class SQLiteStore:
             self._insert_evaluation(connection, decision)
         return decision
 
+    def save_critic_invocation(self, inv: "CriticInvocation") -> "CriticInvocation":
+        with self.connect() as connection:
+            # if exists, update, else insert
+            existing = connection.execute("SELECT 1 FROM critic_invocations WHERE id = ?", (inv.id,)).fetchone()
+            if existing:
+                self._update_critic_invocation(connection, inv)
+            else:
+                self._insert_critic_invocation(connection, inv)
+        return inv
+
+    def get_critic_invocation(self, inv_id: str) -> "CriticInvocation" | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM critic_invocations WHERE id = ?", (inv_id,)).fetchone()
+        if row is None:
+            return None
+        return CriticInvocation(
+            id=row["id"],
+            research_run_id=row["research_run_id"],
+            evaluation_id=row["evaluation_id"],
+            parent_spec_id=row["parent_spec_id"],
+            context_version=row["context_version"],
+            prompt_version=row["prompt_version"],
+            provider=row["provider"],
+            model=row["model"],
+            context_snapshot=self._loads(row["context_snapshot_json"]),
+            raw_response=row["raw_response_text"],
+            parsed_decision=self._loads(row["parsed_decision_json"]),
+            validation_status=row["validation_status"],
+            validation_errors=self._loads(row["validation_errors_json"]),
+            resulting_proposal_id=row["resulting_proposal_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            completed_at=None if row["completed_at"] is None else datetime.fromisoformat(row["completed_at"]),
+        )
+
     def record_audit_event(self, event: AuditEvent) -> AuditEvent:
         with self.connect() as connection:
             self._insert_audit_event(connection, event)
@@ -461,8 +600,10 @@ class SQLiteStore:
         with self.connect() as connection:
             self._insert_attempt(connection, attempt)
             self._insert_result(connection, result)
-            self._update_run(connection, run)
-            self._insert_audit_event(connection, event)
+            # do not update the research run here; callers may be inserting attempts/results
+            # as test helpers and we must not overwrite run state set elsewhere
+            if event is not None:
+                self._insert_audit_event(connection, event)
         return run
 
     def record_discovery_outcome(
@@ -478,7 +619,8 @@ class SQLiteStore:
             self._insert_result(connection, result)
             self._insert_evaluation(connection, decision)
             self._update_run(connection, run)
-            self._insert_audit_event(connection, event)
+            if event is not None:
+                self._insert_audit_event(connection, event)
         return run
 
     def get_research_run(self, run_id: str) -> ResearchRun | None:

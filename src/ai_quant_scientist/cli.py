@@ -14,6 +14,8 @@ from .storage.sqlite_store import SQLiteStore
 from .tools.stub_backtester import StubBacktester
 from .models.research import SpecRevisionProposal, new_id
 from .models.enums import ResearchAction, SpecRevisionProposalStatus
+from .services.research_critic import FakeResearchCritic, run_critic_for_run
+from .models.critic import CriticInvocation
 
 
 DEFAULT_DB_PATH = Path("data/ai_quant_scientist.db")
@@ -56,6 +58,23 @@ def cmd_step(args: argparse.Namespace) -> int:
         raise SystemExit(f"Unknown run: {args.run_id}")
     after = orchestrator.run_next_step(args.run_id)
     print(f"Run {after.id}: {before.stage.value} -> {after.stage.value} | iterations={after.iteration_count}")
+    return 0
+
+
+def cmd_critique(args: argparse.Namespace) -> int:
+    orchestrator = build_orchestrator(args.db_path)
+    run = orchestrator.get_state(args.run_id)
+    if run is None:
+        raise SystemExit(f"Unknown run: {args.run_id}")
+    if run.next_required_action != ResearchAction.REVISION_REQUIRED:
+        raise SystemExit("Critic may only run when a revision is required")
+    critic = FakeResearchCritic()
+    inv, decision, result = run_critic_for_run(store=orchestrator.store, critic=critic, run_id=run.id)
+    print(f"Critic invocation {inv.id}: validation={inv.validation_status}")
+    if result.get("proposal"):
+        print(f"Created proposal {result.get('proposal')}")
+    else:
+        print(f"Decision: {decision.decision_type.value} | rationale: {decision.rationale}")
     return 0
 
 
@@ -214,6 +233,10 @@ def build_parser() -> argparse.ArgumentParser:
     accept_parser = subparsers.add_parser("accept-revision", help="Accept a spec revision proposal")
     accept_parser.add_argument("proposal_id")
     accept_parser.set_defaults(func=cmd_accept_revision)
+
+    critique_parser = subparsers.add_parser("critique", help="Run AI research critic for a run (supervised)")
+    critique_parser.add_argument("run_id")
+    critique_parser.set_defaults(func=cmd_critique)
 
     evaluations_parser = subparsers.add_parser("evaluations", help="Show persisted evaluation decisions for a run")
     evaluations_parser.add_argument("run_id")
