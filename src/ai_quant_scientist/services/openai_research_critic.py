@@ -110,10 +110,12 @@ class OpenAIResearchCritic(ResearchCritic):
         from pydantic import BaseModel, Field
         from pydantic import ConfigDict
 
+        ScalarValue = str | int | float | bool | None
+
         class CriticChangeSchema(BaseModel):
             parameter: str
-            from_value: Any | None = Field(alias="from")
-            to: Any | None
+            from_value: ScalarValue = Field(..., alias="from")
+            to: ScalarValue = Field(...)
 
             model_config = ConfigDict(extra="forbid")
 
