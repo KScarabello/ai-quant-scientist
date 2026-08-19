@@ -63,16 +63,22 @@ class OpenAIResearchCritic(ResearchCritic):
             "required": ["decision"],
         }
 
+    @staticmethod
+    def _ctx(context: Any, key: str, default: Any = None) -> Any:
+        """Read a field from either a dict or a dataclass/object context."""
+        if isinstance(context, dict):
+            return context.get(key, default)
+        return getattr(context, key, default)
+
     def _build_messages(self, context: Any) -> Dict[str, Any]:
-        # Convert CriticContext into compact structured input
         inp = {
-            "hypothesis": getattr(context, "hypothesis", None),
-            "current_spec": getattr(context, "current_spec", None),
-            "current_result": getattr(context, "current_result", None),
-            "evaluation": getattr(context, "evaluation", None),
-            "reason_codes": getattr(context, "reason_codes", None) or [],
-            "lineage": getattr(context, "bounded_lineage", None) or [],
-            "revision_constraints": getattr(context, "revision_constraints", None),
+            "hypothesis": self._ctx(context, "hypothesis"),
+            "current_spec": self._ctx(context, "current_spec"),
+            "current_result": self._ctx(context, "result"),
+            "evaluation": self._ctx(context, "evaluation"),
+            "reason_codes": self._ctx(context, "reason_codes") or [],
+            "lineage": self._ctx(context, "prior_lineage") or [],
+            "revision_constraints": self._ctx(context, "allowed_revision_constraints"),
             "prompt_version": self.prompt_version,
         }
         return inp
@@ -147,19 +153,18 @@ class OpenAIResearchCritic(ResearchCritic):
         except Exception:
             raise
 
-        # Save raw response
+        # Save raw response — use str() as safe universal fallback
         try:
-            raw_response_str = json.dumps(response.__dict__ if hasattr(response, "__dict__") else response)
+            raw_response_str = json.dumps(str(response))
         except Exception:
             raw_response_str = str(response)
 
         # Extract usage metadata if present
-        usage = getattr(response, "usage", None) or getattr(response, "meta", {}).get("usage", None)
-        if usage:
-            # include usage in raw_response for later persistence
+        usage = getattr(response, "usage", None)
+        if usage is not None:
             try:
-                usage_json = json.dumps(usage)
-                raw_response_str = json.dumps({"response": response.__dict__ if hasattr(response, "__dict__") else str(response), "usage": usage})
+                usage_dict = usage if isinstance(usage, dict) else {k: getattr(usage, k, None) for k in ("input_tokens", "output_tokens", "cached_input_tokens")}
+                raw_response_str = json.dumps({"response": str(response), "usage": usage_dict})
             except Exception:
                 pass
 
@@ -210,7 +215,7 @@ class OpenAIResearchCritic(ResearchCritic):
 
         decision = CriticDecision(
             id=new_id(),
-            research_run_id=getattr(context, "research_run_id", None),
+            research_run_id=self._ctx(context, "research_run_id"),
             decision_type=dec_type,
             parent_spec_id=parent_spec_id,
             changes=changes,

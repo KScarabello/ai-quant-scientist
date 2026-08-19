@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import time
+from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from ai_quant_scientist.evals.critic_eval import load_cases_from_file, CriticEvalSuite
 from ai_quant_scientist.services.openai_research_critic import OpenAIResearchCritic
+
+
+def _serialise_decision(decision) -> dict:
+    """Convert a CriticDecision (frozen slotted dataclass) to a JSON-safe dict."""
+    raw = dataclasses.asdict(decision)
+    for k, v in raw.items():
+        if isinstance(v, Enum):
+            raw[k] = v.name
+        elif isinstance(v, datetime):
+            raw[k] = v.isoformat()
+    return raw
 
 
 def run_live_eval(model: str, eval_path: str, allow_live_api: bool = False, max_cases: Optional[int] = None, case_id: Optional[str] = None, output_dir: str = "artifacts/evals", max_retries_per_case: int = 1):
@@ -40,7 +54,7 @@ def run_live_eval(model: str, eval_path: str, allow_live_api: bool = False, max_
             total_calls += 1
             try:
                 decision = client.critique(case.context)
-                res = {"case_id": case.id, "decision": decision.decision_type.name, "parsed": decision.__dict__}
+                res = {"case_id": case.id, "decision": decision.decision_type.name, "parsed": _serialise_decision(decision)}
                 results.append(res)
                 break
             except Exception as exc:

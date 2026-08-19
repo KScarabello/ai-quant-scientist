@@ -146,3 +146,45 @@ def test_parse_called_with_expected_kwargs(monkeypatch):
 def test_live_runner_guard_no_allow(monkeypatch):
     with pytest.raises(RuntimeError):
         run_live_eval(model="gpt-5.6-luna", eval_path="evals/critic_v1.json", allow_live_api=False, max_cases=1)
+
+
+def test_payload_keys_populated_from_dict_context():
+    # Ensure _build_messages correctly reads dict context (as used by live runner with eval fixtures)
+    cases = load_cases_from_file("evals/critic_v1.json")
+    crit = OpenAIResearchCritic(client=MagicMock())
+    payload = crit._build_messages(cases[0].context)
+    assert payload["hypothesis"] is not None, "hypothesis must be populated from dict context"
+    assert payload["current_spec"] is not None, "current_spec must be populated from dict context"
+    assert payload["current_result"] is not None, "current_result must be populated from dict context"
+    assert payload["evaluation"] is not None, "evaluation must be populated from dict context"
+
+
+def test_live_runner_serialises_decision(tmp_path):
+    # Prove runner writes valid JSON without hitting __dict__ on a slotted dataclass
+    cases = load_cases_from_file("evals/critic_v1.json")
+    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": cases[0].context.get("current_spec", {}).get("id"), "change": None}
+    client = make_client_that_returns(parsed)
+
+    def fake_init(self, model=None, **kw):
+        self.model = model or "gpt-5.6-luna"
+        self.prompt_version = "v1"
+        self.reasoning = "medium"
+        self.max_output_tokens = 512
+        self._client = client
+
+    from unittest.mock import patch
+    with patch.object(OpenAIResearchCritic, "__init__", fake_init):
+        out = run_live_eval(
+            model="gpt-5.6-luna",
+            eval_path="evals/critic_v1.json",
+            allow_live_api=True,
+            max_cases=1,
+            output_dir=str(tmp_path),
+        )
+    data = json.loads(open(out).read())
+    result = data["results"][0]
+    assert result["decision"] == "NO_USEFUL_REVISION"
+    assert "parsed" in result
+    # parsed must be a plain dict, not raise AttributeError
+    assert isinstance(result["parsed"], dict)
+    assert "decision_type" in result["parsed"] or "decision" in result["parsed"]
