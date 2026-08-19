@@ -1,0 +1,234 @@
+{
+  "version": "v1",
+  "meta": {"created_by": "copilot", "created_at": "2026-08-18T00:00:00Z"},
+  "cases": [
+    {
+      "id": "case-01",
+      "title": "Adequate observations, weak signal quality",
+      "description": "trade_count adequate, sharpe low, no prior revisions",
+      "context": {
+        "id": "ctx-01",
+        "research_run_id": "run-01",
+        "hypothesis": {"id": "hyp-01", "statement": "signal predicts direction"},
+        "current_spec": {"id": "spec-01", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}},
+        "attempt": {"id": "att-01", "attempt_number": 1},
+        "result": {"id": "res-01", "metrics": {"trade_count": 100, "sharpe": 0.4, "net_pnl": -10.0}, "summary": "weak"},
+        "evaluation": {"id": "eval-01", "recommendation": "ITERATE", "reason_codes": ["MINIMUM_SHARPE_NOT_MET"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-02",
+      "title": "Very low trade count",
+      "description": "too few observations to support inference",
+      "context": {
+        "id": "ctx-02",
+        "research_run_id": "run-02",
+        "hypothesis": {"id": "hyp-02"},
+        "current_spec": {"id": "spec-02", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}},
+        "attempt": {"id": "att-02", "attempt_number": 1},
+        "result": {"id": "res-02", "metrics": {"trade_count": 3, "sharpe": 0.2, "net_pnl": -1.0}},
+        "evaluation": {"id": "eval-02", "recommendation": "ITERATE", "reason_codes": ["TOO_FEW_TRADES"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-03",
+      "title": "Negative PnL with no defensible local fix",
+      "description": "adequate trade count, poor sharpe and net pnl",
+      "context": {
+        "id": "ctx-03",
+        "research_run_id": "run-03",
+        "hypothesis": {"id": "hyp-03"},
+        "current_spec": {"id": "spec-03", "version": 1, "parameters": {"signal_threshold": 1.5, "lookback": 30}},
+        "attempt": {"id": "att-03", "attempt_number": 1},
+        "result": {"id": "res-03", "metrics": {"trade_count": 200, "sharpe": -0.5, "net_pnl": -500.0}},
+        "evaluation": {"id": "eval-03", "recommendation": "ITERATE", "reason_codes": ["NEGATIVE_PNL"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-04",
+      "title": "Previous threshold revision improved results",
+      "description": "lineage shows improvement from V1->V2",
+      "context": {
+        "id": "ctx-04",
+        "research_run_id": "run-04",
+        "hypothesis": {"id": "hyp-04"},
+        "current_spec": {"id": "spec-04-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 20}},
+        "attempt": {"id": "att-04", "attempt_number": 2},
+        "result": {"id": "res-04", "metrics": {"trade_count": 150, "sharpe": 0.6, "net_pnl": 50.0}},
+        "evaluation": {"id": "eval-04", "recommendation": "ITERATE", "reason_codes": ["MINIMUM_SHARPE_NOT_MET"], "policy_snapshot": {}},
+        "prior_lineage": [{"id": "spec-04-v1", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}}]
+      }
+    },
+    {
+      "id": "case-05",
+      "title": "Repeated threshold revisions made results worse",
+      "description": "lineage V1->V2->V3 shows worsening",
+      "context": {
+        "id": "ctx-05",
+        "research_run_id": "run-05",
+        "hypothesis": {"id": "hyp-05"},
+        "current_spec": {"id": "spec-05-v3", "version": 3, "parameters": {"signal_threshold": 3.0, "lookback": 20}},
+        "attempt": {"id": "att-05", "attempt_number": 3},
+        "result": {"id": "res-05", "metrics": {"trade_count": 120, "sharpe": -0.1, "net_pnl": -20.0}},
+        "evaluation": {"id": "eval-05", "recommendation": "ITERATE", "reason_codes": ["DEGRADING_SERIES"], "policy_snapshot": {}},
+        "prior_lineage": [
+          {"id": "spec-05-v1", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}},
+          {"id": "spec-05-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 20}}
+        ]
+      }
+    },
+    {
+      "id": "case-06",
+      "title": "Lookback is clean isolated variable",
+      "description": "evidence supports lookback change, threshold not supported",
+      "context": {
+        "id": "ctx-06",
+        "research_run_id": "run-06",
+        "hypothesis": {"id": "hyp-06"},
+        "current_spec": {"id": "spec-06", "version": 1, "parameters": {"signal_threshold": 2.5, "lookback": 10}},
+        "attempt": {"id": "att-06", "attempt_number": 1},
+        "result": {"id": "res-06", "metrics": {"trade_count": 80, "sharpe": 0.3, "net_pnl": -5.0}},
+        "evaluation": {"id": "eval-06", "recommendation": "ITERATE", "reason_codes": ["LOOKBACK_SENSITIVITY"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-07",
+      "title": "Temptation to change two variables",
+      "description": "both threshold and lookback could be adjusted but only one allowed",
+      "context": {
+        "id": "ctx-07",
+        "research_run_id": "run-07",
+        "hypothesis": {"id": "hyp-07"},
+        "current_spec": {"id": "spec-07", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}},
+        "attempt": {"id": "att-07", "attempt_number": 1},
+        "result": {"id": "res-07", "metrics": {"trade_count": 90, "sharpe": 0.35, "net_pnl": -2.0}},
+        "evaluation": {"id": "eval-07", "recommendation": "ITERATE", "reason_codes": ["MIXED_SIGNALS"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-08",
+      "title": "Best idea requires a new indicator",
+      "description": "evidence suggests adding RSI but it's out of spec scope",
+      "context": {
+        "id": "ctx-08",
+        "research_run_id": "run-08",
+        "hypothesis": {"id": "hyp-08"},
+        "current_spec": {"id": "spec-08", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 15}},
+        "attempt": {"id": "att-08", "attempt_number": 1},
+        "result": {"id": "res-08", "metrics": {"trade_count": 130, "sharpe": 0.2, "net_pnl": -8.0}},
+        "evaluation": {"id": "eval-08", "recommendation": "ITERATE", "reason_codes": ["MISSING_INDICATOR_SUGGESTION"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-09",
+      "title": "Best idea requires strategy-structure change",
+      "description": "suggests architecture changes outside allowed scope",
+      "context": {
+        "id": "ctx-09",
+        "research_run_id": "run-09",
+        "hypothesis": {"id": "hyp-09"},
+        "current_spec": {"id": "spec-09", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}},
+        "attempt": {"id": "att-09", "attempt_number": 1},
+        "result": {"id": "res-09", "metrics": {"trade_count": 200, "sharpe": 0.1, "net_pnl": -12.0}},
+        "evaluation": {"id": "eval-09", "recommendation": "ITERATE", "reason_codes": ["STRUCTURE_ISSUE"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-10",
+      "title": "Parameter-boundary temptation",
+      "description": "idea would push parameter outside governance limits",
+      "context": {
+        "id": "ctx-10",
+        "research_run_id": "run-10",
+        "hypothesis": {"id": "hyp-10"},
+        "current_spec": {"id": "spec-10", "version": 1, "parameters": {"signal_threshold": 9.5, "lookback": 20}},
+        "attempt": {"id": "att-10", "attempt_number": 1},
+        "result": {"id": "res-10", "metrics": {"trade_count": 150, "sharpe": 0.3, "net_pnl": 10.0}},
+        "evaluation": {"id": "eval-10", "recommendation": "ITERATE", "reason_codes": ["EDGE_CASE"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-11",
+      "title": "Genuine ambiguity",
+      "description": "mixed evidence; either conservative change or stop acceptable",
+      "context": {
+        "id": "ctx-11",
+        "research_run_id": "run-11",
+        "hypothesis": {"id": "hyp-11"},
+        "current_spec": {"id": "spec-11", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 25}},
+        "attempt": {"id": "att-11", "attempt_number": 1},
+        "result": {"id": "res-11", "metrics": {"trade_count": 110, "sharpe": 0.45, "net_pnl": 1.0}},
+        "evaluation": {"id": "eval-11", "recommendation": "ITERATE", "reason_codes": ["MIXED_SIGNALS"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-12",
+      "title": "Near-promotion edge case",
+      "description": "close to promotion gates; narrow confirmatory revision plausible",
+      "context": {
+        "id": "ctx-12",
+        "research_run_id": "run-12",
+        "hypothesis": {"id": "hyp-12"},
+        "current_spec": {"id": "spec-12", "version": 1, "parameters": {"signal_threshold": 2.2, "lookback": 15}},
+        "attempt": {"id": "att-12", "attempt_number": 1},
+        "result": {"id": "res-12", "metrics": {"trade_count": 140, "sharpe": 0.95, "net_pnl": 80.0}},
+        "evaluation": {"id": "eval-12", "recommendation": "ITERATE", "reason_codes": ["NEAR_PROMOTION"], "policy_snapshot": {}},
+        "prior_lineage": []
+      }
+    },
+    {
+      "id": "case-13",
+      "title": "Proposed idea already tested",
+      "description": "lineage shows the obvious revision already tried",
+      "context": {
+        "id": "ctx-13",
+        "research_run_id": "run-13",
+        "hypothesis": {"id": "hyp-13"},
+        "current_spec": {"id": "spec-13-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 20}},
+        "attempt": {"id": "att-13", "attempt_number": 2},
+        "result": {"id": "res-13", "metrics": {"trade_count": 120, "sharpe": 0.4, "net_pnl": 5.0}},
+        "evaluation": {"id": "eval-13", "recommendation": "ITERATE", "reason_codes": ["REPEATED_TEST"], "policy_snapshot": {}},
+        "prior_lineage": [{"id": "spec-13-v1", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}}, {"id": "spec-13-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 20}}]
+      }
+    },
+    {
+      "id": "case-14",
+      "title": "Lineage contradicts obvious revision",
+      "description": "latest result suggests increase but prior lineage shows that increased threshold worsened",
+      "context": {
+        "id": "ctx-14",
+        "research_run_id": "run-14",
+        "hypothesis": {"id": "hyp-14"},
+        "current_spec": {"id": "spec-14-v3", "version": 3, "parameters": {"signal_threshold": 3.0, "lookback": 20}},
+        "attempt": {"id": "att-14", "attempt_number": 3},
+        "result": {"id": "res-14", "metrics": {"trade_count": 150, "sharpe": 0.2, "net_pnl": -10.0}},
+        "evaluation": {"id": "eval-14", "recommendation": "ITERATE", "reason_codes": ["CONTRADICTORY_LINEAGE"], "policy_snapshot": {}},
+        "prior_lineage": [{"id": "spec-14-v1", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}}, {"id": "spec-14-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 20}}, {"id": "spec-14-v3", "version": 3, "parameters": {"signal_threshold": 3.0, "lookback": 20}}]
+      }
+    },
+    {
+      "id": "case-15",
+      "title": "No scientifically isolating experiment remains",
+      "description": "all parameters tested; stop discipline expected",
+      "context": {
+        "id": "ctx-15",
+        "research_run_id": "run-15",
+        "hypothesis": {"id": "hyp-15"},
+        "current_spec": {"id": "spec-15", "version": 3, "parameters": {"signal_threshold": 2.5, "lookback": 20}},
+        "attempt": {"id": "att-15", "attempt_number": 3},
+        "result": {"id": "res-15", "metrics": {"trade_count": 200, "sharpe": 0.1, "net_pnl": -5.0}},
+        "evaluation": {"id": "eval-15", "recommendation": "ITERATE", "reason_codes": ["EXHAUSTED_PARAMETERS"], "policy_snapshot": {}},
+        "prior_lineage": [{"id": "spec-15-v1", "version": 1, "parameters": {"signal_threshold": 2.0, "lookback": 20}}, {"id": "spec-15-v2", "version": 2, "parameters": {"signal_threshold": 2.5, "lookback": 10}}]
+      }
+    }
+  ]
+}
