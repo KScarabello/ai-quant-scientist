@@ -1,0 +1,11 @@
+{
+  "model": "gpt-5.6-luna",
+  "prompt_version": "v1",
+  "timestamp": 1787107165,
+  "results": [
+    {
+      "case_id": "case-01",
+      "error": "'CriticDecision' object has no attribute '__dict__'"
+    }
+  ]
+}
