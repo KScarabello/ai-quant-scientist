@@ -120,10 +120,13 @@ class OpenAIResearchCritic(ResearchCritic):
         text_format = CriticDecisionSchema
 
         try:
+            # The Responses API expects `input` to be a string or an array of input items.
+            # Serialize deterministically to a JSON string so SDK receives a stable input.
+            input_str = json.dumps(payload, sort_keys=True)
             response = self._client.responses.parse(
                 model=self.model,
                 instructions=instructions,
-                input=payload,
+                input=input_str,
                 text_format=text_format,
                 reasoning={"effort": self.reasoning},
                 max_output_tokens=self.max_output_tokens,

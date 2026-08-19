@@ -112,6 +112,8 @@ def test_parse_called_with_expected_kwargs(monkeypatch):
     parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": cases[0].context.get("current_spec", {}).get("id"), "change": None}
     client = make_client_that_returns(parsed)
     crit = OpenAIResearchCritic(client=client)
+    # capture expected structured payload before invocation
+    expected_payload = crit._build_messages(cases[0].context)
     decision = crit.critique(cases[0].context)
     # assert parse was called
     client.responses.parse.assert_called()
@@ -120,6 +122,9 @@ def test_parse_called_with_expected_kwargs(monkeypatch):
     assert kwargs["model"] == crit.model
     assert "instructions" in kwargs
     assert "input" in kwargs
+    # input must be a JSON string that decodes to the expected payload
+    assert isinstance(kwargs["input"], str)
+    assert json.loads(kwargs["input"]) == expected_payload
     assert "text_format" in kwargs
     # text_format should be a provider-specific class named CriticDecisionSchema
     tf = kwargs["text_format"]
