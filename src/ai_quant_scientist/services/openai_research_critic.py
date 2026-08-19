@@ -107,15 +107,25 @@ class OpenAIResearchCritic(ResearchCritic):
         instructions = self._build_instructions(context)
 
         # Provider-specific Pydantic model (required)
-        from pydantic import BaseModel
+        from pydantic import BaseModel, Field
+        from pydantic import ConfigDict
+
+        class CriticChangeSchema(BaseModel):
+            parameter: str
+            from_value: Any | None = Field(alias="from")
+            to: Any | None
+
+            model_config = ConfigDict(extra="forbid")
 
         class CriticDecisionSchema(BaseModel):
             decision: str
             parent_spec_id: str | None = None
-            change: dict | None = None
+            change: CriticChangeSchema | None = None
             rationale: str | None = None
             prediction: str | None = None
             confidence: str | None = None
+
+            model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
         text_format = CriticDecisionSchema
 
@@ -156,9 +166,13 @@ class OpenAIResearchCritic(ResearchCritic):
         if not parsed:
             raise ValueError("Structured output missing or unparseable")
 
-        # If parsed is a Pydantic model instance, convert to dict
+        # If parsed is a Pydantic model instance, convert to dict using by-alias
         try:
-            if hasattr(parsed, "dict"):
+            if hasattr(parsed, "model_dump"):
+                parsed = parsed.model_dump(by_alias=True)
+            elif isinstance(parsed, dict):
+                parsed = parsed
+            elif hasattr(parsed, "dict"):
                 parsed = parsed.dict()
         except Exception:
             pass
