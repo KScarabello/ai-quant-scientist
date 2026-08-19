@@ -1,3 +1,25 @@
+AI Quant Scientist — V0.6 (OpenAI Research Critic adapter)
+
+Overview
+- Adds `OpenAIResearchCritic` adapter (Responses API, structured outputs).
+- Provides a guarded live-runner for the `critic_v1` 15-case benchmark.
+
+Key points
+- Default candidate model: `gpt-5.6-luna` (configurable via `AI_QUANT_CRITIC_MODEL`).
+- Uses OpenAI Responses API with a strict JSON schema for outputs.
+- Critic output remains a proposal only: `CriticDecision` -> deterministic `CriticProposalValidator` -> `SpecRevisionProposal(status=PROPOSED)` (human acceptance required).
+
+Live benchmark guard
+- Live calls are refused unless `--allow-live-api` is passed to the live runner module.
+- Support for `--max-cases` and `--case-id` so you can smoke-test a single case before running all 15.
+
+Artifacts
+- Live-run artifacts are written to `artifacts/evals/` as JSON; the runner does not mutate the authoritative DB.
+
+Environment
+- Provide `OPENAI_API_KEY` in environment for live runs.
+
+Important: Luna is a candidate evaluation model only. Validation and acceptance remain deterministic and supervised.
 AI Quant Scientist — V0.4 hardened
 
 Summary

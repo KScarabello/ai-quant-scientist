@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Deterministic research orchestration backbone for AI Quant Scientist"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+	"openai>=3.3.0,<4",
+	"pydantic>=1.9.0,<3",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
