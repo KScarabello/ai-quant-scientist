@@ -19,12 +19,20 @@ class DummyResponse:
 
 def make_client_that_returns(parsed: dict, usage: dict | None = None):
     client = MagicMock()
-    # build response.output structure: list of message objects with content items
     from types import SimpleNamespace
 
-    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=None)
+    output_text = json.dumps(parsed)  # realistic: the text field holds the raw JSON
+    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=output_text)
     message = SimpleNamespace(type="message", content=[output_item])
-    resp = SimpleNamespace(output=[message], usage=usage or {})
+    resp = SimpleNamespace(
+        output=[message],
+        usage=usage or {},
+        id="resp_test123",
+        model="gpt-5.6-luna",
+        status="completed",
+        created_at=1_000_000.0,
+        completed_at=1_000_001.0,
+    )
     client.responses.parse.return_value = resp
     return client
 
@@ -32,9 +40,18 @@ def make_client_that_returns(parsed: dict, usage: dict | None = None):
 def make_client_that_raises_then_returns(parsed: dict):
     client = MagicMock()
     from types import SimpleNamespace
-    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=None)
+    output_text = json.dumps(parsed)
+    output_item = SimpleNamespace(type="output_text", parsed=parsed, text=output_text)
     message = SimpleNamespace(type="message", content=[output_item])
-    resp = SimpleNamespace(output=[message], usage={"input_tokens": 10, "output_tokens": 20})
+    resp = SimpleNamespace(
+        output=[message],
+        usage={"input_tokens": 10, "output_tokens": 20},
+        id="resp_retry",
+        model="gpt-5.6-luna",
+        status="completed",
+        created_at=1_000_000.0,
+        completed_at=1_000_002.0,
+    )
     client.responses.parse.side_effect = [RuntimeError("429"), resp]
     return client
 
@@ -48,7 +65,7 @@ def test_structured_parsing_propose_revision(monkeypatch):
         "change": {"parameter": "signal_threshold", "from": 2.0, "to": 1.5},
         "rationale": "short",
         "prediction": "trade_count up",
-        "confidence": "MEDIUM",
+        "confidence": "medium",
     }
     client = make_client_that_returns(parsed, usage={"input_tokens": 5, "output_tokens": 10})
     # inject client
@@ -146,6 +163,31 @@ def test_parse_called_with_expected_kwargs(monkeypatch):
 def test_live_runner_guard_no_allow(monkeypatch):
     with pytest.raises(RuntimeError):
         run_live_eval(model="gpt-5.6-luna", eval_path="evals/critic_v1.json", allow_live_api=False, max_cases=1)
+
+
+def test_openai_compact_provenance_no_encrypted_content():
+    """raw_response must contain response_id/model/usage/output_text; must NOT contain encrypted_content."""
+    cases = load_cases_from_file("evals/critic_v1.json")
+    parsed = {
+        "decision": "NO_USEFUL_REVISION",
+        "parent_spec_id": None,
+        "change": None,
+        "rationale": "no useful revision",
+        "prediction": None,
+        "confidence": None,
+    }
+    usage = {"input_tokens": 42, "output_tokens": 17}
+    client = make_client_that_returns(parsed, usage=usage)
+    decision = OpenAIResearchCritic(client=client).critique(cases[0].context)
+
+    prov = json.loads(decision.raw_response)
+    assert prov.get("response_id") == "resp_test123"
+    assert prov.get("model") == "gpt-5.6-luna"
+    assert prov.get("status") == "completed"
+    assert "usage" in prov
+    assert "encrypted_content" not in decision.raw_response
+    # output_text should contain the raw JSON the model produced
+    assert prov.get("output_text") is not None
 
 
 def test_payload_keys_populated_from_dict_context():

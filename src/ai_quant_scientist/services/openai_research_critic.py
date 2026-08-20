@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict
 from typing import Any, Dict, Optional
 
-from ai_quant_scientist.models.critic import CriticDecision, CriticDecisionType, CriticInvocation
+from ai_quant_scientist.models.critic import CriticDecision, CriticDecisionType, CriticInvocation, validate_critic_decision
 from ai_quant_scientist.models.research import new_id
 from ai_quant_scientist.services.research_critic import ResearchCritic
 
@@ -21,6 +21,53 @@ DEFAULT_MODEL = os.getenv("AI_QUANT_CRITIC_MODEL", "gpt-5.6-luna")
 DEFAULT_PROMPT_VERSION = "v1"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 512
+
+
+def _get(obj: Any, key: str) -> Any:
+    """Read a field from either a dict or an SDK object."""
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def _extract_compact_provenance(response: Any) -> str:
+    """Return a compact JSON provenance string — no encrypted reasoning or schema dumps."""
+    usage = getattr(response, "usage", None)
+    usage_dict: Dict[str, Any] = {}
+    if usage is not None:
+        usage_dict = {
+            "input_tokens": _get(usage, "input_tokens"),
+            "output_tokens": _get(usage, "output_tokens"),
+        }
+        out_det = _get(usage, "output_tokens_details")
+        if out_det is not None:
+            usage_dict["reasoning_tokens"] = _get(out_det, "reasoning_tokens")
+        in_det = _get(usage, "input_tokens_details")
+        if in_det is not None:
+            usage_dict["cached_tokens"] = _get(in_det, "cached_tokens")
+
+    output_text: Optional[str] = None
+    for out in getattr(response, "output", None) or []:
+        if getattr(out, "type", None) == "message":
+            for item in getattr(out, "content", []) or []:
+                if getattr(item, "type", None) == "output_text":
+                    output_text = getattr(item, "text", None)
+                    break
+
+    prov = {
+        "response_id": getattr(response, "id", None),
+        "model": getattr(response, "model", None),
+        "status": getattr(response, "status", None),
+        "created_at": getattr(response, "created_at", None),
+        "completed_at": getattr(response, "completed_at", None),
+        "store": False,
+        "usage": usage_dict or None,
+        "output_text": output_text,
+    }
+    try:
+        return json.dumps(prov)
+    except Exception:
+        return json.dumps({"error": "provenance_serialisation_failed"})
 
 
 class OpenAIResearchCritic(ResearchCritic):
@@ -115,6 +162,7 @@ class OpenAIResearchCritic(ResearchCritic):
         # Provider-specific Pydantic model (required)
         from pydantic import BaseModel, Field
         from pydantic import ConfigDict
+        from typing import Literal
 
         ScalarValue = str | int | float | bool | None
 
@@ -126,12 +174,12 @@ class OpenAIResearchCritic(ResearchCritic):
             model_config = ConfigDict(extra="forbid")
 
         class CriticDecisionSchema(BaseModel):
-            decision: str
+            decision: Literal["PROPOSE_REVISION", "NO_USEFUL_REVISION"]
             parent_spec_id: str | None = None
             change: CriticChangeSchema | None = None
             rationale: str | None = None
             prediction: str | None = None
-            confidence: str | None = None
+            confidence: Literal["low", "medium", "high"] | None = None
 
             model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -153,20 +201,8 @@ class OpenAIResearchCritic(ResearchCritic):
         except Exception:
             raise
 
-        # Save raw response — use str() as safe universal fallback
-        try:
-            raw_response_str = json.dumps(str(response))
-        except Exception:
-            raw_response_str = str(response)
-
-        # Extract usage metadata if present
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            try:
-                usage_dict = usage if isinstance(usage, dict) else {k: getattr(usage, k, None) for k in ("input_tokens", "output_tokens", "cached_input_tokens")}
-                raw_response_str = json.dumps({"response": str(response), "usage": usage_dict})
-            except Exception:
-                pass
+        # Compact provenance — no encrypted reasoning, no schema dumps
+        raw_response_str = _extract_compact_provenance(response)
 
         # SDK v3.3.0: use the parsed result returned by responses.parse()
         # The Responses API places structured outputs inside `response.output` messages.
@@ -227,4 +263,5 @@ class OpenAIResearchCritic(ResearchCritic):
             raw_response=raw_response_str,
         )
 
+        validate_critic_decision(decision)
         return decision

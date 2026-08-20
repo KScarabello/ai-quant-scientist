@@ -1,25 +1,38 @@
-AI Quant Scientist — V0.6 (OpenAI Research Critic adapter)
+AI Quant Scientist — V0.7 (Contract Hardening; Benchmark V1 complete)
 
-Overview
-- Adds `OpenAIResearchCritic` adapter (Responses API, structured outputs).
-- Provides a guarded live-runner for the `critic_v1` 15-case benchmark.
+Benchmark V1 — COMPLETE (2026-08-19)
+- Eval set: `evals/critic_v1.json` — 15 cases, version v1 (frozen).
+- Models evaluated: gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol, llama3.1:8b (local Ollama).
+- Provisional critic selection: gpt-5.6-terra.
+- Local Llama 8B: operationally excellent (fast, zero cost) but scientifically insufficient for the critic role.
+- Prompt v1 is scientifically unchanged. Prompt v2 / anti-fiddling work is NEXT.
 
-Key points
+Contract rules (post-Benchmark-V1 hardening)
+- Decision must be exactly `PROPOSE_REVISION` or `NO_USEFUL_REVISION`.
+- Confidence must be exactly `low`, `medium`, or `high`; arbitrary strings rejected.
+- For PROPOSE_REVISION: parent_spec_id, exactly-one change, rationale, prediction, and confidence are all required.
+- For NO_USEFUL_REVISION: changes must be absent; confidence is optional but if present must satisfy the vocabulary.
+- Provenance is compact: response_id, model, status, timestamps, token usage, output_text — no encrypted blobs.
+
+OpenAI adapter
 - Default candidate model: `gpt-5.6-luna` (configurable via `AI_QUANT_CRITIC_MODEL`).
-- Uses OpenAI Responses API with a strict JSON schema for outputs.
-- Critic output remains a proposal only: `CriticDecision` -> deterministic `CriticProposalValidator` -> `SpecRevisionProposal(status=PROPOSED)` (human acceptance required).
+- Uses OpenAI Responses API + Pydantic strict structured outputs.
+- Critic output is a proposal only → deterministic validator → `SpecRevisionProposal(status=PROPOSED)` → human acceptance required.
+
+Ollama adapter
+- Local only (`localhost:11434`), no API key.
+- Default model: `llama3.1:8b` (configurable via `OLLAMA_CRITIC_MODEL`).
 
 Live benchmark guard
-- Live calls are refused unless `--allow-live-api` is passed to the live runner module.
-- Support for `--max-cases` and `--case-id` so you can smoke-test a single case before running all 15.
+- OpenAI: requires `--allow-live-api` flag.
+- Ollama: no flag required (local; no cost).
+- Both support `--max-cases` / `--case-id` for smoke tests.
 
-Artifacts
-- Live-run artifacts are written to `artifacts/evals/` as JSON; the runner does not mutate the authoritative DB.
+Artifacts: `artifacts/evals/` — do not mutate the authoritative DB.
+Environment: set `OPENAI_API_KEY` for OpenAI live runs.
 
-Environment
-- Provide `OPENAI_API_KEY` in environment for live runs.
+Important: Luna/Terra/Sol are candidate models being evaluated. AI output remains a proposal. Acceptance remains deterministic/supervised.
 
-Important: Luna is a candidate evaluation model only. Validation and acceptance remain deterministic and supervised.
 AI Quant Scientist — V0.4 hardened
 
 Summary
