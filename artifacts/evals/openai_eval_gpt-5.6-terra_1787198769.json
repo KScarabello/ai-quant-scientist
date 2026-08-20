@@ -1,0 +1,25 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v2",
+  "timestamp": 1787198769,
+  "results": [
+    {
+      "case_id": "case-05",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "e0d805fa-6dbf-4cdc-ae6a-fe4f6ca9b765",
+        "research_run_id": "run-05",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-05-v3",
+        "changes": null,
+        "rationale": "The threshold-increase sequence is flagged as degrading, but no parameter-level measurements identify an untested value or support a further directional move. Reverting to 2.0 would repeat a tested specification, while lowering below it is not justified by the supplied evidence.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0ad97f30d90244ee016a867d33752c819bb89650b132928675\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787198771.0, \"completed_at\": 1787198775.0, \"store\": false, \"usage\": {\"input_tokens\": 1305, \"output_tokens\": 252, \"reasoning_tokens\": 154, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The threshold-increase sequence is flagged as degrading, but no parameter-level measurements identify an untested value or support a further directional move. Reverting to 2.0 would repeat a tested specification, while lowering below it is not justified by the supplied evidence.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T04:06:15.895501+00:00"
+      }
+    }
+  ]
+}

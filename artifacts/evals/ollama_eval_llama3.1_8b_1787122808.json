@@ -1,0 +1,362 @@
+{
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "prompt_version": "v1",
+  "timestamp": 1787122808,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1669,
+      "prompt_eval_count": 291,
+      "eval_count": 114,
+      "total_duration_ns": 1650352583,
+      "parsed": {
+        "id": "1b50d388-1956-45e9-a1a7-029a91110915",
+        "research_run_id": "run-01",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-01",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "Reducing signal threshold may improve predictive power of the signal, leading to better trade decisions.",
+        "prediction": "Expect a significant increase in Sharpe ratio (>0.6) with the revised signal threshold.",
+        "confidence": ".8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-01\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 1.5}, \"rationale\": \"Reducing signal threshold may improve predictive power of the signal, leading to better trade decisions.\", \"prediction\": \"Expect a significant increase in Sharpe ratio (>0.6) with the revised signal threshold.\", \"confidence\": \".8\"}, \"provenance\": {\"total_duration\": 1650352583, \"load_duration\": 135863667, \"prompt_eval_count\": 291, \"eval_count\": 114}}",
+        "created_at": "2026-08-19T07:00:10.024983+00:00"
+      }
+    },
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1847,
+      "prompt_eval_count": 276,
+      "eval_count": 117,
+      "total_duration_ns": 1845040417,
+      "parsed": {
+        "id": "cf202ac0-adb4-4274-b8cb-9f9d693a83c4",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 2.5
+        },
+        "rationale": "Increasing the signal threshold may improve performance by reducing false positives, leading to higher net PnL and Sharpe ratio.",
+        "prediction": "Expect an increase in net PnL by 10-20% and an improvement in Sharpe ratio by 0.05-0.1.",
+        "confidence": ".7",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-02\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 2.5}, \"rationale\": \"Increasing the signal threshold may improve performance by reducing false positives, leading to higher net PnL and Sharpe ratio.\", \"prediction\": \"Expect an increase in net PnL by 10-20% and an improvement in Sharpe ratio by 0.05-0.1.\", \"confidence\": \".7\"}, \"provenance\": {\"total_duration\": 1845040417, \"load_duration\": 109133042, \"prompt_eval_count\": 276, \"eval_count\": 117}}",
+        "created_at": "2026-08-19T07:00:11.873903+00:00"
+      }
+    },
+    {
+      "case_id": "case-03",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1654,
+      "prompt_eval_count": 274,
+      "eval_count": 102,
+      "total_duration_ns": 1652948334,
+      "parsed": {
+        "id": "8e3862ad-87a0-4af7-a27b-4063de5e4188",
+        "research_run_id": "run-03",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-03",
+        "changes": {
+          "signal_threshold": 2.0
+        },
+        "rationale": "Reducing signal_threshold to 2.0 may improve performance by allowing for more trades.",
+        "prediction": "Expected net_pnl to increase by 10% and sharpe ratio to increase by 0.2",
+        "confidence": ".8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-03\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 1.5, \"to\": 2.0}, \"rationale\": \"Reducing signal_threshold to 2.0 may improve performance by allowing for more trades.\", \"prediction\": \"Expected net_pnl to increase by 10% and sharpe ratio to increase by 0.2\", \"confidence\": \".8\"}, \"provenance\": {\"total_duration\": 1652948334, \"load_duration\": 108845792, \"prompt_eval_count\": 274, \"eval_count\": 102}}",
+        "created_at": "2026-08-19T07:00:13.529385+00:00"
+      }
+    },
+    {
+      "case_id": "case-04",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1902,
+      "prompt_eval_count": 313,
+      "eval_count": 118,
+      "total_duration_ns": 1899124958,
+      "parsed": {
+        "id": "608a6980-b745-4da1-853a-94c794351a4c",
+        "research_run_id": "run-04",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-04-v2",
+        "changes": {
+          "signal_threshold": 2.2
+        },
+        "rationale": "Current signal_threshold is set too high, resulting in a Sharpe ratio below the minimum threshold. Reducing it to 2.2 should improve the strategy's risk-adjusted returns.",
+        "prediction": "The revised strategy will yield a Sharpe ratio above 0.7.",
+        "confidence": ".8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-04-v2\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.5, \"to\": 2.2}, \"rationale\": \"Current signal_threshold is set too high, resulting in a Sharpe ratio below the minimum threshold. Reducing it to 2.2 should improve the strategy's risk-adjusted returns.\", \"prediction\": \"The revised strategy will yield a Sharpe ratio above 0.7.\", \"confidence\": \".8\"}, \"provenance\": {\"total_duration\": 1899124958, \"load_duration\": 112016541, \"prompt_eval_count\": 313, \"eval_count\": 118}}",
+        "created_at": "2026-08-19T07:00:15.432280+00:00"
+      }
+    },
+    {
+      "case_id": "case-05",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 2394,
+      "prompt_eval_count": 346,
+      "eval_count": 154,
+      "total_duration_ns": 2391709917,
+      "parsed": {
+        "id": "f17e636c-0177-4868-bb50-4a0e76bd88fa",
+        "research_run_id": "run-05",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-05-v2",
+        "changes": {
+          "signal_threshold": 3.2
+        },
+        "rationale": "The current strategy is experiencing a degrading series (DEGRADING_SERIES) due to underestimation of signal strength. Increasing signal_threshold to 3.2 should improve performance.",
+        "prediction": "We expect the Sharpe Ratio to increase by at least 0.05 and trade count to decrease by at most 20.",
+        "confidence": "If the Sharpe Ratio does not improve, it will indicate the strategy is too aggressive and needs further revision.",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-05-v2\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.5, \"to\": 3.2}, \"rationale\": \"The current strategy is experiencing a degrading series (DEGRADING_SERIES) due to underestimation of signal strength. Increasing signal_threshold to 3.2 should improve performance.\", \"prediction\": \"We expect the Sharpe Ratio to increase by at least 0.05 and trade count to decrease by at most 20.\", \"confidence\": \"If the Sharpe Ratio does not improve, it will indicate the strategy is too aggressive and needs further revision.\"}, \"provenance\": {\"total_duration\": 2391709917, \"load_duration\": 108625833, \"prompt_eval_count\": 346, \"eval_count\": 154}}",
+        "created_at": "2026-08-19T07:00:17.828604+00:00"
+      }
+    },
+    {
+      "case_id": "case-06",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1667,
+      "prompt_eval_count": 275,
+      "eval_count": 103,
+      "total_duration_ns": 1664505042,
+      "parsed": {
+        "id": "328e460a-76e7-4ef8-8486-3ed12a6c3f42",
+        "research_run_id": "run-06",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-06",
+        "changes": {
+          "lookback": 20
+        },
+        "rationale": "Adjusting the lookback period to account for LOOKBACK_SENSITIVITY",
+        "prediction": "We expect a 20% increase in Sharpe ratio with the new lookback period",
+        "confidence": "80%",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-06\", \"change\": {\"parameter\": \"lookback\", \"from\": 10, \"to\": 20}, \"rationale\": \"Adjusting the lookback period to account for LOOKBACK_SENSITIVITY\", \"prediction\": \"We expect a 20% increase in Sharpe ratio with the new lookback period\", \"confidence\": \"80%\"}, \"provenance\": {\"total_duration\": 1664505042, \"load_duration\": 114073625, \"prompt_eval_count\": 275, \"eval_count\": 103}}",
+        "created_at": "2026-08-19T07:00:19.498191+00:00"
+      }
+    },
+    {
+      "case_id": "case-07",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1843,
+      "prompt_eval_count": 275,
+      "eval_count": 117,
+      "total_duration_ns": 1841139209,
+      "parsed": {
+        "id": "b29d5c0f-c187-4405-bf34-81fa48a6c05d",
+        "research_run_id": "run-07",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-07",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "Mixed signals are a common issue in this type of trading strategy. Reducing the signal threshold may improve performance by reducing false positives.",
+        "prediction": "We expect a 10-20% improvement in net PNL and a 5-10% increase in Sharpe ratio with this revision.",
+        "confidence": "medium-high",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-07\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 1.5}, \"rationale\": \"Mixed signals are a common issue in this type of trading strategy. Reducing the signal threshold may improve performance by reducing false positives.\", \"prediction\": \"We expect a 10-20% improvement in net PNL and a 5-10% increase in Sharpe ratio with this revision.\", \"confidence\": \"medium-high\"}, \"provenance\": {\"total_duration\": 1841139209, \"load_duration\": 118087000, \"prompt_eval_count\": 275, \"eval_count\": 117}}",
+        "created_at": "2026-08-19T07:00:21.344233+00:00"
+      }
+    },
+    {
+      "case_id": "case-08",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1672,
+      "prompt_eval_count": 279,
+      "eval_count": 102,
+      "total_duration_ns": 1669697750,
+      "parsed": {
+        "id": "f8264a03-29a8-4b50-8135-818a11d73c1f",
+        "research_run_id": "run-08",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-08",
+        "changes": {
+          "lookback": 30
+        },
+        "rationale": "Increased lookback period to capture more trend information, potentially improving signal quality.",
+        "prediction": "Expected improvement in net PnL by 10-20% and Sharpe ratio by 0.1-0.2 units.",
+        "confidence": "0.8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-08\", \"change\": {\"parameter\": \"lookback\", \"from\": 15, \"to\": 30}, \"rationale\": \"Increased lookback period to capture more trend information, potentially improving signal quality.\", \"prediction\": \"Expected improvement in net PnL by 10-20% and Sharpe ratio by 0.1-0.2 units.\", \"confidence\": \"0.8\"}, \"provenance\": {\"total_duration\": 1669697750, \"load_duration\": 122713084, \"prompt_eval_count\": 279, \"eval_count\": 102}}",
+        "created_at": "2026-08-19T07:00:23.017813+00:00"
+      }
+    },
+    {
+      "case_id": "case-09",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1965,
+      "prompt_eval_count": 274,
+      "eval_count": 125,
+      "total_duration_ns": 1962522583,
+      "parsed": {
+        "id": "f30091a1-bcb1-4837-af72-8b7860c62a76",
+        "research_run_id": "run-09",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-09",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "The current signal threshold is too high, leading to a low Sharpe ratio. Lowering it may improve performance.",
+        "prediction": "The new strategy will yield a higher Sharpe ratio (> 0.2) and a higher net PnL (> -10.0).",
+        "confidence": "0.7",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-09\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 1.5}, \"rationale\": \"The current signal threshold is too high, leading to a low Sharpe ratio. Lowering it may improve performance.\", \"prediction\": \"The new strategy will yield a higher Sharpe ratio (> 0.2) and a higher net PnL (> -10.0).\", \"confidence\": \"0.7\"}, \"provenance\": {\"total_duration\": 1962522583, \"load_duration\": 122851125, \"prompt_eval_count\": 274, \"eval_count\": 125}}",
+        "created_at": "2026-08-19T07:00:24.985671+00:00"
+      }
+    },
+    {
+      "case_id": "case-10",
+      "decision": "NO_USEFUL_REVISION",
+      "latency_ms": 1685,
+      "prompt_eval_count": 272,
+      "eval_count": 101,
+      "total_duration_ns": 1683261958,
+      "parsed": {
+        "id": "0cd9accf-fbd7-4fcc-bb45-db4c1cde7c5f",
+        "research_run_id": "run-10",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-10",
+        "changes": null,
+        "rationale": "The current results (net_pnl: 10.0, sharpe: 0.3, trade_count: 150) are not sufficient to justify a revision. The evaluation indicates an edge case and recommends iterating, which implies that further exploration is needed before revising the strategy.",
+        "prediction": null,
+        "confidence": null,
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"NO_USEFUL_REVISION\", \"parent_spec_id\": \"spec-10\", \"change\": null, \"rationale\": \"The current results (net_pnl: 10.0, sharpe: 0.3, trade_count: 150) are not sufficient to justify a revision. The evaluation indicates an edge case and recommends iterating, which implies that further exploration is needed before revising the strategy.\", \"prediction\": null, \"confidence\": null}, \"provenance\": {\"total_duration\": 1683261958, \"load_duration\": 127945000, \"prompt_eval_count\": 272, \"eval_count\": 101}}",
+        "created_at": "2026-08-19T07:00:26.673263+00:00"
+      }
+    },
+    {
+      "case_id": "case-11",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1902,
+      "prompt_eval_count": 275,
+      "eval_count": 119,
+      "total_duration_ns": 1899021500,
+      "parsed": {
+        "id": "c2d1a7ff-d3d1-47fd-91a2-e1c73afce577",
+        "research_run_id": "run-11",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-11",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "The signal threshold of 2.0 may be too high, leading to missed trades. Reducing it to 1.5 may improve performance.",
+        "prediction": "With a signal threshold of 1.5, we expect to increase the trade count and improve the Sharpe ratio.",
+        "confidence": "moderate",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-11\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 1.5}, \"rationale\": \"The signal threshold of 2.0 may be too high, leading to missed trades. Reducing it to 1.5 may improve performance.\", \"prediction\": \"With a signal threshold of 1.5, we expect to increase the trade count and improve the Sharpe ratio.\", \"confidence\": \"moderate\"}, \"provenance\": {\"total_duration\": 1899021500, \"load_duration\": 122762708, \"prompt_eval_count\": 275, \"eval_count\": 119}}",
+        "created_at": "2026-08-19T07:00:28.577146+00:00"
+      }
+    },
+    {
+      "case_id": "case-12",
+      "decision": "NO_USEFUL_REVISION",
+      "latency_ms": 1133,
+      "prompt_eval_count": 274,
+      "eval_count": 59,
+      "total_duration_ns": 1130775708,
+      "parsed": {
+        "id": "e7598fa3-2ae8-478b-b043-bf339b351d13",
+        "research_run_id": "run-12",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "The current strategy has already been iterated upon and no further revisions are justified based on the provided information.",
+        "prediction": null,
+        "confidence": null,
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"NO_USEFUL_REVISION\", \"parent_spec_id\": null, \"change\": null, \"rationale\": \"The current strategy has already been iterated upon and no further revisions are justified based on the provided information.\", \"prediction\": null, \"confidence\": null}, \"provenance\": {\"total_duration\": 1130775708, \"load_duration\": 129408083, \"prompt_eval_count\": 274, \"eval_count\": 59}}",
+        "created_at": "2026-08-19T07:00:29.711682+00:00"
+      }
+    },
+    {
+      "case_id": "case-13",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1942,
+      "prompt_eval_count": 345,
+      "eval_count": 115,
+      "total_duration_ns": 1939494167,
+      "parsed": {
+        "id": "b9504438-eb26-430a-ab0b-bc849fef1acc",
+        "research_run_id": "run-13",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-13-v2",
+        "changes": {
+          "signal_threshold": 3.0
+        },
+        "rationale": "To increase the signal threshold to improve trade selection and reduce False Positives.",
+        "prediction": "Expect a 15% increase in net_pnl and a 0.2 increase in Sharpe ratio within the next 50 trades.",
+        "confidence": ".8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-13-v2\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.5, \"to\": 3.0}, \"rationale\": \"To increase the signal threshold to improve trade selection and reduce False Positives.\", \"prediction\": \"Expect a 15% increase in net_pnl and a 0.2 increase in Sharpe ratio within the next 50 trades.\", \"confidence\": \".8\"}, \"provenance\": {\"total_duration\": 1939494167, \"load_duration\": 120987708, \"prompt_eval_count\": 345, \"eval_count\": 115}}",
+        "created_at": "2026-08-19T07:00:31.654330+00:00"
+      }
+    },
+    {
+      "case_id": "case-14",
+      "decision": "NO_USEFUL_REVISION",
+      "latency_ms": 2361,
+      "prompt_eval_count": 383,
+      "eval_count": 141,
+      "total_duration_ns": 2359420917,
+      "parsed": {
+        "id": "98b71302-0288-4f41-9c5d-12fdc1d8c5b5",
+        "research_run_id": "run-14",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-14-v3",
+        "changes": null,
+        "rationale": "The current ResearchSpec has already iterated to version 3, and the evaluation indicates 'ITERATE' without any reason codes. The 'CONTRADICTORY_LINEAGE' code in the evaluation is not a reason to revise, as it is a signal to iterate the strategy, not to change it.",
+        "prediction": "Falsifiable prediction: By revising the signal_threshold to 2.5, the next iteration will improve the Net PnL by at least 5%.",
+        "confidence": "80%",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"NO_USEFUL_REVISION\", \"parent_spec_id\": \"spec-14-v3\", \"change\": null, \"rationale\": \"The current ResearchSpec has already iterated to version 3, and the evaluation indicates 'ITERATE' without any reason codes. The 'CONTRADICTORY_LINEAGE' code in the evaluation is not a reason to revise, as it is a signal to iterate the strategy, not to change it.\", \"prediction\": \"Falsifiable prediction: By revising the signal_threshold to 2.5, the next iteration will improve the Net PnL by at least 5%.\", \"confidence\": \"80%\"}, \"provenance\": {\"total_duration\": 2359420917, \"load_duration\": 131393375, \"prompt_eval_count\": 383, \"eval_count\": 141}}",
+        "created_at": "2026-08-19T07:00:34.017092+00:00"
+      }
+    },
+    {
+      "case_id": "case-15",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 1855,
+      "prompt_eval_count": 344,
+      "eval_count": 103,
+      "total_duration_ns": 1852844000,
+      "parsed": {
+        "id": "d0020122-9b52-4b6e-bf91-532f9d63be97",
+        "research_run_id": "run-15",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-15",
+        "changes": {
+          "signal_threshold": 3.0
+        },
+        "rationale": "Increased signal threshold to reduce overtrading and improve returns.",
+        "prediction": "Expected net pnl to increase by 10% and Sharpe ratio to improve to 0.15 within the next 50 trades.",
+        "confidence": ".8",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-15\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.5, \"to\": 3.0}, \"rationale\": \"Increased signal threshold to reduce overtrading and improve returns.\", \"prediction\": \"Expected net pnl to increase by 10% and Sharpe ratio to improve to 0.15 within the next 50 trades.\", \"confidence\": \".8\"}, \"provenance\": {\"total_duration\": 1852844000, \"load_duration\": 160301041, \"prompt_eval_count\": 344, \"eval_count\": 103}}",
+        "created_at": "2026-08-19T07:00:35.874012+00:00"
+      }
+    }
+  ]
+}

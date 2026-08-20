@@ -1,0 +1,25 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787201079,
+  "results": [
+    {
+      "case_id": "case-05",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "d38c3088-ddf7-490e-a3af-d0cf7c218813",
+        "research_run_id": "run-05",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-05-v3",
+        "changes": null,
+        "rationale": "The only evidence is degradation across successive increases of signal_threshold (2.0\u21922.5\u21923.0) with lookback unchanged. No permitted bounds or alternative parameter values are supplied, and reversing the threshold direction would repeat prior lineage rather than isolate a new effect.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_009cf384151b6a18016a8686381474819aae66ac35ad55024d\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201080.0, \"completed_at\": 1787201082.0, \"store\": false, \"usage\": {\"input_tokens\": 1524, \"output_tokens\": 146, \"reasoning_tokens\": 45, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only evidence is degradation across successive increases of signal_threshold (2.0\\u21922.5\\u21923.0) with lookback unchanged. No permitted bounds or alternative parameter values are supplied, and reversing the threshold direction would repeat prior lineage rather than isolate a new effect.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T04:44:42.696911+00:00"
+      }
+    }
+  ]
+}

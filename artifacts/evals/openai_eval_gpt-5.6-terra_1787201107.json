@@ -1,0 +1,27 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787201107,
+  "results": [
+    {
+      "case_id": "case-06",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "72ec5f2c-c987-4c00-9b57-634521d2ffac",
+        "research_run_id": "run-06",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-06",
+        "changes": {
+          "lookback": 15
+        },
+        "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. A single bounded increase isolates the effect of smoothing/observation horizon without changing the signal threshold.",
+        "prediction": "Comparing this specification with spec-06 will reveal sensitivity of trade frequency and aggregate outcomes to a longer lookback horizon.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_098104d426fc3cd7016a868654548487d087ce3288ce82f423\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201108.0, \"completed_at\": 1787201110.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 104, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. A single bounded increase isolates the effect of smoothing/observation horizon without changing the signal threshold.\\\",\\\"prediction\\\":\\\"Comparing this specification with spec-06 will reveal sensitivity of trade frequency and aggregate outcomes to a longer lookback horizon.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T04:45:10.364151+00:00"
+      }
+    }
+  ]
+}

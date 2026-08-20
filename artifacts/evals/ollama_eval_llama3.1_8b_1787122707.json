@@ -1,0 +1,32 @@
+{
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "prompt_version": "v1",
+  "timestamp": 1787122707,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision": "PROPOSE_REVISION",
+      "latency_ms": 3991,
+      "prompt_eval_count": 291,
+      "eval_count": 107,
+      "total_duration_ns": 3967170750,
+      "parsed": {
+        "id": "01ee694d-5424-4b28-a068-69c797766a20",
+        "research_run_id": "run-01",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-01",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "Reducing signal threshold may improve prediction accuracy by allowing for more nuanced signal interpretation.",
+        "prediction": "With the new threshold, the model's net profit and loss (net_pnl) is expected to increase by at least 20%.",
+        "confidence": "60%",
+        "provider": "ollama",
+        "model": "llama3.1:8b",
+        "raw_response": "{\"content\": {\"decision\": \"PROPOSE_REVISION\", \"parent_spec_id\": \"spec-01\", \"change\": {\"parameter\": \"signal_threshold\", \"from\": 2.0, \"to\": 1.5}, \"rationale\": \"Reducing signal threshold may improve prediction accuracy by allowing for more nuanced signal interpretation.\", \"prediction\": \"With the new threshold, the model's net profit and loss (net_pnl) is expected to increase by at least 20%.\", \"confidence\": \"60%\"}, \"provenance\": {\"total_duration\": 3967170750, \"load_duration\": 2191687583, \"prompt_eval_count\": 291, \"eval_count\": 107}}",
+        "created_at": "2026-08-19T06:58:31.771926+00:00"
+      }
+    }
+  ]
+}

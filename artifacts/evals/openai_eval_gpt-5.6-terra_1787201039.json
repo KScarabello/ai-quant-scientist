@@ -1,0 +1,27 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787201039,
+  "results": [
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "5972b0f5-a626-49cd-8036-9a06a9ecff02",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "TOO_FEW_TRADES directly implicates signal eligibility. Lowering the existing signal threshold is an isolated, bounded test of whether threshold strictness is suppressing trade generation.",
+        "prediction": "If the threshold is limiting eligibility, trade count and signal frequency should increase relative to the current 3 trades.",
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0c163bf3ddc9ac8d016a8686110e2881998fe4611c3d8e3a12\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201041.0, \"completed_at\": 1787201045.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 280, \"reasoning_tokens\": 167, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"TOO_FEW_TRADES directly implicates signal eligibility. Lowering the existing signal threshold is an isolated, bounded test of whether threshold strictness is suppressing trade generation.\\\",\\\"prediction\\\":\\\"If the threshold is limiting eligibility, trade count and signal frequency should increase relative to the current 3 trades.\\\",\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T04:44:05.646067+00:00"
+      }
+    }
+  ]
+}

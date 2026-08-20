@@ -9,6 +9,7 @@ import urllib.request
 from typing import Any, Dict, Optional
 
 from ai_quant_scientist.models.critic import CriticDecision, CriticDecisionType, validate_critic_decision
+from ai_quant_scientist.services.critic_prompts import get_instructions
 from ai_quant_scientist.models.research import new_id
 from ai_quant_scientist.services.research_critic import ResearchCritic
 
@@ -63,15 +64,8 @@ _DECISION_SCHEMA: Dict[str, Any] = {
 }
 
 
-def _build_instructions() -> str:
-    # Prompt v1 — identical semantics to the cloud adapter; not tuned for Llama
-    return (
-        "You are a bounded quantitative research critic.\n"
-        "Given: hypothesis, the current frozen ResearchSpec, measured results, a deterministic evaluation and reason codes, bounded prior lineage, and revision constraints.\n"
-        "Return exactly one of: PROPOSE_REVISION (single parameter change) or NO_USEFUL_REVISION (no bounded follow-up justified).\n"
-        "If proposing, include parent_spec_id, parameter, from, to, a concise rationale, a falsifiable prediction, and a confidence level.\n"
-        "Do not introduce new parameters, redesign the strategy, or execute tests. Keep answers concise."
-    )
+def _build_instructions(prompt_version: str = "v1") -> str:
+    return get_instructions(prompt_version)
 
 
 def _get_context_field(context: Any, key: str, default: Any = None) -> Any:
@@ -98,13 +92,19 @@ class OllamaResearchCritic(ResearchCritic):
         self.timeout = timeout
 
     def _build_payload(self, context: Any) -> Dict[str, Any]:
-        # Same context fields as OpenAIResearchCritic._build_messages
+        evaluation = _get_context_field(context, "evaluation") or {}
+        # reason_codes may be explicit or nested inside evaluation
+        reason_codes = (
+            _get_context_field(context, "reason_codes")
+            or (evaluation.get("reason_codes") if isinstance(evaluation, dict) else None)
+            or []
+        )
         ctx: Dict[str, Any] = {
             "hypothesis": _get_context_field(context, "hypothesis"),
             "current_spec": _get_context_field(context, "current_spec"),
             "current_result": _get_context_field(context, "result"),
-            "evaluation": _get_context_field(context, "evaluation"),
-            "reason_codes": _get_context_field(context, "reason_codes") or [],
+            "evaluation": evaluation,
+            "reason_codes": reason_codes,
             "lineage": _get_context_field(context, "prior_lineage") or [],
             "revision_constraints": _get_context_field(context, "allowed_revision_constraints"),
             "prompt_version": self.prompt_version,
@@ -112,7 +112,7 @@ class OllamaResearchCritic(ResearchCritic):
         return ctx
 
     def critique(self, context: Any) -> CriticDecision:
-        instructions = _build_instructions()
+        instructions = _build_instructions(self.prompt_version)
         ctx_payload = self._build_payload(context)
         user_content = json.dumps(ctx_payload, sort_keys=True)
 

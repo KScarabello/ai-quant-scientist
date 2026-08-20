@@ -1,0 +1,140 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787201886,
+  "repeats": 5,
+  "cases": [
+    {
+      "case_id": "case-02",
+      "repetitions": [
+        {
+          "repeat_index": 0,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "83d65545-49ba-4aab-a41f-2762588eb8f1",
+            "research_run_id": "run-02",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-02",
+            "changes": null,
+            "rationale": "TOO_FEW_TRADES identifies an observation-frequency issue, but no allowed revision bounds or permitted-parameter constraints are supplied. A threshold reduction could be mechanistically relevant, but no specific legal bounded change can be justified without those constraints.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_072c45da1ae562cc016a86895f0b1c87d0ae1d4c7673673b54\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201887.0, \"completed_at\": 1787201889.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 167, \"reasoning_tokens\": 76, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"TOO_FEW_TRADES identifies an observation-frequency issue, but no allowed revision bounds or permitted-parameter constraints are supplied. A threshold reduction could be mechanistically relevant, but no specific legal bounded change can be justified without those constraints.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-20T04:58:10.165955+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 1,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "ce768f7a-bbd8-498a-8db5-4c41f7cc33ef",
+            "research_run_id": "run-02",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-02",
+            "changes": {
+              "signal_threshold": 1.5
+            },
+            "rationale": "TOO_FEW_TRADES identifies insufficient observations. Lowering the existing signal threshold directly tests whether signal eligibility is constraining trade generation.",
+            "prediction": "A lower signal_threshold should increase eligible signals and trade count, revealing whether threshold strictness is the source of the low-trade diagnosis.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0cfff70d049422ea016a868962432c87d08f97b0830264b829\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201890.0, \"completed_at\": 1787201892.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 186, \"reasoning_tokens\": 76, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"TOO_FEW_TRADES identifies insufficient observations. Lowering the existing signal threshold directly tests whether signal eligibility is constraining trade generation.\\\",\\\"prediction\\\":\\\"A lower signal_threshold should increase eligible signals and trade count, revealing whether threshold strictness is the source of the low-trade diagnosis.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:58:12.972087+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 2,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "85518e3a-0ce9-4ac8-9bc4-08e1583509d4",
+            "research_run_id": "run-02",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-02",
+            "changes": {
+              "signal_threshold": 1.5
+            },
+            "rationale": "TOO_FEW_TRADES directly identifies insufficient signal eligibility. Lowering the existing signal threshold is a bounded mechanistic test of whether eligibility is suppressing trade generation.",
+            "prediction": "If threshold gating is the source of the low observation count, trade count should increase relative to the current 3 trades; the result will measure sensitivity of trade frequency to signal eligibility.",
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0a47688320e1c11a016a86896513cc87d0aaba5c646d4a8aea\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201893.0, \"completed_at\": 1787201896.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 297, \"reasoning_tokens\": 172, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"TOO_FEW_TRADES directly identifies insufficient signal eligibility. Lowering the existing signal threshold is a bounded mechanistic test of whether eligibility is suppressing trade generation.\\\",\\\"prediction\\\":\\\"If threshold gating is the source of the low observation count, trade count should increase relative to the current 3 trades; the result will measure sensitivity of trade frequency to signal eligibility.\\\",\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-20T04:58:16.979706+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 3,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "3529b491-3780-44f5-8ba6-c30cadb44d7f",
+            "research_run_id": "run-02",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-02",
+            "changes": null,
+            "rationale": "TOO_FEW_TRADES identifies an eligibility-frequency issue, and lowering signal_threshold could mechanistically test it. However, no revision constraints or permitted bounds are supplied, so no specific bounded, authorized parameter change can be proposed.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0b815279a44855c4016a868969273087d0bb64eccb5e6de4ea\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201897.0, \"completed_at\": 1787201899.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 202, \"reasoning_tokens\": 113, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"TOO_FEW_TRADES identifies an eligibility-frequency issue, and lowering signal_threshold could mechanistically test it. However, no revision constraints or permitted bounds are supplied, so no specific bounded, authorized parameter change can be proposed.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-20T04:58:20.056566+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 4,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "a5f57eef-7947-4e8e-af35-20b438402319",
+            "research_run_id": "run-02",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-02",
+            "changes": {
+              "signal_threshold": 1.5
+            },
+            "rationale": "TOO_FEW_TRADES identifies insufficient observation frequency. Lowering the existing signal eligibility threshold is a direct bounded diagnostic of whether the threshold is suppressing trade generation.",
+            "prediction": "If threshold gating is the source of low activity, trade count should increase relative to the current 3 trades; otherwise the low-trade issue likely arises elsewhere in the strategy.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0b38a00bf0d58c4d016a86896c2b4487d098f2818281d5eaef\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201900.0, \"completed_at\": 1787201903.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 263, \"reasoning_tokens\": 139, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"TOO_FEW_TRADES identifies insufficient observation frequency. Lowering the existing signal eligibility threshold is a direct bounded diagnostic of whether the threshold is suppressing trade generation.\\\",\\\"prediction\\\":\\\"If threshold gating is the source of low activity, trade count should increase relative to the current 3 trades; otherwise the low-trade issue likely arises elsewhere in the strategy.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:58:23.652932+00:00"
+          },
+          "error": null
+        }
+      ],
+      "aggregate": {
+        "total_runs": 5,
+        "successful_runs": 5,
+        "failed_runs": 0,
+        "PROPOSE_REVISION": 3,
+        "NO_USEFUL_REVISION": 2,
+        "decision_agreement_rate": 0.6,
+        "majority_decision": "PROPOSE_REVISION",
+        "confidence_distribution": {
+          "high": 3,
+          "medium": 2
+        },
+        "input_tokens_total": 7270,
+        "output_tokens_total": 1115,
+        "reasoning_tokens_total": 576
+      }
+    }
+  ],
+  "summary": {
+    "total_invocations": 5,
+    "total_successful": 5,
+    "total_failed": 0,
+    "total_input_tokens": 7270,
+    "total_output_tokens": 1115,
+    "total_reasoning_tokens": 576,
+    "unanimous_cases": 0,
+    "mixed_cases": 1
+  }
+}

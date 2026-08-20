@@ -1,0 +1,143 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787201950,
+  "repeats": 5,
+  "cases": [
+    {
+      "case_id": "case-06",
+      "repetitions": [
+        {
+          "repeat_index": 0,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "fd8e1396-29b1-42fb-a09f-9d7802d849ff",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 15
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates how the signal responds to a longer historical window.",
+            "prediction": "Comparing lookback 15 with 10 will reveal the direction and magnitude of lookback sensitivity, including whether the longer window changes trade frequency.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0e4f23ea0758a696016a86899ee6ac87d09a8bcb84ef67529f\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201950.0, \"completed_at\": 1787201952.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 112, \"reasoning_tokens\": 0, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates how the signal responds to a longer historical window.\\\",\\\"prediction\\\":\\\"Comparing lookback 15 with 10 will reveal the direction and magnitude of lookback sensitivity, including whether the longer window changes trade frequency.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:59:12.870343+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 1,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "f35974ec-79a8-40f8-87b3-6a959daf7ba0",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 15
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. A bounded change to lookback isolates its effect while holding the signal threshold fixed.",
+            "prediction": "Changing lookback from 10 to 15 will reveal sensitivity of trade count and aggregate outcomes to the signal window length.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_02eff7ed3c3f4aac016a8689a0fb4487d08c7ef96085c90574\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201953.0, \"completed_at\": 1787201954.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 101, \"reasoning_tokens\": 0, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. A bounded change to lookback isolates its effect while holding the signal threshold fixed.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 15 will reveal sensitivity of trade count and aggregate outcomes to the signal window length.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:59:14.601302+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 2,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "b32f600e-2a0a-4668-b4e3-c3075cbfa597",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 15
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage, a bounded change to lookback is a non-redundant sensitivity experiment that isolates its effect.",
+            "prediction": "Changing lookback from 10 to 15 will reveal whether signal generation and trade count are sensitive to a longer estimation window.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_069c91499a1c22b1016a8689a2b1b887d0beaa11d1797bc493\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201954.0, \"completed_at\": 1787201956.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 110, \"reasoning_tokens\": 0, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage, a bounded change to lookback is a non-redundant sensitivity experiment that isolates its effect.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 15 will reveal whether signal generation and trade count are sensitive to a longer estimation window.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:59:16.476939+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 3,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "b02b9e9b-ef36-4bba-a027-24b165d47008",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 15
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. A bounded perturbation of lookback isolates its effect while holding the signal threshold fixed.",
+            "prediction": "Changing lookback from 10 to 15 will reveal the strategy's sensitivity to the signal estimation horizon through observable changes in trade count and resulting performance metrics.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_08c6239ca7510c49016a8689a497a4819b9f16aa0c0f85b49b\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201956.0, \"completed_at\": 1787201958.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 109, \"reasoning_tokens\": 0, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. A bounded perturbation of lookback isolates its effect while holding the signal threshold fixed.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 15 will reveal the strategy's sensitivity to the signal estimation horizon through observable changes in trade count and resulting performance metrics.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:59:18.537728+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 4,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "3022846c-811b-421e-a503-91320b2c9124",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 15
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage tests, a bounded change in lookback isolates sensitivity of signals and trade frequency to the observation window.",
+            "prediction": "Increasing lookback from 10 to 15 will reveal whether signal generation and trade count are materially sensitive to a longer observation window.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_058651b894824cbb016a8689a6a38487d0b701ba32345a20cb\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787201958.0, \"completed_at\": 1787201960.0, \"store\": false, \"usage\": {\"input_tokens\": 1454, \"output_tokens\": 110, \"reasoning_tokens\": 0, \"cached_tokens\": 1451}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage tests, a bounded change in lookback isolates sensitivity of signals and trade frequency to the observation window.\\\",\\\"prediction\\\":\\\"Increasing lookback from 10 to 15 will reveal whether signal generation and trade count are materially sensitive to a longer observation window.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-20T04:59:20.302238+00:00"
+          },
+          "error": null
+        }
+      ],
+      "aggregate": {
+        "total_runs": 5,
+        "successful_runs": 5,
+        "failed_runs": 0,
+        "PROPOSE_REVISION": 5,
+        "NO_USEFUL_REVISION": 0,
+        "decision_agreement_rate": 1.0,
+        "majority_decision": "PROPOSE_REVISION",
+        "confidence_distribution": {
+          "medium": 5
+        },
+        "input_tokens_total": 7270,
+        "output_tokens_total": 542,
+        "reasoning_tokens_total": 0
+      }
+    }
+  ],
+  "summary": {
+    "total_invocations": 5,
+    "total_successful": 5,
+    "total_failed": 0,
+    "total_input_tokens": 7270,
+    "total_output_tokens": 542,
+    "total_reasoning_tokens": 0,
+    "unanimous_cases": 1,
+    "mixed_cases": 0
+  }
+}

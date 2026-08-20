@@ -10,6 +10,27 @@ from ..models.critic import CriticContext, CriticDecision, CriticDecisionType
 from ..services.research_critic import CriticProposalValidator, build_default_constraints
 
 
+def build_critic_context(case: "CriticEvalCase") -> CriticContext:
+    """Canonical eval-case → CriticContext builder shared by all evaluation paths.
+
+    Applies case.allowed_parameters (or default bounds) as allowed_revision_constraints
+    so every eval path — deterministic suite, OpenAI live runner, Ollama live runner —
+    constructs identical context objects.
+    """
+    ctx_dict = case.context
+    return CriticContext(
+        id=ctx_dict.get("id"),
+        research_run_id=ctx_dict.get("research_run_id"),
+        hypothesis=ctx_dict.get("hypothesis", {}),
+        current_spec=ctx_dict.get("current_spec", {}),
+        attempt=ctx_dict.get("attempt", {}),
+        result=ctx_dict.get("result", {}),
+        evaluation=ctx_dict.get("evaluation", {}),
+        prior_lineage=ctx_dict.get("prior_lineage", []),
+        allowed_revision_constraints=case.allowed_parameters or build_default_constraints(),
+    )
+
+
 @dataclass(frozen=True)
 class CriticEvalCase:
     id: str
@@ -71,19 +92,8 @@ class CriticEvalSuite:
         return results
 
     def _run_case(self, case: CriticEvalCase, critic, prompt_version: str) -> CriticEvalResult:
-        # Build CriticContext object from case.context (do not mutate authoritative store)
-        ctx_dict = case.context
-        ctx = CriticContext(
-            id=ctx_dict.get("id"),
-            research_run_id=ctx_dict.get("research_run_id"),
-            hypothesis=ctx_dict.get("hypothesis", {}),
-            current_spec=ctx_dict.get("current_spec", {}),
-            attempt=ctx_dict.get("attempt", {}),
-            result=ctx_dict.get("result", {}),
-            evaluation=ctx_dict.get("evaluation", {}),
-            prior_lineage=ctx_dict.get("prior_lineage", []),
-            allowed_revision_constraints=case.allowed_parameters or build_default_constraints(),
-        )
+        # Build canonical CriticContext (constraints injected deterministically)
+        ctx = build_critic_context(case)
 
         decision: CriticDecision = critic.critique(ctx)
 

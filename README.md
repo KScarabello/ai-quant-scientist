@@ -1,5 +1,25 @@
 AI Quant Scientist — V0.7 (Contract Hardening; Benchmark V1 complete)
 
+Evaluation Integrity Note (post-Benchmark-V1)
+- A context plumbing bug was discovered and fixed after Benchmark V1 was run.
+- Live critic eval runners (OpenAI and Ollama) were passing raw fixture dicts to the model
+  adapter instead of properly constructed CriticContext objects.
+- As a result: revision constraints (allowed_revision_constraints) were omitted (null) in
+  all live benchmark payloads; the top-level reason_codes convenience field was also empty.
+- A canonical build_critic_context(case) builder was introduced to ensure all evaluation
+  paths (deterministic suite, OpenAI runner, Ollama runner) construct identical contexts.
+- Previous live benchmark artifacts (Luna, Terra V1, Sol, Terra V2/V3, Llama) were produced
+  without revision constraints in the model input. They remain as historical evidence but
+  should NOT be treated as final scientific comparisons pending a re-run with the fix.
+- Structural / stop-discipline decisions (e.g., NO_USEFUL_REVISION on exhausted/contradictory
+  cases) may remain informative even without explicit constraints, since those decisions were
+  grounded in reason codes and lineage rather than parameter bounds.
+- Fix is in: src/ai_quant_scientist/evals/critic_eval.py (build_critic_context),
+  run_live_critic_eval.py, run_ollama_critic_eval.py, openai_research_critic.py,
+  ollama_research_critic.py.
+- Regression tests: tests/test_context_plumbing.py (17 tests).
+
+
 Benchmark V1 — COMPLETE (2026-08-19)
 - Eval set: `evals/critic_v1.json` — 15 cases, version v1 (frozen).
 - Models evaluated: gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol, llama3.1:8b (local Ollama).

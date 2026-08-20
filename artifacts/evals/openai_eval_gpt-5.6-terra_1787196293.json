@@ -1,0 +1,295 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787196293,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "6fb797ff-e1de-4600-8148-af9eb8878ab7",
+        "research_run_id": "run-01",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-01",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "The signal hypothesis remains plausible, but the current threshold yields insufficient risk-adjusted performance. A modest threshold reduction may admit additional predictive signals without redesigning the strategy.",
+        "prediction": "With signal_threshold=1.5, out-of-sample Sharpe will exceed 0.4 while trade count increases above 100.",
+        "confidence": "low",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0ddfb634357ae7b4016a8673872ec8819b81c701e5db5f599b\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196295.0, \"completed_at\": 1787196297.0, \"store\": false, \"usage\": {\"input_tokens\": 549, \"output_tokens\": 114, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-01\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"The signal hypothesis remains plausible, but the current threshold yields insufficient risk-adjusted performance. A modest threshold reduction may admit additional predictive signals without redesigning the strategy.\\\",\\\"prediction\\\":\\\"With signal_threshold=1.5, out-of-sample Sharpe will exceed 0.4 while trade count increases above 100.\\\",\\\"confidence\\\":\\\"low\\\"}\"}",
+        "created_at": "2026-08-20T03:24:57.523069+00:00"
+      }
+    },
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "e6247048-9b6c-4300-a61b-8645482c2909",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "Only 3 trades triggered TOO_FEW_TRADES; lowering the existing entry threshold should increase signal frequency without changing strategy structure.",
+        "prediction": "Trade count will exceed 3, resolving the TOO_FEW_TRADES reason code; net PnL and Sharpe remain to be empirically validated.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_064bd1f9c937e894016a867389c0a48198bc2ecf6b5b40042a\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196297.0, \"completed_at\": 1787196300.0, \"store\": false, \"usage\": {\"input_tokens\": 534, \"output_tokens\": 110, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"Only 3 trades triggered TOO_FEW_TRADES; lowering the existing entry threshold should increase signal frequency without changing strategy structure.\\\",\\\"prediction\\\":\\\"Trade count will exceed 3, resolving the TOO_FEW_TRADES reason code; net PnL and Sharpe remain to be empirically validated.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T03:25:00.219929+00:00"
+      }
+    },
+    {
+      "case_id": "case-03",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "cca29cf9-012b-4553-b9d3-a2b9f706fcb3",
+        "research_run_id": "run-03",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-03",
+        "changes": {
+          "signal_threshold": 2.0
+        },
+        "rationale": "Negative PnL supports testing a stricter entry filter to reduce marginal signals.",
+        "prediction": "Raising the threshold to 2.0 will reduce trade count and improve net PnL relative to -500.",
+        "confidence": "low",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_04b2687e90905a6b016a86738c6050819bafc4f36fb2f29d7c\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196300.0, \"completed_at\": 1787196303.0, \"store\": false, \"usage\": {\"input_tokens\": 532, \"output_tokens\": 151, \"reasoning_tokens\": 55, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":1.5,\\\"to\\\":2.0},\\\"rationale\\\":\\\"Negative PnL supports testing a stricter entry filter to reduce marginal signals.\\\",\\\"prediction\\\":\\\"Raising the threshold to 2.0 will reduce trade count and improve net PnL relative to -500.\\\",\\\"confidence\\\":\\\"low\\\"}\"}",
+        "created_at": "2026-08-20T03:25:03.088356+00:00"
+      }
+    },
+    {
+      "case_id": "case-04",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "7509795e-f822-4e24-9e23-0ef1b6b76335",
+        "research_run_id": "run-04",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-04-v2",
+        "changes": {
+          "signal_threshold": 3.0
+        },
+        "rationale": "Sharpe of 0.6 missed the minimum; a modest threshold increase may filter weaker signals while preserving the existing lookback design.",
+        "prediction": "With signal_threshold=3.0, out-of-sample Sharpe will exceed 0.6.",
+        "confidence": "low",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0862d255598f623f016a867390016487d0aeb112b8dd072152\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196304.0, \"completed_at\": 1787196306.0, \"store\": false, \"usage\": {\"input_tokens\": 571, \"output_tokens\": 193, \"reasoning_tokens\": 87, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-04-v2\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.5,\\\"to\\\":3.0},\\\"rationale\\\":\\\"Sharpe of 0.6 missed the minimum; a modest threshold increase may filter weaker signals while preserving the existing lookback design.\\\",\\\"prediction\\\":\\\"With signal_threshold=3.0, out-of-sample Sharpe will exceed 0.6.\\\",\\\"confidence\\\":\\\"low\\\"}\"}",
+        "created_at": "2026-08-20T03:25:06.774028+00:00"
+      }
+    },
+    {
+      "case_id": "case-05",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "709a6e83-c7db-436f-99b9-6f874169852c",
+        "research_run_id": "run-05",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-05-v3",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "The threshold has been raised sequentially from 2.0 to 3.0 and evaluation flags a degrading series; testing a lower threshold is the bounded directional follow-up.",
+        "prediction": "At 1.5, net PnL and Sharpe will improve versus -20.0 and -0.1, respectively.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0bc040d5965824a4016a867392e67487d0bf7d2257cc34a3ae\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196306.0, \"completed_at\": 1787196310.0, \"store\": false, \"usage\": {\"input_tokens\": 604, \"output_tokens\": 237, \"reasoning_tokens\": 116, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":3.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"The threshold has been raised sequentially from 2.0 to 3.0 and evaluation flags a degrading series; testing a lower threshold is the bounded directional follow-up.\\\",\\\"prediction\\\":\\\"At 1.5, net PnL and Sharpe will improve versus -20.0 and -0.1, respectively.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T03:25:10.614267+00:00"
+      }
+    },
+    {
+      "case_id": "case-06",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "2c188aa2-1829-4934-92ac-4c15b5d01d94",
+        "research_run_id": "run-06",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-06",
+        "changes": {
+          "lookback": 15
+        },
+        "rationale": "The evaluation explicitly flags lookback sensitivity, so adjusting lookback is the single bounded follow-up supported by the evidence.",
+        "prediction": "With lookback increased to 15, out-of-sample net PnL will improve above -5.0 while maintaining at least 80 trades.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_09e75426279afa16016a867396cb60819bb804e22abc680101\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196310.0, \"completed_at\": 1787196312.0, \"store\": false, \"usage\": {\"input_tokens\": 534, \"output_tokens\": 104, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":15},\\\"rationale\\\":\\\"The evaluation explicitly flags lookback sensitivity, so adjusting lookback is the single bounded follow-up supported by the evidence.\\\",\\\"prediction\\\":\\\"With lookback increased to 15, out-of-sample net PnL will improve above -5.0 while maintaining at least 80 trades.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T03:25:12.917668+00:00"
+      }
+    },
+    {
+      "case_id": "case-07",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "e06d6f31-0db3-48e0-9775-820d46c905e3",
+        "research_run_id": "run-07",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-07",
+        "changes": {
+          "signal_threshold": 2.5
+        },
+        "rationale": "Negative PnL despite 90 trades and MIXED_SIGNALS suggests the current entry cutoff may admit marginal signals; a modestly stricter threshold is a bounded quality filter.",
+        "prediction": "At the same evaluation protocol, threshold 2.5 will reduce trade count and improve net PnL relative to -2.0, with Sharpe above 0.35.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_00ad59280d9933fb016a867399139c819aac6bda5bba8813e9\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196313.0, \"completed_at\": 1787196315.0, \"store\": false, \"usage\": {\"input_tokens\": 533, \"output_tokens\": 126, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-07\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":2.5},\\\"rationale\\\":\\\"Negative PnL despite 90 trades and MIXED_SIGNALS suggests the current entry cutoff may admit marginal signals; a modestly stricter threshold is a bounded quality filter.\\\",\\\"prediction\\\":\\\"At the same evaluation protocol, threshold 2.5 will reduce trade count and improve net PnL relative to -2.0, with Sharpe above 0.35.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T03:25:15.510898+00:00"
+      }
+    },
+    {
+      "case_id": "case-08",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "59fa0d34-3047-495a-a0cd-ac5dfcde867b",
+        "research_run_id": "run-08",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "The only evaluation reason code is MISSING_INDICATOR_SUGGESTION, which provides no bounded evidence for changing either existing parameter.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_07430a09bc17dc74016a86739bb0fc87d0a7d5efca48d05f74\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196315.0, \"completed_at\": 1787196316.0, \"store\": false, \"usage\": {\"input_tokens\": 537, \"output_tokens\": 67, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":null,\\\"change\\\":null,\\\"rationale\\\":\\\"The only evaluation reason code is MISSING_INDICATOR_SUGGESTION, which provides no bounded evidence for changing either existing parameter.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:16.881753+00:00"
+      }
+    },
+    {
+      "case_id": "case-09",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "8537bb72-db77-43e7-9bca-657420941d74",
+        "research_run_id": "run-09",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "The STRUCTURE_ISSUE code provides no parameter-specific diagnosis, and there is no lineage evidence to justify changing either bounded parameter.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_01b58d7c2df6b1d8016a86739de14c819890a37db58964fd7c\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196317.0, \"completed_at\": 1787196319.0, \"store\": false, \"usage\": {\"input_tokens\": 533, \"output_tokens\": 66, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":null,\\\"change\\\":null,\\\"rationale\\\":\\\"The STRUCTURE_ISSUE code provides no parameter-specific diagnosis, and there is no lineage evidence to justify changing either bounded parameter.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:19.779824+00:00"
+      }
+    },
+    {
+      "case_id": "case-10",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "f5498996-73ca-4ed4-aaef-33e043645fe9",
+        "research_run_id": "run-10",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "EDGE_CASE with an ITERATE recommendation provides no directional evidence for changing either lookback or signal_threshold; a bounded parameter change would be speculative.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0a03130b549f74fb016a86739ff60487d0b95d9ec7fdd9dff6\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196319.0, \"completed_at\": 1787196321.0, \"store\": false, \"usage\": {\"input_tokens\": 530, \"output_tokens\": 125, \"reasoning_tokens\": 55, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":null,\\\"change\\\":null,\\\"rationale\\\":\\\"EDGE_CASE with an ITERATE recommendation provides no directional evidence for changing either lookback or signal_threshold; a bounded parameter change would be speculative.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:21.935778+00:00"
+      }
+    },
+    {
+      "case_id": "case-11",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "c5b396f9-9645-44c0-9df5-2bca65319467",
+        "research_run_id": "run-11",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-11",
+        "changes": {
+          "signal_threshold": 1.8
+        },
+        "rationale": "Mixed signals with a positive but modest Sharpe support a bounded sensitivity test that modestly increases signal participation without redesigning the strategy.",
+        "prediction": "Lowering the threshold to 1.8 will increase trade count above 110 and improve Sharpe above 0.45 while maintaining non-negative net PnL.",
+        "confidence": "low",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_01c87123dc6ff7fa016a8673a2153c87d093360d10b2c413b8\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196322.0, \"completed_at\": 1787196324.0, \"store\": false, \"usage\": {\"input_tokens\": 533, \"output_tokens\": 114, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-11\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.8},\\\"rationale\\\":\\\"Mixed signals with a positive but modest Sharpe support a bounded sensitivity test that modestly increases signal participation without redesigning the strategy.\\\",\\\"prediction\\\":\\\"Lowering the threshold to 1.8 will increase trade count above 110 and improve Sharpe above 0.45 while maintaining non-negative net PnL.\\\",\\\"confidence\\\":\\\"low\\\"}\"}",
+        "created_at": "2026-08-20T03:25:24.179938+00:00"
+      }
+    },
+    {
+      "case_id": "case-12",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "8bd927a1-a8d2-4aaf-92bb-1e43e28a3cf9",
+        "research_run_id": "run-12",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-12",
+        "changes": {
+          "signal_threshold": 2.0
+        },
+        "rationale": "The result is near promotion with a healthy 140-trade sample; a modest threshold reduction may increase opportunity capture while remaining close to the validated setting.",
+        "prediction": "Lowering signal_threshold to 2.0 will increase trade_count and improve net_pnl, with Sharpe remaining near or above 0.95.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0508f380b2035e38016a8673a44f8487d0a688c310d553efd5\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196324.0, \"completed_at\": 1787196326.0, \"store\": false, \"usage\": {\"input_tokens\": 532, \"output_tokens\": 115, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-12\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.2,\\\"to\\\":2.0},\\\"rationale\\\":\\\"The result is near promotion with a healthy 140-trade sample; a modest threshold reduction may increase opportunity capture while remaining close to the validated setting.\\\",\\\"prediction\\\":\\\"Lowering signal_threshold to 2.0 will increase trade_count and improve net_pnl, with Sharpe remaining near or above 0.95.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T03:25:26.229680+00:00"
+      }
+    },
+    {
+      "case_id": "case-13",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "1685c6d0-8924-4af1-bdd5-18e7f4f8524b",
+        "research_run_id": "run-13",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-13-v2",
+        "changes": null,
+        "rationale": "The only evaluation reason code is REPEATED_TEST, and the sole prior change already adjusted signal_threshold. No additional bounded parameter change is justified by the supplied evidence.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0a1ba41c8b64a729016a8673a66b2487d0939e6b9d5cbaf0a3\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196326.0, \"completed_at\": 1787196327.0, \"store\": false, \"usage\": {\"input_tokens\": 603, \"output_tokens\": 77, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-13-v2\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only evaluation reason code is REPEATED_TEST, and the sole prior change already adjusted signal_threshold. No additional bounded parameter change is justified by the supplied evidence.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:28.079891+00:00"
+      }
+    },
+    {
+      "case_id": "case-14",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "b7d2bb1f-e9e5-4f3c-8592-a2c2ea2601df",
+        "research_run_id": "run-14",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "No lineage performance evidence is provided to identify a directionally justified single-parameter revision; the evaluation flags CONTRADICTORY_LINEAGE.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_06fcef16bd814271016a8673a839e887d0a765f926a13e69b2\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196328.0, \"completed_at\": 1787196330.0, \"store\": false, \"usage\": {\"input_tokens\": 641, \"output_tokens\": 109, \"reasoning_tokens\": 40, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":null,\\\"change\\\":null,\\\"rationale\\\":\\\"No lineage performance evidence is provided to identify a directionally justified single-parameter revision; the evaluation flags CONTRADICTORY_LINEAGE.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:30.211508+00:00"
+      }
+    },
+    {
+      "case_id": "case-15",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "abb78a6c-0dbf-49f6-a3db-5e4060c1bce7",
+        "research_run_id": "run-15",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": null,
+        "changes": null,
+        "rationale": "The evaluation reports EXHAUSTED_PARAMETERS, so no bounded single-parameter follow-up is justified.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_00e9dbf44f13f96d016a8673aa73f887d0a50df1d5cdd8f8cf\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787196330.0, \"completed_at\": 1787196332.0, \"store\": false, \"usage\": {\"input_tokens\": 602, \"output_tokens\": 60, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":null,\\\"change\\\":null,\\\"rationale\\\":\\\"The evaluation reports EXHAUSTED_PARAMETERS, so no bounded single-parameter follow-up is justified.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T03:25:33.018858+00:00"
+      }
+    }
+  ]
+}
