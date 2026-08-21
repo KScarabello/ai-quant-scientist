@@ -27,7 +27,7 @@ def _make_parsed(decision: str, confidence: str | None = "high", input_tok: int 
         return {
             "decision": decision,
             "parent_spec_id": "spec-01",
-            "change": {"parameter": "signal_threshold", "from": 2.0, "to": 1.5},
+            "intent": {"parameter": "signal_threshold", "direction": "DECREASE", "experiment_type": "MECHANISTIC_DIAGNOSTIC"},
             "rationale": "test rationale",
             "prediction": "trade count will change",
             "confidence": confidence,
@@ -35,7 +35,7 @@ def _make_parsed(decision: str, confidence: str | None = "high", input_tok: int 
     return {
         "decision": decision,
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "none",
         "prediction": None,
         "confidence": confidence,

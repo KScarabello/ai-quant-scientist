@@ -118,9 +118,10 @@ class CriticProposalValidator:
 
 
 def build_default_constraints() -> dict:
+    # V1 planning grid: step sizes define the smallest informative perturbation
     return {
-        "signal_threshold": {"type": "float", "min": -10.0, "max": 10.0},
-        "lookback": {"type": "int", "min": 1, "max": 365},
+        "signal_threshold": {"type": "float", "min": -10.0, "max": 10.0, "step": 0.5},
+        "lookback": {"type": "int", "min": 1, "max": 365, "step": 5},
     }
 
 

@@ -61,6 +61,9 @@ class CriticDecision:
     provider: str | None = None
     model: str | None = None
     raw_response: str | None = None
+    # intent-architecture provenance (None for pre-intent decisions)
+    revision_intent: dict[str, Any] | None = None
+    planner_version: str | None = None
     created_at: datetime = field(default_factory=utcnow)
 
 

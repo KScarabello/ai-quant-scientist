@@ -67,11 +67,11 @@ def test_stream_is_false_and_format_schema_sent():
     case = cases[0]
     response_content = {
         "decision": "NO_USEFUL_REVISION",
-        "parent_spec_id": case.context.get("current_spec", {}).get("id"),
-        "change": None,
+        "parent_spec_id": None,
+        "intent": None,
         "rationale": "no useful",
         "prediction": None,
-        "confidence": "high",
+        "confidence": None,
     }
     resp_bytes = _ollama_response(response_content)
 
@@ -91,19 +91,20 @@ def test_stream_is_false_and_format_schema_sent():
 
 
 def test_valid_propose_revision_maps_to_critic_decision():
+    from ai_quant_scientist.evals.critic_eval import build_critic_context
     cases = load_cases_from_file("evals/critic_v1.json")
-    case = cases[0]
+    case = cases[0]  # spec-01: signal_threshold=2.0; planner selects 1.5
+    ctx = build_critic_context(case)
     content = {
         "decision": "PROPOSE_REVISION",
         "parent_spec_id": case.context.get("current_spec", {}).get("id"),
-        "change": {"parameter": "signal_threshold", "from": 2.0, "to": 1.5},
-        "rationale": "test",
-        "prediction": "trade_count up",
+        "intent": {"parameter": "signal_threshold", "direction": "DECREASE", "experiment_type": "MECHANISTIC_DIAGNOSTIC"},
+        "rationale": "TOO_FEW_TRADES: lower threshold increases trade frequency",
+        "prediction": "trade count will increase",
         "confidence": "medium",
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
-        decision = OllamaResearchCritic().critique(case.context)
-
+        decision = OllamaResearchCritic().critique(ctx)
     assert decision.decision_type.name == "PROPOSE_REVISION"
     assert decision.changes == {"signal_threshold": 1.5}
     assert decision.provider == "ollama"
@@ -115,10 +116,10 @@ def test_valid_no_useful_revision_maps_to_critic_decision():
     content = {
         "decision": "NO_USEFUL_REVISION",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "nothing useful",
         "prediction": None,
-        "confidence": "high",
+        "confidence": None,
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
         decision = OllamaResearchCritic().critique(case.context)
@@ -133,10 +134,10 @@ def test_usage_metadata_captured_in_raw_response():
     content = {
         "decision": "NO_USEFUL_REVISION",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "ok",
         "prediction": None,
-        "confidence": "low",
+        "confidence": None,
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
         decision = OllamaResearchCritic().critique(case.context)
@@ -168,10 +169,10 @@ def test_invalid_decision_value_raises_value_error():
     content = {
         "decision": "DO_SOMETHING_ELSE",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "bad",
         "prediction": None,
-        "confidence": "high",
+        "confidence": None,
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
         with pytest.raises(ValueError, match="Invalid decision"):
@@ -195,10 +196,10 @@ def test_runner_serialises_output_to_json(tmp_path):
     content = {
         "decision": "NO_USEFUL_REVISION",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "ok",
         "prediction": None,
-        "confidence": "low",
+        "confidence": None,
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
         out = run_ollama_eval(
@@ -239,10 +240,10 @@ def test_runner_continues_after_one_case_failure(tmp_path):
     content = {
         "decision": "NO_USEFUL_REVISION",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "ok",
         "prediction": None,
-        "confidence": "low",
+        "confidence": None,
     }
     call_count = 0
 
@@ -272,10 +273,10 @@ def test_runner_no_authoritative_db_writes(tmp_path):
     content = {
         "decision": "NO_USEFUL_REVISION",
         "parent_spec_id": None,
-        "change": None,
+        "intent": None,
         "rationale": "ok",
         "prediction": None,
-        "confidence": "low",
+        "confidence": None,
     }
     with patch("urllib.request.urlopen", return_value=_mock_urlopen(_ollama_response(content))):
         with patch("ai_quant_scientist.storage.sqlite_store.SQLiteStore") as mock_store:

@@ -9,7 +9,14 @@ from typing import Any, Dict, Optional
 from ai_quant_scientist.models.critic import CriticDecision, CriticDecisionType, CriticInvocation, validate_critic_decision
 from ai_quant_scientist.services.critic_prompts import get_instructions
 from ai_quant_scientist.models.research import new_id
-from ai_quant_scientist.services.research_critic import ResearchCritic
+from ai_quant_scientist.models.revision import (
+    ExperimentType,
+    RevisionDirection,
+    RevisionIntent,
+    validate_revision_intent,
+)
+from ai_quant_scientist.services.research_critic import ResearchCritic, build_default_constraints
+from ai_quant_scientist.services.revision_planner import PlannerRejectionError, RevisionPlanner
 
 try:
     # Modern OpenAI SDK: client = OpenAI()
@@ -142,53 +149,36 @@ class OpenAIResearchCritic(ResearchCritic):
         return get_instructions(self.prompt_version)
 
     def critique(self, context) -> CriticDecision:
-        # We'll capture raw response and usage locally; persistence is handled by caller
-        invoked_at = time.time()
+        import dataclasses as _dc
         raw_response_str = None
-
 
         if self._client is None:
             raise RuntimeError("OpenAI client not configured")
 
-        # Build structured output schema and input
-        schema = self._build_structured_schema()
         payload = self._build_messages(context)
-
-        # attach request payload for provenance
-        request_json = json.dumps({"model": self.model, "input": payload})
-
-        # Responses API parse call (SDK v3.3.0): use explicit `responses.parse` with provider-specific Pydantic model
         instructions = self._build_instructions(context)
 
-        # Provider-specific Pydantic model (required)
         from pydantic import BaseModel, Field
         from pydantic import ConfigDict
         from typing import Literal
 
-        ScalarValue = str | int | float | bool | None
-
-        class CriticChangeSchema(BaseModel):
+        class CriticIntentSchema(BaseModel):
             parameter: str
-            from_value: ScalarValue = Field(..., alias="from")
-            to: ScalarValue = Field(...)
-
+            direction: Literal["INCREASE", "DECREASE", "PERTURB"]
+            experiment_type: Literal["MECHANISTIC_DIAGNOSTIC", "PARAMETER_SENSITIVITY"]
             model_config = ConfigDict(extra="forbid")
 
         class CriticDecisionSchema(BaseModel):
             decision: Literal["PROPOSE_REVISION", "NO_USEFUL_REVISION"]
-            parent_spec_id: str | None = None
-            change: CriticChangeSchema | None = None
+            intent: CriticIntentSchema | None = None
             rationale: str | None = None
             prediction: str | None = None
             confidence: Literal["low", "medium", "high"] | None = None
-
             model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
         text_format = CriticDecisionSchema
 
         try:
-            # The Responses API expects `input` to be a string or an array of input items.
-            # Serialize deterministically to a JSON string so SDK receives a stable input.
             input_str = json.dumps(payload, sort_keys=True)
             response = self._client.responses.parse(
                 model=self.model,
@@ -202,19 +192,13 @@ class OpenAIResearchCritic(ResearchCritic):
         except Exception:
             raise
 
-        # Compact provenance — no encrypted reasoning, no schema dumps
         raw_response_str = _extract_compact_provenance(response)
 
-        # SDK v3.3.0: use the parsed result returned by responses.parse()
-        # The Responses API places structured outputs inside `response.output` messages.
         parsed = None
-        outputs = getattr(response, "output", None) or []
-        for out in outputs:
-            # expect message type
+        for out in getattr(response, "output", None) or []:
             if getattr(out, "type", None) != "message":
                 continue
-            content = getattr(out, "content", []) or []
-            for item in content:
+            for item in getattr(out, "content", []) or []:
                 if getattr(item, "type", None) == "output_text":
                     parsed = getattr(item, "parsed", None)
                     if parsed is not None:
@@ -224,45 +208,101 @@ class OpenAIResearchCritic(ResearchCritic):
         if not parsed:
             raise ValueError("Structured output missing or unparseable")
 
-        # If parsed is a Pydantic model instance, convert to dict using by-alias
         try:
             if hasattr(parsed, "model_dump"):
                 parsed = parsed.model_dump(by_alias=True)
-            elif isinstance(parsed, dict):
-                parsed = parsed
-            elif hasattr(parsed, "dict"):
+            elif not isinstance(parsed, dict) and hasattr(parsed, "dict"):
                 parsed = parsed.dict()
         except Exception:
             pass
 
-        # Map parsed dict to CriticDecision
-        decision_raw = parsed
         try:
-            dec_type = CriticDecisionType[decision_raw.get("decision")]
+            dec_type = CriticDecisionType[parsed.get("decision")]
         except Exception:
             raise ValueError("Invalid decision type from provider")
 
-        parent_spec_id = decision_raw.get("parent_spec_id")
-        change = decision_raw.get("change")
-        if change is None:
-            changes = None
+        # parent_spec_id is authoritative from context, never from AI output
+        authoritative_spec_id = (self._ctx(context, "current_spec") or {}).get("id")
+
+        if dec_type == CriticDecisionType.NO_USEFUL_REVISION:
+            decision = CriticDecision(
+                id=new_id(),
+                research_run_id=self._ctx(context, "research_run_id"),
+                decision_type=dec_type,
+                parent_spec_id=authoritative_spec_id,
+                changes=None,
+                rationale=parsed.get("rationale"),
+                prediction=parsed.get("prediction"),
+                confidence=parsed.get("confidence"),
+                provider=self.provider,
+                model=self.model,
+                raw_response=raw_response_str,
+            )
+            validate_critic_decision(decision)
+            return decision
+
+        # PROPOSE_REVISION — fail closed if authoritative spec ID is unavailable
+        if not authoritative_spec_id:
+            raise ValueError("Cannot propose revision: authoritative current_spec has no id")
+
+        # PROPOSE_REVISION — parse intent and run deterministic planner
+        intent_raw = parsed.get("intent")
+        if not intent_raw:
+            raise ValueError("PROPOSE_REVISION requires intent field")
+
+        if isinstance(intent_raw, dict):
+            intent_param = intent_raw.get("parameter")
+            direction_raw = intent_raw.get("direction")
+            experiment_raw = intent_raw.get("experiment_type")
         else:
-            # convert to application change dict {parameter: to}
-            changes = {change["parameter"]: change.get("to")}
+            intent_param = getattr(intent_raw, "parameter", None)
+            direction_raw = getattr(intent_raw, "direction", None)
+            experiment_raw = getattr(intent_raw, "experiment_type", None)
+
+        try:
+            direction = RevisionDirection[direction_raw]
+            experiment_type = ExperimentType[experiment_raw]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"Invalid intent direction or experiment_type: {exc}") from exc
+
+        intent = RevisionIntent(
+            id=new_id(),
+            research_run_id=self._ctx(context, "research_run_id"),
+            parent_spec_id=authoritative_spec_id,
+            parameter=intent_param,
+            direction=direction,
+            experiment_type=experiment_type,
+            rationale=parsed.get("rationale"),
+            prediction=parsed.get("prediction"),
+            confidence=parsed.get("confidence"),
+            provider=self.provider,
+            model=self.model,
+            prompt_version=self.prompt_version,
+        )
+        validate_revision_intent(intent)
+
+        current_spec = self._ctx(context, "current_spec") or {}
+        constraints = self._ctx(context, "allowed_revision_constraints") or build_default_constraints()
+        lineage = self._ctx(context, "prior_lineage") or []
+
+        plan_result = RevisionPlanner().plan(intent, current_spec, constraints, lineage)
+        if plan_result.rejection_reason is not None:
+            raise PlannerRejectionError(plan_result.rejection_reason, plan_result)
 
         decision = CriticDecision(
             id=new_id(),
             research_run_id=self._ctx(context, "research_run_id"),
             decision_type=dec_type,
-            parent_spec_id=parent_spec_id,
-            changes=changes,
-            rationale=decision_raw.get("rationale"),
-            prediction=decision_raw.get("prediction"),
-            confidence=decision_raw.get("confidence"),
+            parent_spec_id=authoritative_spec_id,
+            changes=plan_result.planned_change,
+            rationale=intent.rationale,
+            prediction=intent.prediction,
+            confidence=intent.confidence,
             provider=self.provider,
             model=self.model,
             raw_response=raw_response_str,
+            revision_intent=_dc.asdict(intent),
+            planner_version=plan_result.planner_version,
         )
-
         validate_critic_decision(decision)
         return decision

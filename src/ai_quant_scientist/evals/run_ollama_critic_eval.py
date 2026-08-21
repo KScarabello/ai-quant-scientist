@@ -15,13 +15,22 @@ from ai_quant_scientist.services.ollama_research_critic import OllamaResearchCri
 
 
 def _serialise_decision(decision) -> dict:
+    """Convert a CriticDecision (frozen slotted dataclass) to a JSON-safe dict."""
     raw = dataclasses.asdict(decision)
-    for k, v in raw.items():
-        if isinstance(v, Enum):
-            raw[k] = v.name
-        elif isinstance(v, datetime):
-            raw[k] = v.isoformat()
-    return raw
+    return _json_safe(raw)
+
+
+def _json_safe(obj):
+    """Recursively convert Enum and datetime values to JSON-safe types."""
+    if isinstance(obj, Enum):
+        return obj.name
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    return obj
 
 
 def run_ollama_eval(

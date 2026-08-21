@@ -57,42 +57,43 @@ def make_client_that_raises_then_returns(parsed: dict):
 
 
 def test_structured_parsing_propose_revision(monkeypatch):
+    from ai_quant_scientist.evals.critic_eval import build_critic_context
     cases = load_cases_from_file("evals/critic_v1.json")
-    case = cases[0]
+    case = cases[0]  # spec-01: signal_threshold=2.0, default constraints step=0.5
+    ctx = build_critic_context(case)
     parsed = {
         "decision": "PROPOSE_REVISION",
         "parent_spec_id": case.context.get("current_spec", {}).get("id"),
-        "change": {"parameter": "signal_threshold", "from": 2.0, "to": 1.5},
-        "rationale": "short",
-        "prediction": "trade_count up",
+        "intent": {"parameter": "signal_threshold", "direction": "DECREASE", "experiment_type": "MECHANISTIC_DIAGNOSTIC"},
+        "rationale": "TOO_FEW_TRADES: lowering threshold should increase trade frequency",
+        "prediction": "trade count will increase",
         "confidence": "medium",
     }
     client = make_client_that_returns(parsed, usage={"input_tokens": 5, "output_tokens": 10})
-    # inject client
-    crit = OpenAIResearchCritic(client=client)
-    decision = crit.critique(case.context)
+    decision = OpenAIResearchCritic(client=client).critique(ctx)
     assert decision.decision_type.name == "PROPOSE_REVISION"
+    # planner selects nearest DECREASE step: 2.0 - 0.5 = 1.5
     assert decision.changes == {"signal_threshold": 1.5}
+    assert decision.planner_version is not None
 
 
 def test_structured_parsing_no_useful(monkeypatch):
     cases = load_cases_from_file("evals/critic_v1.json")
     case = cases[1]
-    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": case.context.get("current_spec", {}).get("id"), "change": None, "rationale": "no useful"}
+    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": case.context.get("current_spec", {}).get("id"),
+              "intent": None, "rationale": "no useful", "prediction": None, "confidence": None}
     client = make_client_that_returns(parsed)
-    crit = OpenAIResearchCritic(client=client)
-    decision = crit.critique(case.context)
+    decision = OpenAIResearchCritic(client=client).critique(case.context)
     assert decision.decision_type.name == "NO_USEFUL_REVISION"
 
 
 def test_usage_extraction_in_invocation(monkeypatch):
     cases = load_cases_from_file("evals/critic_v1.json")
     case = cases[0]
-    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": case.context.get("current_spec", {}).get("id"), "change": None}
+    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": case.context.get("current_spec", {}).get("id"),
+              "intent": None, "rationale": "ok", "prediction": None, "confidence": None}
     client = make_client_that_returns(parsed, usage={"input_tokens": 7, "output_tokens": 13})
-    crit = OpenAIResearchCritic(client=client)
-    decision = crit.critique(case.context)
-    # invocation metadata is embedded in decision.raw_response via adapter
+    decision = OpenAIResearchCritic(client=client).critique(case.context)
     assert decision.raw_response is not None
 
 
@@ -134,12 +135,15 @@ def test_live_runner_retries_on_transient(monkeypatch, tmp_path):
 
 def test_parse_called_with_expected_kwargs(monkeypatch):
     cases = load_cases_from_file("evals/critic_v1.json")
-    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": cases[0].context.get("current_spec", {}).get("id"), "change": None}
+    from ai_quant_scientist.evals.critic_eval import build_critic_context
+    ctx = build_critic_context(cases[0])
+    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": None,
+              "intent": None, "rationale": "none", "prediction": None, "confidence": None}
     client = make_client_that_returns(parsed)
     crit = OpenAIResearchCritic(client=client)
     # capture expected structured payload before invocation
-    expected_payload = crit._build_messages(cases[0].context)
-    decision = crit.critique(cases[0].context)
+    expected_payload = crit._build_messages(ctx)
+    decision = crit.critique(ctx)
     # assert parse was called
     client.responses.parse.assert_called()
     # inspect last call args
@@ -168,16 +172,9 @@ def test_live_runner_guard_no_allow(monkeypatch):
 def test_openai_compact_provenance_no_encrypted_content():
     """raw_response must contain response_id/model/usage/output_text; must NOT contain encrypted_content."""
     cases = load_cases_from_file("evals/critic_v1.json")
-    parsed = {
-        "decision": "NO_USEFUL_REVISION",
-        "parent_spec_id": None,
-        "change": None,
-        "rationale": "no useful revision",
-        "prediction": None,
-        "confidence": None,
-    }
-    usage = {"input_tokens": 42, "output_tokens": 17}
-    client = make_client_that_returns(parsed, usage=usage)
+    parsed = {"decision": "NO_USEFUL_REVISION", "parent_spec_id": None,
+              "intent": None, "rationale": "no useful revision", "prediction": None, "confidence": None}
+    client = make_client_that_returns(parsed, usage={"input_tokens": 42, "output_tokens": 17})
     decision = OpenAIResearchCritic(client=client).critique(cases[0].context)
 
     prov = json.loads(decision.raw_response)

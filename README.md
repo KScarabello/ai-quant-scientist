@@ -1,4 +1,38 @@
-AI Quant Scientist — V0.7 (Contract Hardening; Benchmark V1 complete)
+AI Quant Scientist — V0.8 (Revision Intent + Deterministic Planner)
+
+Core architectural principle:
+
+  AI decides experimental intent.
+  Deterministic Revision Planner chooses exact parameter value.
+  Governance validates the result.
+
+Intent Architecture (V0.8)
+- AI (Terra + Prompt V3) expresses RevisionIntent: parameter name, direction (INCREASE/DECREASE/PERTURB),
+  and experiment type (MECHANISTIC_DIAGNOSTIC / PARAMETER_SENSITIVITY).
+- The AI does NOT specify an exact target value.
+- RevisionPlanner (revision_planner_v1) resolves intent to an exact value deterministically:
+    smallest legal untested perturbation in the requested direction.
+    same inputs always produce the same output.
+    fails closed when no legal non-redundant candidate exists.
+- RevisionPlanner makes zero LLM/API calls.
+- Resulting change flows into the existing deterministic SpecRevisionProposal workflow.
+- Human acceptance remains required.
+
+Planner V1 policy
+- Float parameters: requires a step field in constraints; rejects if absent (no arbitrary heuristics).
+- Integer parameters: defaults to step=1 if no step is specified.
+- Default constraint grid: signal_threshold step=0.5, lookback step=5.
+- Candidate selection: nearest untested full-spec in the requested direction.
+- Lineage checked at full-spec level (not just individual parameter value).
+
+Provisional critic: gpt-5.6-terra (Terra + Prompt V3, hardened context, intent contract)
+Terra is the current candidate model — not permanently selected.
+
+Previous benchmark artifacts (Luna, Terra V1/V2/V3, Sol, Llama)
+- Produced under old value-contract (AI chose exact numeric value).
+- Constraint plumbing fix and intent architecture follow those runs.
+- Those artifacts remain as historical evidence, not as final scientific comparisons.
+
 
 Evaluation Integrity Note (post-Benchmark-V1)
 - A context plumbing bug was discovered and fixed after Benchmark V1 was run.
