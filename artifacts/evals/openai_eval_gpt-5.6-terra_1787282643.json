@@ -1,0 +1,43 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787282643,
+  "results": [
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "ab52e588-474f-4b45-9957-d0f7bd65e74e",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "The sole diagnostic is TOO_FEW_TRADES, and signal_threshold directly governs signal eligibility. Lowering it is a bounded test of whether restrictive signal gating is causing the low trade count.",
+        "prediction": "Signal eligibility and trade count should increase; the result will reveal whether threshold gating is the principal source of sparse observations.",
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0c0cd5eb4e5a106c016a87c4d50cfc87d09eb930ccf9af51f2\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787282645.0, \"completed_at\": 1787282647.0, \"store\": false, \"usage\": {\"input_tokens\": 1683, \"output_tokens\": 111, \"reasoning_tokens\": 0, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"intent\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"direction\\\":\\\"DECREASE\\\",\\\"experiment_type\\\":\\\"MECHANISTIC_DIAGNOSTIC\\\"},\\\"rationale\\\":\\\"The sole diagnostic is TOO_FEW_TRADES, and signal_threshold directly governs signal eligibility. Lowering it is a bounded test of whether restrictive signal gating is causing the low trade count.\\\",\\\"prediction\\\":\\\"Signal eligibility and trade count should increase; the result will reveal whether threshold gating is the principal source of sparse observations.\\\",\\\"confidence\\\":\\\"high\\\"}\"}",
+        "revision_intent": {
+          "id": "eac91de0-285a-47f9-a171-44f4879cc42b",
+          "research_run_id": "run-02",
+          "parent_spec_id": "spec-02",
+          "parameter": "signal_threshold",
+          "direction": "DECREASE",
+          "experiment_type": "MECHANISTIC_DIAGNOSTIC",
+          "rationale": "The sole diagnostic is TOO_FEW_TRADES, and signal_threshold directly governs signal eligibility. Lowering it is a bounded test of whether restrictive signal gating is causing the low trade count.",
+          "prediction": "Signal eligibility and trade count should increase; the result will reveal whether threshold gating is the principal source of sparse observations.",
+          "confidence": "high",
+          "provider": "openai",
+          "model": "gpt-5.6-terra",
+          "prompt_version": "v3",
+          "created_at": "2026-08-21T03:24:07.376746+00:00"
+        },
+        "planner_version": "revision_planner_v1",
+        "created_at": "2026-08-21T03:24:07.376865+00:00"
+      }
+    }
+  ]
+}
