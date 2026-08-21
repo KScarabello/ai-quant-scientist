@@ -1,4 +1,126 @@
-AI Quant Scientist — V0.8 (Revision Intent + Deterministic Planner)
+AI Quant Scientist — V0.10 (Research Candidate + Deterministic Feasibility Gate)
+
+Architecture (current):
+
+  Idea
+   ↓
+  Future Hypothesis Scientist  ← NOT YET IMPLEMENTED
+   ↓
+  ResearchCandidate
+    ├─ hypothesis_statement
+    ├─ hypothesis_rationale
+    └─ requirements (explicit, NOT inferred from prose)
+         ├─ DataRequirement(...)
+         └─ ToolRequirement(...)
+   ↓
+  ResearchFeasibilityGate.evaluate(candidate, registry)
+   ↓
+  ┌──────────────────────────┬──────────────────────────────┐
+  │ READY_FOR_SPEC            │ BLOCKED_CAPABILITY           │
+  │                           │                              │
+  │ all requirements met      │ Missing Capability Report    │
+  │                           │ (hypothesis NOT rejected)    │
+  └──────────────────────────┴──────────────────────────────┘
+   ↓
+  Future Spec Builder   (READY_FOR_SPEC only)
+   ↓
+  ResearchSpec
+   ↓
+  existing research pipeline
+
+Key principles:
+  - Requirements are explicit domain objects — never inferred from hypothesis prose
+  - BLOCKED_CAPABILITY ≠ scientifically invalid hypothesis
+  - Fail-closed: Capability.field=None means "not declared", not "unrestricted"
+  - AI cannot override feasibility decisions
+  - Same candidate + registry → same gate decision
+
+V0.10 components
+  ResearchCandidate — pre-spec proposal with explicit requirements (gate.py)
+  ResearchFeasibilityGate — deterministic gate boundary (gate.py)
+  GateDecision — READY_FOR_SPEC | BLOCKED_CAPABILITY
+  ResearchFeasibilityDecision — structured verdict + provenance + registry fingerprint
+  Gate policy version: research_feasibility_gate_v1
+
+V0.9 components (hardened in V0.10)
+  CapabilityRegistry — fail-closed; Capability.None ≠ unrestricted
+  DataRequirement + ToolRequirement — explicit requirement types (ToolRequirement new in V0.10)
+  FeasibilityResult — TESTABLE | NOT_TESTABLE with reason codes
+  Registry version: capability_registry_v1
+  Registry fingerprint: SHA-256 over canonical capability definitions
+
+V1 actual capabilities (truthful — stub only)
+  stub_backtester_v1: SYNTHETIC_PARAMETRIC / SYNTHETIC / NOT_APPLICABLE
+  No real market data. No real instruments. No real asset class.
+
+Persistence: not yet needed (no autonomous generation); future integration point
+  is to record ResearchCandidate + ResearchFeasibilityDecision with each ResearchRun.
+
+CLI:
+  python3 -m ai_quant_scientist.cli capabilities             (list registry)
+  python3 -m ai_quant_scientist.cli feasibility-check --preset synthetic
+  python3 -m ai_quant_scientist.cli feasibility-check --preset ohlcv-mes
+
+Hypothesis Scientist is NOT implemented. Requirements are NOT inferred from prose.
+
+
+Core question answered by V0.9:
+  "Can this system actually test the proposed research?"
+
+Architecture (current):
+
+  Idea
+   ↓
+  Hypothesis
+   ↓
+  DataRequirement(s)
+   ↓
+  CapabilityRegistry.evaluate(requirements) → FeasibilityResult
+   ↓
+  ┌────────────────────────┬─────────────────────────┐
+  │ TESTABLE               │ NOT_TESTABLE             │
+  │                        │                          │
+  │ all requirements met   │ missing capability report│
+  └────────────────────────┴─────────────────────────┘
+   ↓
+  ResearchSpec → existing research pipeline
+
+Distinction:
+  Scientific desirability: AI responsibility (future Hypothesis Scientist)
+  Testability:             deterministic CapabilityRegistry  ← V0.9
+  Execution:               deterministic tools (StubBacktester)
+  Governance:              explicit FeasibilityResult
+
+V0.9 capabilities
+- CapabilityRegistry (registry.py) — deterministic, fail-closed, no network calls
+  - Same registry + requirements → same FeasibilityResult
+  - Registry fingerprint: SHA-256 over canonical sorted capability definitions
+  - Registry version: capability_registry_v1
+- DataRequirement domain model — constrained dimensions: data_kind, asset_class,
+  resolution, required_fields, instruments, date coverage, point_in_time, parameters
+- FeasibilityResult — machine-readable: status, per-requirement verdicts, reason codes,
+  registry_version, registry_fingerprint
+- Reason codes: NO_MATCHING_DATA_KIND, ASSET_CLASS_UNAVAILABLE, INSTRUMENT_UNAVAILABLE,
+  RESOLUTION_UNAVAILABLE, REQUIRED_FIELD_MISSING, DATE_COVERAGE_INSUFFICIENT,
+  POINT_IN_TIME_UNAVAILABLE, CAPABILITY_DISABLED, TOOL_UNAVAILABLE, REQUIRED_PARAMETER_MISSING
+
+V0.9 actual capabilities registered (conservative truth)
+- stub_backtester_v1 (EXECUTION_TOOL):
+    data_kind = SYNTHETIC_PARAMETRIC
+    asset_class = SYNTHETIC
+    resolution = NOT_APPLICABLE
+    parameters: signal_threshold (float), lookback (int)
+    NO real market data. NO real instruments. NO real asset class.
+  → This is the only registered capability. The registry is sparse by design.
+
+Design note: NOT_TESTABLE ≠ scientifically invalid hypothesis.
+  Missing capability → record missing requirements; defer for data acquisition.
+  The FeasibilityResult preserves unsatisfied requirements for future tracking.
+
+CLI: python3 -m ai_quant_scientist.cli capabilities  (lists capabilities + fingerprint as JSON)
+
+Not yet implemented: Hypothesis Scientist (AI), real data providers, live backtester.
+
 
 Core architectural principle:
 

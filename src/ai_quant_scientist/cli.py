@@ -16,6 +16,11 @@ from .models.research import SpecRevisionProposal, new_id
 from .models.enums import ResearchAction, SpecRevisionProposalStatus
 from .services.research_critic import FakeResearchCritic, run_critic_for_run
 from .models.critic import CriticInvocation
+from .capabilities.v1_registry import build_v1_registry
+from .capabilities.gate import ResearchCandidate, ResearchFeasibilityGate, GateDecision
+from .capabilities.models import (
+    AssetClass, DataKind, DataRequirement, Resolution, ToolRequirement,
+)
 
 
 DEFAULT_DB_PATH = Path("data/ai_quant_scientist.db")
@@ -189,6 +194,83 @@ def cmd_accept_revision(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_capabilities(args: argparse.Namespace) -> int:
+    import json
+    registry = build_v1_registry()
+    caps = [
+        {
+            "capability_id": c.capability_id,
+            "capability_type": c.capability_type,
+            "data_kind": c.data_kind.value,
+            "asset_classes": [a.value for a in c.asset_classes],
+            "resolutions": [r.value for r in c.resolutions],
+            "instruments": sorted(c.instruments) if c.instruments is not None else None,
+            "available_fields": sorted(c.available_fields) if c.available_fields is not None else None,
+            "supported_parameters": sorted(c.supported_parameters) if c.supported_parameters is not None else None,
+            "coverage_start": c.coverage_start.isoformat() if c.coverage_start else None,
+            "coverage_end": c.coverage_end.isoformat() if c.coverage_end else None,
+            "point_in_time": c.point_in_time,
+            "provider": c.provider,
+            "enabled": c.enabled,
+            "version": c.version,
+            "metadata": c.metadata,
+        }
+        for c in registry.list_capabilities()
+    ]
+    output = {
+        "registry_version": registry.version,
+        "registry_fingerprint": registry.fingerprint,
+        "capabilities": caps,
+    }
+    print(json.dumps(output, indent=2))
+    return 0
+
+
+def cmd_feasibility_check(args: argparse.Namespace) -> int:
+    import json
+    registry = build_v1_registry()
+    gate = ResearchFeasibilityGate()
+
+    if args.preset == "synthetic":
+        candidate = ResearchCandidate.create(
+            hypothesis_statement="signal_threshold controls trade frequency",
+            hypothesis_rationale="SYNTHETIC: deterministic stub experiment",
+            requirements=[
+                DataRequirement(requirement_id="data", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+                                asset_class=AssetClass.SYNTHETIC),
+                ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1"),
+            ],
+        )
+    elif args.preset == "ohlcv-mes":
+        candidate = ResearchCandidate.create(
+            hypothesis_statement="order-book imbalance predicts MES futures returns",
+            hypothesis_rationale="microstructure hypothesis requiring real market data",
+            requirements=[
+                DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
+                                asset_class=AssetClass.FUTURES, instruments=("MES",),
+                                resolution=Resolution.SECOND_1),
+                ToolRequirement(requirement_id="tool", tool_name="futures_backtester"),
+            ],
+        )
+    else:
+        raise SystemExit(f"Unknown preset: {args.preset}. Available: synthetic, ohlcv-mes")
+
+    decision = gate.evaluate(candidate, registry)
+    fr = decision.feasibility_result
+    output = {
+        "candidate_id": decision.candidate_id,
+        "decision": decision.decision.value,
+        "gate_version": decision.gate_version,
+        "registry_version": decision.registry_version,
+        "registry_fingerprint": decision.registry_fingerprint,
+        "satisfied_ids": list(fr.satisfied_ids),
+        "unsatisfied_ids": list(fr.unsatisfied_ids),
+        "reason_codes": [r.value for r in fr.reason_codes],
+    }
+    print(json.dumps(output, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ai_quant_scientist")
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
@@ -237,6 +319,19 @@ def build_parser() -> argparse.ArgumentParser:
     critique_parser = subparsers.add_parser("critique", help="Run AI research critic for a run (supervised)")
     critique_parser.add_argument("run_id")
     critique_parser.set_defaults(func=cmd_critique)
+
+    capabilities_parser = subparsers.add_parser("capabilities", help="List registered capabilities and registry version")
+    capabilities_parser.set_defaults(func=cmd_capabilities)
+
+    feasibility_parser = subparsers.add_parser(
+        "feasibility-check",
+        help="Evaluate a named candidate preset against the V1 registry",
+    )
+    feasibility_parser.add_argument(
+        "--preset", choices=["synthetic", "ohlcv-mes"], default="synthetic",
+        help="built-in candidate preset (default: synthetic)",
+    )
+    feasibility_parser.set_defaults(func=cmd_feasibility_check)
 
     evaluations_parser = subparsers.add_parser("evaluations", help="Show persisted evaluation decisions for a run")
     evaluations_parser.add_argument("run_id")
