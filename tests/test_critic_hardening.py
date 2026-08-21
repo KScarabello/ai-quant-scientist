@@ -458,8 +458,12 @@ def test_v3_to_v4_migration(tmp_path):
         r = c.execute("SELECT id FROM research_runs WHERE id = ?", (run_id,)).fetchone()
         assert r is not None
 
-    # reopen to test idempotency
+    # reopen to test v4->v5 migration runs on second instantiation
     store2 = SQLiteStore(db)
     with store2.connect() as c:
         ver2 = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver2 == 4
+        assert ver2 == 5
+        # new tables must exist
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        assert "research_candidates" in tables
+        assert "feasibility_decisions" in tables

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from uuid import uuid4
 
-from .models import AnyRequirement, DataRequirement, ToolRequirement
+from .models import AnyRequirement, DataRequirement, FeasibilityResult, ToolRequirement
 from .registry import CapabilityRegistry
 
 GATE_VERSION = "research_feasibility_gate_v1"
@@ -94,11 +94,13 @@ class ResearchFeasibilityDecision:
     """
     candidate_id: str
     decision: GateDecision
-    feasibility_result: object   # FeasibilityResult — typed as object to avoid circular hint
+    feasibility_result: FeasibilityResult
     gate_version: str
     registry_version: str
     registry_fingerprint: str
     evaluated_at: datetime = field(default_factory=_utcnow)
+    # auto-generated DB identity; last field so it does not break positional construction
+    id: str = field(default_factory=_new_id)
 
     @property
     def is_ready(self) -> bool:

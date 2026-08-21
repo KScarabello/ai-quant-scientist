@@ -18,6 +18,7 @@ from .services.research_critic import FakeResearchCritic, run_critic_for_run
 from .models.critic import CriticInvocation
 from .capabilities.v1_registry import build_v1_registry
 from .capabilities.gate import ResearchCandidate, ResearchFeasibilityGate, GateDecision
+from .capabilities.intake import GovernedResearchIntake
 from .capabilities.models import (
     AssetClass, DataKind, DataRequirement, Resolution, ToolRequirement,
 )
@@ -271,6 +272,69 @@ def cmd_feasibility_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_candidates(args: argparse.Namespace) -> int:
+    import json
+    store = SQLiteStore(args.db_path)
+    candidates = store.list_research_candidates()
+    output = [
+        {
+            "id": c.id,
+            "hypothesis_statement": c.hypothesis_statement,
+            "source": c.source,
+            "requirement_count": len(c.requirements),
+            "created_at": c.created_at.isoformat(),
+        }
+        for c in candidates
+    ]
+    print(json.dumps(output, indent=2))
+    return 0
+
+
+def cmd_candidate(args: argparse.Namespace) -> int:
+    import json
+    from .capabilities.serialization import requirements_to_json, compute_candidate_fingerprint
+    store = SQLiteStore(args.db_path)
+    candidate = store.get_research_candidate(args.candidate_id)
+    if candidate is None:
+        raise SystemExit(f"Unknown candidate: {args.candidate_id}")
+    import json as _json
+    output = {
+        "id": candidate.id,
+        "hypothesis_statement": candidate.hypothesis_statement,
+        "hypothesis_rationale": candidate.hypothesis_rationale,
+        "source": candidate.source,
+        "created_at": candidate.created_at.isoformat(),
+        "scientific_fingerprint": compute_candidate_fingerprint(
+            candidate.hypothesis_statement, candidate.hypothesis_rationale, candidate.requirements,
+        ),
+        "requirements": _json.loads(requirements_to_json(candidate.requirements)),
+    }
+    print(json.dumps(output, indent=2))
+    return 0
+
+
+def cmd_feasibility_history(args: argparse.Namespace) -> int:
+    import json
+    store = SQLiteStore(args.db_path)
+    decisions = store.get_feasibility_decisions(args.candidate_id)
+    output = [
+        {
+            "id": d.id,
+            "gate_decision": d.gate_decision.value,
+            "gate_version": d.gate_version,
+            "registry_version": d.registry_version,
+            "registry_fingerprint": d.registry_fingerprint,
+            "satisfied_ids": list(d.satisfied_ids),
+            "unsatisfied_ids": list(d.unsatisfied_ids),
+            "reason_codes": [r.value for r in d.reason_codes],
+            "evaluated_at": d.evaluated_at.isoformat(),
+        }
+        for d in decisions
+    ]
+    print(json.dumps(output, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ai_quant_scientist")
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
@@ -332,6 +396,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="built-in candidate preset (default: synthetic)",
     )
     feasibility_parser.set_defaults(func=cmd_feasibility_check)
+
+    candidates_parser = subparsers.add_parser("candidates", help="List persisted research candidates")
+    candidates_parser.set_defaults(func=cmd_candidates)
+
+    candidate_parser = subparsers.add_parser("candidate", help="Show a specific research candidate")
+    candidate_parser.add_argument("candidate_id")
+    candidate_parser.set_defaults(func=cmd_candidate)
+
+    fh_parser = subparsers.add_parser("feasibility-history", help="Show feasibility decisions for a candidate")
+    fh_parser.add_argument("candidate_id")
+    fh_parser.set_defaults(func=cmd_feasibility_history)
 
     evaluations_parser = subparsers.add_parser("evaluations", help="Show persisted evaluation decisions for a run")
     evaluations_parser.add_argument("run_id")

@@ -25,7 +25,7 @@ from ..models.enums import ResearchAction, SpecRevisionProposalStatus
 from ..models.critic import CriticInvocation, CriticDecision
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class SQLiteStore:
@@ -176,6 +176,29 @@ class SQLiteStore:
                     created_at TEXT NOT NULL,
                     completed_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS research_candidates (
+                    id TEXT PRIMARY KEY,
+                    hypothesis_statement TEXT NOT NULL,
+                    hypothesis_rationale TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    requirements_json TEXT NOT NULL,
+                    candidate_fingerprint TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS feasibility_decisions (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    gate_decision TEXT NOT NULL,
+                    gate_version TEXT NOT NULL,
+                    registry_version TEXT NOT NULL,
+                    registry_fingerprint TEXT NOT NULL,
+                    feasibility_result_json TEXT NOT NULL,
+                    satisfied_ids_json TEXT NOT NULL,
+                    unsatisfied_ids_json TEXT NOT NULL,
+                    reason_codes_json TEXT NOT NULL,
+                    evaluated_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                );
                 """
             )
             current_version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
@@ -249,6 +272,36 @@ class SQLiteStore:
                             resulting_proposal_id TEXT,
                             created_at TEXT NOT NULL,
                             completed_at TEXT
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (4,))
+                elif v == 4:
+                    # migrate v4 -> v5: add research_candidates and feasibility_decisions
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_candidates (
+                            id TEXT PRIMARY KEY,
+                            hypothesis_statement TEXT NOT NULL,
+                            hypothesis_rationale TEXT NOT NULL,
+                            source TEXT NOT NULL,
+                            requirements_json TEXT NOT NULL,
+                            candidate_fingerprint TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        );
+                        CREATE TABLE IF NOT EXISTS feasibility_decisions (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            gate_decision TEXT NOT NULL,
+                            gate_version TEXT NOT NULL,
+                            registry_version TEXT NOT NULL,
+                            registry_fingerprint TEXT NOT NULL,
+                            feasibility_result_json TEXT NOT NULL,
+                            satisfied_ids_json TEXT NOT NULL,
+                            unsatisfied_ids_json TEXT NOT NULL,
+                            reason_codes_json TEXT NOT NULL,
+                            evaluated_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
                         );
                         """
                     )
@@ -904,3 +957,132 @@ class SQLiteStore:
                 )
             )
         return events
+
+    # ─── Research candidates ──────────────────────────────────────────────────
+
+    def save_research_candidate(self, candidate) -> None:
+        """Persist a ResearchCandidate.  Idempotent: duplicate id is silently skipped."""
+        from ..capabilities.serialization import (
+            requirements_to_json,
+            compute_candidate_fingerprint,
+        )
+        fingerprint = compute_candidate_fingerprint(
+            candidate.hypothesis_statement,
+            candidate.hypothesis_rationale,
+            candidate.requirements,
+        )
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO research_candidates
+                   (id, hypothesis_statement, hypothesis_rationale, source,
+                    requirements_json, candidate_fingerprint, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    candidate.id,
+                    candidate.hypothesis_statement,
+                    candidate.hypothesis_rationale,
+                    candidate.source,
+                    requirements_to_json(candidate.requirements),
+                    fingerprint,
+                    candidate.created_at.isoformat(),
+                ),
+            )
+
+    def get_research_candidate(self, candidate_id: str):
+        """Return a ResearchCandidate or None if not found."""
+        from ..capabilities.gate import ResearchCandidate
+        from ..capabilities.serialization import requirements_from_json
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_candidates WHERE id = ?", (candidate_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchCandidate(
+            id=row["id"],
+            hypothesis_statement=row["hypothesis_statement"],
+            hypothesis_rationale=row["hypothesis_rationale"],
+            source=row["source"],
+            requirements=requirements_from_json(row["requirements_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def list_research_candidates(self) -> list:
+        """Return all persisted ResearchCandidates ordered by created_at."""
+        from ..capabilities.gate import ResearchCandidate
+        from ..capabilities.serialization import requirements_from_json
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM research_candidates ORDER BY created_at, rowid"
+            ).fetchall()
+        return [
+            ResearchCandidate(
+                id=r["id"],
+                hypothesis_statement=r["hypothesis_statement"],
+                hypothesis_rationale=r["hypothesis_rationale"],
+                source=r["source"],
+                requirements=requirements_from_json(r["requirements_json"]),
+                created_at=datetime.fromisoformat(r["created_at"]),
+            )
+            for r in rows
+        ]
+
+    def save_feasibility_decision(self, decision) -> None:
+        """Persist a ResearchFeasibilityDecision.  Never overwrites prior decisions."""
+        from ..capabilities.serialization import feasibility_result_to_dict
+        import json as _json
+        fr = decision.feasibility_result
+        snapshot = feasibility_result_to_dict(fr)
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO feasibility_decisions
+                   (id, candidate_id, gate_decision, gate_version, registry_version,
+                    registry_fingerprint, feasibility_result_json,
+                    satisfied_ids_json, unsatisfied_ids_json, reason_codes_json,
+                    evaluated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    decision.id,
+                    decision.candidate_id,
+                    decision.decision.value,
+                    decision.gate_version,
+                    decision.registry_version,
+                    decision.registry_fingerprint,
+                    _json.dumps(snapshot, sort_keys=True),
+                    _json.dumps(list(fr.satisfied_ids)),
+                    _json.dumps(list(fr.unsatisfied_ids)),
+                    _json.dumps([r.value for r in fr.reason_codes]),
+                    decision.evaluated_at.isoformat(),
+                ),
+            )
+
+    def get_feasibility_decisions(self, candidate_id: str) -> list:
+        """Return all feasibility decisions for a candidate, oldest first."""
+        from ..capabilities.gate import GateDecision
+        from ..capabilities.models import FeasibilityReasonCode
+        from ..capabilities.intake import StoredFeasibilityDecision
+        import json as _json
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM feasibility_decisions WHERE candidate_id = ? ORDER BY evaluated_at, rowid",
+                (candidate_id,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            reason_codes = tuple(
+                FeasibilityReasonCode[c] for c in _json.loads(row["reason_codes_json"])
+            )
+            result.append(StoredFeasibilityDecision(
+                id=row["id"],
+                candidate_id=row["candidate_id"],
+                gate_decision=GateDecision[row["gate_decision"]],
+                gate_version=row["gate_version"],
+                registry_version=row["registry_version"],
+                registry_fingerprint=row["registry_fingerprint"],
+                satisfied_ids=tuple(_json.loads(row["satisfied_ids_json"])),
+                unsatisfied_ids=tuple(_json.loads(row["unsatisfied_ids_json"])),
+                reason_codes=reason_codes,
+                feasibility_snapshot=_json.loads(row["feasibility_result_json"]),
+                evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
+            ))
+        return result

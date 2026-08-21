@@ -22,6 +22,17 @@ from .gate import (
     ResearchFeasibilityDecision,
     ResearchFeasibilityGate,
 )
+from .intake import (
+    GovernedResearchIntake,
+    IntakeResult,
+    StoredFeasibilityDecision,
+)
+from .serialization import (
+    compute_candidate_fingerprint,
+    feasibility_result_to_dict,
+    requirements_from_json,
+    requirements_to_json,
+)
 
 __all__ = [
     "AnyRequirement",

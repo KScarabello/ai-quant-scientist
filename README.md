@@ -1,4 +1,61 @@
-AI Quant Scientist — V0.10 (Research Candidate + Deterministic Feasibility Gate)
+AI Quant Scientist — V0.11 (Persistent Research Intake + Governed Spec Authorization)
+
+Architecture (current):
+
+  Future Hypothesis Scientist  ← NOT YET IMPLEMENTED
+   ↓
+  ResearchCandidate
+    ├─ hypothesis_statement
+    ├─ hypothesis_rationale
+    └─ requirements (explicit, NOT inferred from prose)
+   ↓
+  GovernedResearchIntake.submit(candidate)
+    ├─ PERSIST candidate (immutable)
+    ├─ ResearchFeasibilityGate.evaluate(candidate, registry)
+    └─ PERSIST FeasibilityDecision (never overwrite; history grows)
+   ↓
+  ┌──────────────────────────┬──────────────────────────────┐
+  │ READY_FOR_SPEC            │ BLOCKED_CAPABILITY           │
+  │                           │                              │
+  │ future Spec Builder       │ Stored Missing Capability    │
+  │                           │ Evidence (auditable)         │
+  └──────────────────────────┴──────────────────────────────┘
+   ↓                                    ↓
+  ResearchSpec                 Candidate remains retrievable;
+   ↓                           hypothesis NOT rejected;
+  existing research pipeline   may be re-evaluated later
+
+Key principles:
+  - Requirements are explicit domain objects — never inferred from prose
+  - Candidates are immutable scientific proposals (no in-place editing)
+  - One candidate may accumulate multiple feasibility decisions as capabilities change
+  - BLOCKED_CAPABILITY ≠ hypothesis rejected; research may become testable later
+  - AI cannot override feasibility decisions
+  - Same candidate + same registry → same logical gate decision
+  - Registry is fail-closed (capability.None ≠ unrestricted)
+
+V0.11 persistence
+  SQLite schema v5 (migrates from v4 in one SQLiteStore instantiation)
+  research_candidates: immutable candidate rows with requirements_json + scientific fingerprint
+  feasibility_decisions: append-only decision rows with full snapshot (registry_fingerprint, gate_version, requirement-level results)
+
+Components
+  GovernedResearchIntake — submit() / re_evaluate()
+  StoredFeasibilityDecision — persisted decision with full provenance
+  ResearchFeasibilityDecision — strong-typed (FeasibilityResult, not object)
+  candidate scientific fingerprint — SHA-256 over hypothesis + rationale + requirements (excludes id/timestamp/source)
+  Gate policy: research_feasibility_gate_v1
+  Registry: capability_registry_v1 (stub only; truthful)
+
+CLI:
+  python3 -m ai_quant_scientist.cli candidates                         (list all)
+  python3 -m ai_quant_scientist.cli candidate <id>                     (details + fingerprint)
+  python3 -m ai_quant_scientist.cli feasibility-history <id>           (all decisions for candidate)
+  python3 -m ai_quant_scientist.cli feasibility-check --preset ...     (dry-run gate check)
+  python3 -m ai_quant_scientist.cli capabilities                       (registry list)
+
+Hypothesis Scientist is NOT implemented. Requirements are NOT inferred from prose.
+
 
 Architecture (current):
 
