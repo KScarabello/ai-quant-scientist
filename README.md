@@ -1,4 +1,56 @@
-AI Quant Scientist — V0.11 (Persistent Research Intake + Governed Spec Authorization)
+AI Quant Scientist — V0.12A (Bounded Hypothesis Scientist)
+
+Architecture (current):
+
+  ResearchBrief (human-supplied or future orchestrator)
+   ↓
+  AI Hypothesis Scientist  ← FIRST AI COMPONENT — proposes only
+   ↓
+  HypothesisScientistDecision (PROPOSE_HYPOTHESIS | NO_HYPOTHESIS)
+   ↓
+  Deterministic HypothesisProposalValidator
+   ↓
+  Candidate materialization (id/source/created_at assigned by software)
+   ↓
+  ResearchCandidate
+   ↓
+  GovernedResearchIntake (persistent, auditable)
+   ↓
+  ResearchFeasibilityGate
+   ↓
+  ┌──────────────────────────┬──────────────────────────────┐
+  │ READY_FOR_SPEC            │ BLOCKED_CAPABILITY           │
+  │                           │ (hypothesis NOT rejected)    │
+  └──────────────────────────┴──────────────────────────────┘
+   ↓
+  Future Spec Builder
+
+Authority boundaries:
+
+AI MAY:
+  - originate exactly one falsifiable hypothesis
+  - explain the scientific rationale
+  - declare explicit data and tool requirements
+  - return NO_HYPOTHESIS when brief is underspecified
+
+AI MAY NOT:
+  - declare feasibility or capability availability
+  - create a ResearchSpec
+  - start or run research
+  - invent empirical evidence
+  - supply governance fields (id, source, created_at)
+  - override the capability registry or feasibility gate
+
+Key V0.12A facts:
+  - Scientist prompt version: hypothesis_scientist_v1
+  - DB schema: v6 (adds hypothesis_scientist_invocations)
+  - ToolRequirement matching: capability_type OR capability_id
+  - Eval set: evals/scientist_v1.json (12 cases)
+  - Live runner: src/.../evals/run_live_scientist_eval.py (--allow-live-api required)
+  - No autonomous loop; no spec builder yet; no RAG; no web search
+  - NO_HYPOTHESIS is a valid scientific decision
+  - BLOCKED_CAPABILITY ≠ bad science; hypothesis preserved for later re-evaluation
+
 
 Architecture (current):
 

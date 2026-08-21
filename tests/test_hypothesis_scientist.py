@@ -1,0 +1,675 @@
+"""Comprehensive deterministic tests for Bounded Hypothesis Scientist V0.12A.
+
+Zero live API calls. Zero network calls.
+"""
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from ai_quant_scientist.capabilities import (
+    AssetClass,
+    DataKind,
+    DataRequirement,
+    GateDecision,
+    Resolution,
+    ToolRequirement,
+    build_v1_registry,
+)
+from ai_quant_scientist.capabilities.gate import ResearchCandidate
+from ai_quant_scientist.capabilities.intake import GovernedResearchIntake
+from ai_quant_scientist.capabilities.serialization import (
+    compute_candidate_fingerprint,
+    requirements_from_json,
+    requirements_to_json,
+)
+from ai_quant_scientist.evals.scientist_eval import (
+    ScientistEvalSuite,
+    load_cases_from_file,
+)
+from ai_quant_scientist.evals.run_live_scientist_eval import run_live_scientist_eval
+from ai_quant_scientist.models.hypothesis_scientist import (
+    HypothesisScientistDecision,
+    HypothesisScientistDecisionType,
+    HypothesisScientistInvocation,
+    ResearchBrief,
+)
+from ai_quant_scientist.services.hypothesis_prompts import (
+    SCIENTIST_VERSION,
+    available_versions,
+    get_scientist_instructions,
+)
+from ai_quant_scientist.services.hypothesis_scientist import (
+    FakeHypothesisScientist,
+    HypothesisProposalValidator,
+    SCIENTIST_SOURCE,
+    brief_to_json,
+    generate_candidate,
+    materialize_research_candidate,
+)
+from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
+from ai_quant_scientist.storage.sqlite_store import SQLiteStore
+
+
+# ─── helpers ─────────────────────────────────────────────────────────────────
+
+def _synth_brief(**kw) -> ResearchBrief:
+    return ResearchBrief.create(
+        research_question=kw.get("research_question", "Does signal_threshold control trade frequency?"),
+        asset_class_focus=kw.get("asset_class_focus", "SYNTHETIC"),
+    )
+
+
+def _propose_decision(brief: ResearchBrief, **kw) -> HypothesisScientistDecision:
+    reqs = kw.get("reqs", (
+        DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+                        asset_class=AssetClass.SYNTHETIC),
+        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+    ))
+    return HypothesisScientistDecision(
+        id="dec-01",
+        decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement=kw.get("statement", "threshold controls trade frequency"),
+        hypothesis_rationale=kw.get("rationale", "mechanistic test of gating"),
+        requirements_snapshot=requirements_to_json(reqs),
+        provider="fake",
+        model="fake-v1",
+        prompt_version="v1",
+    )
+
+
+def _no_hyp_decision(brief: ResearchBrief, reason: str = "too vague") -> HypothesisScientistDecision:
+    return HypothesisScientistDecision(
+        id="dec-02",
+        decision_type=HypothesisScientistDecisionType.NO_HYPOTHESIS,
+        research_brief_id=brief.id,
+        no_hypothesis_reason=reason,
+        provider="fake",
+        model="fake-v1",
+        prompt_version="v1",
+    )
+
+
+def _store(tmp_path):
+    return SQLiteStore(tmp_path / "test.db")
+
+
+# ─── ResearchBrief ────────────────────────────────────────────────────────────
+
+def test_brief_valid_minimal():
+    b = ResearchBrief.create(research_question="Does signal_threshold affect trade count?")
+    assert b.id
+    assert b.research_question
+
+
+def test_brief_optional_fields():
+    b = ResearchBrief.create(
+        research_question="test",
+        asset_class_focus="FUTURES",
+        instrument_focus=["MES"],
+        exclusions=["options"],
+        prior_candidate_fingerprints=["abc123"],
+    )
+    assert b.asset_class_focus == "FUTURES"
+    assert "MES" in b.instrument_focus
+    assert "options" in b.exclusions
+    assert "abc123" in b.prior_candidate_fingerprints
+
+
+def test_brief_empty_question_rejected():
+    with pytest.raises(ValueError, match="research_question"):
+        ResearchBrief.create(research_question="")
+
+
+def test_brief_is_immutable():
+    b = ResearchBrief.create(research_question="test")
+    with pytest.raises((AttributeError, TypeError)):
+        b.research_question = "mutated"  # type: ignore
+
+
+# ─── Prompt versioning ────────────────────────────────────────────────────────
+
+def test_prompt_v1_available():
+    assert "v1" in available_versions()
+
+
+def test_prompt_v1_contains_core_instructions():
+    p = get_scientist_instructions("v1")
+    assert "PROPOSE_HYPOTHESIS" in p
+    assert "NO_HYPOTHESIS" in p
+    assert "falsifiable" in p.lower()
+    assert "requirements" in p.lower()
+
+
+def test_prompt_v1_forbids_governance_fields():
+    p = get_scientist_instructions("v1")
+    assert "Do NOT" in p or "must not" in p.lower()
+    assert "feasibility" in p.lower()
+
+
+def test_unknown_prompt_version_raises():
+    with pytest.raises(KeyError):
+        get_scientist_instructions("v99")
+
+
+# ─── Validator ────────────────────────────────────────────────────────────────
+
+def test_valid_propose_passes():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid and not errors
+
+
+def test_valid_no_hypothesis_passes():
+    brief = _synth_brief()
+    decision = _no_hyp_decision(brief)
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid and not errors
+
+
+def test_propose_requires_statement():
+    brief = _synth_brief()
+    decision = _propose_decision(brief, statement="   ")
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid and "hypothesis_statement" in errors
+
+
+def test_propose_requires_rationale():
+    brief = _synth_brief()
+    decision = _propose_decision(brief, rationale="")
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid and "hypothesis_rationale" in errors
+
+
+def test_propose_requires_non_empty_requirements():
+    brief = _synth_brief()
+    d = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="test", hypothesis_rationale="test",
+        requirements_snapshot=requirements_to_json(()),  # empty
+        provider="f", model="f", prompt_version="v1",
+    )
+    valid, errors = HypothesisProposalValidator().validate(d, brief)
+    assert not valid and "requirements_empty" in errors
+
+
+def test_propose_requires_requirements_present():
+    brief = _synth_brief()
+    d = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="test", hypothesis_rationale="test",
+        requirements_snapshot=None,
+        provider="f", model="f", prompt_version="v1",
+    )
+    valid, errors = HypothesisProposalValidator().validate(d, brief)
+    assert not valid and "requirements" in errors
+
+
+def test_no_hypothesis_requires_reason():
+    brief = _synth_brief()
+    d = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.NO_HYPOTHESIS,
+        research_brief_id=brief.id, no_hypothesis_reason="   ",
+        provider="f", model="f", prompt_version="v1",
+    )
+    valid, errors = HypothesisProposalValidator().validate(d, brief)
+    assert not valid and "no_hypothesis_reason" in errors
+
+
+def test_no_hypothesis_must_not_include_candidate_fields():
+    brief = _synth_brief()
+    d = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.NO_HYPOTHESIS,
+        research_brief_id=brief.id, no_hypothesis_reason="too vague",
+        hypothesis_statement="extra",
+        provider="f", model="f", prompt_version="v1",
+    )
+    valid, errors = HypothesisProposalValidator().validate(d, brief)
+    assert not valid and "no_hypothesis_extra" in errors
+
+
+# ─── Requirements round-trip ──────────────────────────────────────────────────
+
+def test_data_requirement_round_trip_through_decision():
+    brief = _synth_brief()
+    req = DataRequirement(
+        requirement_id="r1", data_kind=DataKind.OHLCV, asset_class=AssetClass.EQUITY,
+        resolution=Resolution.DAILY, required_fields=("close", "volume"),
+    )
+    decision = _propose_decision(brief, reqs=(req,))
+    back = requirements_from_json(decision.requirements_snapshot)
+    assert back[0] == req
+
+
+def test_tool_requirement_round_trip_through_decision():
+    brief = _synth_brief()
+    req = ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL")
+    decision = _propose_decision(brief, reqs=(req,))
+    back = requirements_from_json(decision.requirements_snapshot)
+    assert isinstance(back[0], ToolRequirement)
+    assert back[0].tool_name == "EXECUTION_TOOL"
+
+
+def test_mixed_requirements_round_trip():
+    brief = _synth_brief()
+    reqs = (
+        DataRequirement(requirement_id="d", data_kind=DataKind.ORDER_BOOK, asset_class=AssetClass.FUTURES),
+        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+    )
+    decision = _propose_decision(brief, reqs=reqs)
+    back = requirements_from_json(decision.requirements_snapshot)
+    assert len(back) == 2
+    assert isinstance(back[0], DataRequirement)
+    assert isinstance(back[1], ToolRequirement)
+
+
+# ─── ToolRequirement capability_type matching ─────────────────────────────────
+
+def test_tool_requirement_matches_capability_type():
+    from ai_quant_scientist.capabilities.registry import CapabilityRegistry
+    from ai_quant_scientist.capabilities.models import Capability
+    cap = Capability(
+        capability_id="stub_backtester_v1",
+        capability_type="EXECUTION_TOOL",
+        data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+        asset_classes=(AssetClass.SYNTHETIC,),
+        resolutions=(Resolution.NOT_APPLICABLE,),
+        supported_parameters=("signal_threshold", "lookback"),
+        provider="test", enabled=True, version="1",
+    )
+    reg = CapabilityRegistry([cap])
+    req = ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL")
+    result = reg.evaluate_tool_requirement(req)
+    assert result.satisfied
+
+
+def test_tool_requirement_also_matches_capability_id():
+    """Existing exact-id matching preserved."""
+    req = ToolRequirement(requirement_id="t", tool_name="stub_backtester_v1")
+    result = build_v1_registry().evaluate_tool_requirement(req)
+    assert result.satisfied
+
+
+# ─── Materialization ──────────────────────────────────────────────────────────
+
+def test_materialization_assigns_id_from_software():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    candidate = materialize_research_candidate(decision, brief)
+    assert candidate.id  # must exist
+    assert candidate.id != decision.id  # distinct from AI decision id
+
+
+def test_materialization_assigns_source_from_software():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    candidate = materialize_research_candidate(decision, brief)
+    assert SCIENTIST_SOURCE in candidate.source
+
+
+def test_materialization_assigns_timestamp():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    candidate = materialize_research_candidate(decision, brief)
+    assert isinstance(candidate.created_at, datetime)
+
+
+def test_materialization_copies_requirements_exactly():
+    brief = _synth_brief()
+    reqs = (
+        DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+                        asset_class=AssetClass.SYNTHETIC),
+        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+    )
+    decision = _propose_decision(brief, reqs=reqs)
+    candidate = materialize_research_candidate(decision, brief)
+    assert candidate.requirements == reqs
+
+
+def test_materialization_same_science_same_fingerprint():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    c1 = materialize_research_candidate(decision, brief)
+    c2 = materialize_research_candidate(decision, brief)
+    # Different ids but same scientific content → same fingerprint
+    f1 = compute_candidate_fingerprint(c1.hypothesis_statement, c1.hypothesis_rationale, c1.requirements)
+    f2 = compute_candidate_fingerprint(c2.hypothesis_statement, c2.hypothesis_rationale, c2.requirements)
+    assert f1 == f2
+    assert c1.id != c2.id
+
+
+# ─── FakeHypothesisScientist ──────────────────────────────────────────────────
+
+def test_fake_scientist_propose_for_clear_brief():
+    scientist = FakeHypothesisScientist()
+    brief = _synth_brief()
+    decision = scientist.generate(brief)
+    assert decision.decision_type == HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS
+    assert decision.hypothesis_statement
+    assert decision.requirements_snapshot
+
+
+def test_fake_scientist_no_hypothesis_for_underspecified():
+    scientist = FakeHypothesisScientist()
+    brief = ResearchBrief.create(research_question="general explore markets underspecified")
+    decision = scientist.generate(brief)
+    assert decision.decision_type == HypothesisScientistDecisionType.NO_HYPOTHESIS
+
+
+# ─── Persistence ─────────────────────────────────────────────────────────────
+
+def test_save_and_retrieve_propose_invocation(tmp_path):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+    scientist = FakeHypothesisScientist()
+    inv, candidate = generate_candidate(scientist, brief, store)
+    assert inv.validation_status == "VALID"
+    assert inv.resulting_candidate_id is not None
+    retrieved = store.get_hypothesis_scientist_invocations(brief.id)
+    assert len(retrieved) == 1
+    r = retrieved[0]
+    assert r.research_brief_id == brief.id
+    assert r.resulting_candidate_id == candidate.id
+
+
+def test_save_and_retrieve_no_hypothesis_invocation(tmp_path):
+    store = _store(tmp_path)
+    brief = ResearchBrief.create(research_question="general explore markets underspecified")
+    scientist = FakeHypothesisScientist()
+    inv, candidate = generate_candidate(scientist, brief, store)
+    assert candidate is None
+    assert inv.resulting_candidate_id is None
+    retrieved = store.get_hypothesis_scientist_invocations(brief.id)
+    assert len(retrieved) == 1
+    assert retrieved[0].resulting_candidate_id is None
+
+
+def test_invalid_decision_persisted_with_validation_failure(tmp_path):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+
+    class BadScientist:
+        provider = "fake"
+        model = "bad"
+        prompt_version = "v1"
+        def generate(self, b):
+            return HypothesisScientistDecision(
+                id="bad", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+                research_brief_id=b.id,
+                hypothesis_statement="",  # invalid
+                hypothesis_rationale="test",
+                requirements_snapshot=None,  # missing
+                provider="fake", model="bad", prompt_version="v1",
+            )
+
+    inv, candidate = generate_candidate(BadScientist(), brief, store)
+    assert inv.validation_status == "INVALID"
+    assert candidate is None
+    retrieved = store.get_hypothesis_scientist_invocations(brief.id)
+    assert retrieved[0].validation_status == "INVALID"
+
+
+def test_invocations_immutable(tmp_path):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+    scientist = FakeHypothesisScientist()
+    inv, _ = generate_candidate(scientist, brief, store)
+    generate_candidate(scientist, brief, store)  # second invocation
+    all_invs = store.get_hypothesis_scientist_invocations(brief.id)
+    assert len(all_invs) == 2  # both preserved
+
+
+# ─── Schema migration ─────────────────────────────────────────────────────────
+
+def test_v5_to_v6_migration(tmp_path):
+    db = tmp_path / "v5.sqlite"
+    conn = sqlite3.connect(db)
+    conn.executescript("""
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE schema_version (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL);
+        INSERT INTO schema_version (id, version) VALUES (1, 5);
+        CREATE TABLE research_candidates (id TEXT PRIMARY KEY, hypothesis_statement TEXT NOT NULL,
+            hypothesis_rationale TEXT NOT NULL, source TEXT NOT NULL, requirements_json TEXT NOT NULL,
+            candidate_fingerprint TEXT NOT NULL, created_at TEXT NOT NULL);
+        CREATE TABLE feasibility_decisions (id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL,
+            gate_decision TEXT NOT NULL, gate_version TEXT NOT NULL, registry_version TEXT NOT NULL,
+            registry_fingerprint TEXT NOT NULL, feasibility_result_json TEXT NOT NULL,
+            satisfied_ids_json TEXT NOT NULL, unsatisfied_ids_json TEXT NOT NULL,
+            reason_codes_json TEXT NOT NULL, evaluated_at TEXT NOT NULL);
+    """)
+    conn.commit()
+    conn.close()
+
+    store = SQLiteStore(db)
+    with store.connect() as c:
+        ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
+        assert ver == 6
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        assert "hypothesis_scientist_invocations" in tables
+        assert "research_candidates" in tables
+
+
+def test_fresh_v6_db_has_all_tables(tmp_path):
+    store = SQLiteStore(tmp_path / "fresh.db")
+    with store.connect() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+    for t in ("hypothesis_scientist_invocations", "research_candidates", "feasibility_decisions",
+              "critic_invocations", "research_runs"):
+        assert t in tables
+
+
+def test_v6_migration_idempotent(tmp_path):
+    SQLiteStore(tmp_path / "t.db")
+    SQLiteStore(tmp_path / "t.db")  # second open on v6 DB should stay at v6
+    store = SQLiteStore(tmp_path / "t.db")
+    with store.connect() as c:
+        ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
+        assert ver == 6
+
+
+# ─── Eval harness ─────────────────────────────────────────────────────────────
+
+def test_fixture_loads_12_cases():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    assert len(cases) == 12
+    ids = [c.id for c in cases]
+    assert len(set(ids)) == len(ids)
+
+
+def test_harness_runs_fake_scientist():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:2])
+    results = suite.run(FakeHypothesisScientist())
+    assert len(results) == 2
+    for r in results:
+        assert r.contract_passed or r.decision_type is not None
+
+
+def test_harness_no_api_calls(monkeypatch):
+    import urllib.request
+    called = []
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **kw: called.append(True))
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    ScientistEvalSuite(cases).run(FakeHypothesisScientist())
+    assert not called
+
+
+# ─── Live runner guard ────────────────────────────────────────────────────────
+
+def test_live_runner_requires_allow_live_api():
+    with pytest.raises(RuntimeError, match="--allow-live-api"):
+        run_live_scientist_eval(
+            model="test",
+            eval_path="evals/scientist_v1.json",
+            allow_live_api=False,
+        )
+
+
+# ─── Downstream gate boundary: scientist proposes, gate decides ────────────────
+
+def test_synthetic_candidate_from_fake_scientist_becomes_ready(tmp_path):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+    scientist = FakeHypothesisScientist()
+    inv, candidate = generate_candidate(scientist, brief, store)
+    assert candidate is not None
+
+    store.save_research_candidate(candidate)
+    intake = GovernedResearchIntake(store, build_v1_registry())
+    result = intake.submit(candidate)
+    assert result.is_ready
+
+
+def test_mes_ohlcv_candidate_becomes_blocked(tmp_path):
+    store = _store(tmp_path)
+    brief = ResearchBrief.create(
+        research_question="Does order-book imbalance predict MES futures returns?",
+        asset_class_focus="FUTURES",
+        instrument_focus=["MES"],
+    )
+    # Simulate scientist returning a candidate requiring real market data
+    reqs = (
+        DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
+                        asset_class=AssetClass.FUTURES, instruments=("MES",),
+                        resolution=Resolution.SECOND_1),
+        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+    )
+    decision = HypothesisScientistDecision(
+        id="dec-mes", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="Order-book imbalance predicts MES returns",
+        hypothesis_rationale="Microstructure mechanism",
+        requirements_snapshot=requirements_to_json(reqs),
+        provider="fake", model="fake", prompt_version="v1",
+    )
+    valid, _ = HypothesisProposalValidator().validate(decision, brief)
+    assert valid
+    candidate = materialize_research_candidate(decision, brief)
+    store.save_research_candidate(candidate)
+    intake = GovernedResearchIntake(store, build_v1_registry())
+    result = intake.submit(candidate)
+    # MES order-book not in V1 registry → blocked
+    assert result.is_blocked
+
+
+def test_scientist_proposes_gate_decides_independence(tmp_path):
+    """Scientist proposes; the gate decides reality — not the scientist."""
+    store = _store(tmp_path)
+    brief = ResearchBrief.create(research_question="Does MES microstructure predict returns?")
+    reqs = (
+        DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
+                        asset_class=AssetClass.FUTURES),
+        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+    )
+    decision = HypothesisScientistDecision(
+        id="d", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="test", hypothesis_rationale="test",
+        requirements_snapshot=requirements_to_json(reqs),
+        provider="fake", model="fake", prompt_version="v1",
+    )
+    candidate = materialize_research_candidate(decision, brief)
+    # Scientist produced a valid structural candidate; gate makes the capability call
+    store.save_research_candidate(candidate)
+    intake = GovernedResearchIntake(store, build_v1_registry())
+    result = intake.submit(candidate)
+    assert result.is_blocked   # registry lack, not bad science
+    assert store.get_research_candidate(candidate.id) is not None  # hypothesis preserved
+
+
+# ─── OpenAI adapter mock tests ────────────────────────────────────────────────
+
+def _make_openai_response(parsed: dict):
+    text = json.dumps(parsed)
+    item = SimpleNamespace(type="output_text", parsed=parsed, text=text)
+    msg = SimpleNamespace(type="message", content=[item])
+    return SimpleNamespace(
+        output=[msg], usage={}, id="r1", model="gpt-5.6-terra",
+        status="completed", created_at=1.0, completed_at=2.0,
+    )
+
+
+def test_openai_adapter_propose_hypothesis():
+    parsed = {
+        "decision": "PROPOSE_HYPOTHESIS",
+        "hypothesis_statement": "Threshold controls trade frequency",
+        "hypothesis_rationale": "Mechanism test",
+        "data_requirements": [
+            {"requirement_id": "d", "data_kind": "SYNTHETIC_PARAMETRIC",
+             "asset_class": "SYNTHETIC"},
+        ],
+        "tool_requirements": [
+            {"requirement_id": "t", "tool_name": "EXECUTION_TOOL", "label": ""},
+        ],
+        "no_hypothesis_reason": None,
+    }
+    client = MagicMock()
+    client.responses.parse.return_value = _make_openai_response(parsed)
+    brief = _synth_brief()
+    scientist = OpenAIHypothesisScientist(client=client)
+    decision = scientist.generate(brief)
+    assert decision.decision_type == HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS
+    assert decision.requirements_snapshot
+    reqs = requirements_from_json(decision.requirements_snapshot)
+    assert any(isinstance(r, DataRequirement) for r in reqs)
+    assert any(isinstance(r, ToolRequirement) for r in reqs)
+
+
+def test_openai_adapter_no_hypothesis():
+    parsed = {
+        "decision": "NO_HYPOTHESIS",
+        "hypothesis_statement": None,
+        "hypothesis_rationale": None,
+        "data_requirements": None,
+        "tool_requirements": None,
+        "no_hypothesis_reason": "Brief too vague",
+    }
+    client = MagicMock()
+    client.responses.parse.return_value = _make_openai_response(parsed)
+    scientist = OpenAIHypothesisScientist(client=client)
+    decision = scientist.generate(_synth_brief())
+    assert decision.decision_type == HypothesisScientistDecisionType.NO_HYPOTHESIS
+    assert decision.no_hypothesis_reason == "Brief too vague"
+
+
+def test_openai_adapter_schema_has_no_governance_fields():
+    """AI-facing schema must not include candidate id, source, or created_at."""
+    captured: dict = {}
+    parsed = {
+        "decision": "NO_HYPOTHESIS",
+        "hypothesis_statement": None, "hypothesis_rationale": None,
+        "data_requirements": None, "tool_requirements": None,
+        "no_hypothesis_reason": "too vague",
+    }
+    resp = _make_openai_response(parsed)
+    client = MagicMock()
+    client.responses.parse.side_effect = lambda **kw: (captured.update(kw), resp)[1]
+    OpenAIHypothesisScientist(client=client).generate(_synth_brief())
+    tf = captured.get("text_format")
+    assert tf is not None
+    fields = list(tf.model_fields.keys())
+    for forbidden in ("id", "source", "created_at", "candidate_id", "gate_decision"):
+        assert forbidden not in fields, f"Forbidden field '{forbidden}' in AI schema"
+
+
+def test_openai_adapter_makes_no_network_call_on_mock():
+    """The adapter uses the injected client — no direct network calls."""
+    parsed = {
+        "decision": "NO_HYPOTHESIS", "hypothesis_statement": None,
+        "hypothesis_rationale": None, "data_requirements": None,
+        "tool_requirements": None, "no_hypothesis_reason": "test",
+    }
+    client = MagicMock()
+    client.responses.parse.return_value = _make_openai_response(parsed)
+    OpenAIHypothesisScientist(client=client).generate(_synth_brief())
+    # No urllib calls
+    client.responses.parse.assert_called_once()

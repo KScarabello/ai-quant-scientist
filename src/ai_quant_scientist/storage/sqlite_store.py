@@ -25,7 +25,7 @@ from ..models.enums import ResearchAction, SpecRevisionProposalStatus
 from ..models.critic import CriticInvocation, CriticDecision
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class SQLiteStore:
@@ -199,6 +199,20 @@ class SQLiteStore:
                     evaluated_at TEXT NOT NULL,
                     FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
                 );
+                CREATE TABLE IF NOT EXISTS hypothesis_scientist_invocations (
+                    id TEXT PRIMARY KEY,
+                    research_brief_id TEXT NOT NULL,
+                    research_brief_snapshot TEXT NOT NULL,
+                    prompt_version TEXT NOT NULL,
+                    provider TEXT,
+                    model TEXT,
+                    raw_response TEXT,
+                    parsed_decision_json TEXT,
+                    validation_status TEXT,
+                    validation_errors_json TEXT,
+                    resulting_candidate_id TEXT,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
             current_version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
@@ -302,6 +316,27 @@ class SQLiteStore:
                             reason_codes_json TEXT NOT NULL,
                             evaluated_at TEXT NOT NULL,
                             FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (5,))
+                elif v == 5:
+                    # migrate v5 -> v6: add hypothesis_scientist_invocations
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS hypothesis_scientist_invocations (
+                            id TEXT PRIMARY KEY,
+                            research_brief_id TEXT NOT NULL,
+                            research_brief_snapshot TEXT NOT NULL,
+                            prompt_version TEXT NOT NULL,
+                            provider TEXT,
+                            model TEXT,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            validation_status TEXT,
+                            validation_errors_json TEXT,
+                            resulting_candidate_id TEXT,
+                            created_at TEXT NOT NULL
                         );
                         """
                     )
@@ -1086,3 +1121,49 @@ class SQLiteStore:
                 evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
             ))
         return result
+
+    # ─── Hypothesis scientist invocations ─────────────────────────────────────
+
+    def save_hypothesis_scientist_invocation(self, inv) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO hypothesis_scientist_invocations
+                   (id, research_brief_id, research_brief_snapshot, prompt_version,
+                    provider, model, raw_response, parsed_decision_json,
+                    validation_status, validation_errors_json, resulting_candidate_id,
+                    created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    inv.id, inv.research_brief_id, inv.research_brief_snapshot,
+                    inv.prompt_version, inv.provider, inv.model, inv.raw_response,
+                    inv.parsed_decision_json, inv.validation_status,
+                    inv.validation_errors_json, inv.resulting_candidate_id,
+                    inv.created_at.isoformat(),
+                ),
+            )
+
+    def get_hypothesis_scientist_invocations(self, brief_id: str) -> list:
+        """Return all scientist invocations for a brief, oldest first."""
+        from ..models.hypothesis_scientist import HypothesisScientistInvocation
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM hypothesis_scientist_invocations WHERE research_brief_id = ? ORDER BY created_at, rowid",
+                (brief_id,),
+            ).fetchall()
+        return [
+            HypothesisScientistInvocation(
+                id=r["id"],
+                research_brief_id=r["research_brief_id"],
+                research_brief_snapshot=r["research_brief_snapshot"],
+                prompt_version=r["prompt_version"],
+                provider=r["provider"],
+                model=r["model"],
+                raw_response=r["raw_response"],
+                parsed_decision_json=r["parsed_decision_json"],
+                validation_status=r["validation_status"],
+                validation_errors_json=r["validation_errors_json"],
+                resulting_candidate_id=r["resulting_candidate_id"],
+                created_at=datetime.fromisoformat(r["created_at"]),
+            )
+            for r in rows
+        ]

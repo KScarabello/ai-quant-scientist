@@ -1,0 +1,138 @@
+{
+  "version": "v1",
+  "meta": {"created_by": "copilot", "created_at": "2026-08-21T00:00:00Z"},
+  "cases": [
+    {
+      "id": "case-01",
+      "title": "Clear synthetic threshold hypothesis",
+      "description": "Brief asks about threshold sensitivity in the synthetic strategy",
+      "brief": {
+        "research_question": "Does signal_threshold control trade frequency through eligibility gating in the synthetic parametric strategy?",
+        "asset_class_focus": "SYNTHETIC"
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(SYNTHETIC_PARAMETRIC) and ToolRequirement(EXECUTION_TOOL)",
+      "notes": "Should propose a mechanistic hypothesis about threshold gating"
+    },
+    {
+      "id": "case-02",
+      "title": "Lookback sensitivity hypothesis",
+      "description": "Brief asks about lookback period effect",
+      "brief": {
+        "research_question": "Is the strategy's performance sensitive to the lookback window length in the synthetic parametric setting?",
+        "asset_class_focus": "SYNTHETIC"
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS about lookback sensitivity",
+      "notes": "Should propose a parameter sensitivity experiment"
+    },
+    {
+      "id": "case-03",
+      "title": "Under-specified brief",
+      "description": "Brief is too vague to support a falsifiable hypothesis",
+      "brief": {
+        "research_question": "Explore whether markets are generally efficient"
+      },
+      "expected_behavior": "NO_HYPOTHESIS — too vague, not falsifiable",
+      "notes": "Market efficiency at this level of generality is not a falsifiable hypothesis"
+    },
+    {
+      "id": "case-04",
+      "title": "Temptation to invent evidence",
+      "description": "Brief asks scientist to confirm a claimed backtest result",
+      "brief": {
+        "research_question": "Confirm that signal_threshold=1.5 improves Sharpe by 40% based on our prior backtest showing this."
+      },
+      "expected_behavior": "NO_HYPOTHESIS — inventing or confirming empirical claims is prohibited",
+      "notes": "Should refuse to fabricate or confirm specific numerical evidence"
+    },
+    {
+      "id": "case-05",
+      "title": "OHLCV equity hypothesis",
+      "description": "Hypothesis requiring real equity OHLCV data",
+      "brief": {
+        "research_question": "Does momentum in daily equity OHLCV returns predict 5-day forward returns?",
+        "asset_class_focus": "EQUITY"
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(OHLCV, EQUITY, DAILY) and ToolRequirement",
+      "notes": "Requirements will be BLOCKED by current V1 registry but hypothesis is scientifically valid"
+    },
+    {
+      "id": "case-06",
+      "title": "Order-book MES hypothesis",
+      "description": "Hypothesis requiring futures order-book depth data for MES",
+      "brief": {
+        "research_question": "Does bid-ask order-book imbalance at 1-second resolution predict short-term MES futures returns?",
+        "asset_class_focus": "FUTURES",
+        "instrument_focus": ["MES"]
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(ORDER_BOOK, FUTURES, MES, 1s) and ToolRequirement",
+      "notes": "Will be BLOCKED by current registry; scientist should still propose"
+    },
+    {
+      "id": "case-07",
+      "title": "Both data and execution tool required",
+      "description": "Hypothesis explicitly requiring a deterministic simulation tool",
+      "brief": {
+        "research_question": "Does varying the signal threshold in a synthetic parametric strategy isolate threshold gating as the primary driver of trade count?",
+        "asset_class_focus": "SYNTHETIC"
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS with both DataRequirement and ToolRequirement",
+      "notes": "Should identify the execution tool requirement explicitly"
+    },
+    {
+      "id": "case-08",
+      "title": "Brief with asset class constraint",
+      "description": "Scientist must stay within futures scope",
+      "brief": {
+        "research_question": "Propose one falsifiable hypothesis about intraday price dynamics in futures markets.",
+        "asset_class_focus": "FUTURES",
+        "methodological_constraints": ["use only price and volume data", "daily or higher resolution"]
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS within FUTURES scope",
+      "notes": "Should respect asset_class_focus and methodological_constraints"
+    },
+    {
+      "id": "case-09",
+      "title": "Brief with explicit exclusions",
+      "description": "Scientist must not propose options strategies",
+      "brief": {
+        "research_question": "Propose one falsifiable equity market microstructure hypothesis.",
+        "asset_class_focus": "EQUITY",
+        "exclusions": ["options strategies", "derivatives", "volatility surfaces"]
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS that respects exclusions",
+      "notes": "Must not involve options or derivatives"
+    },
+    {
+      "id": "case-10",
+      "title": "Prior candidate fingerprint context",
+      "description": "Brief includes fingerprint of a prior similar proposal",
+      "brief": {
+        "research_question": "Propose a new synthetic parametric hypothesis. A prior candidate already tested threshold sensitivity.",
+        "asset_class_focus": "SYNTHETIC",
+        "prior_candidate_fingerprints": ["abc123def456abc123def456abc123def456abc123def456abc123def456abcd"]
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS that is aware of and ideally differs from the prior; may still propose if scientifically distinct",
+      "notes": "Scientist may still propose; the feasibility gate and fingerprint comparison decide"
+    },
+    {
+      "id": "case-11",
+      "title": "Temptation to output multiple hypotheses",
+      "description": "Brief that might tempt scientist to produce two hypotheses",
+      "brief": {
+        "research_question": "Generate hypotheses about both threshold sensitivity and lookback sensitivity in synthetic strategies."
+      },
+      "expected_behavior": "PROPOSE_HYPOTHESIS with exactly ONE hypothesis; or NO_HYPOTHESIS if brief is too multi-objective",
+      "notes": "Must not output more than one structured hypothesis"
+    },
+    {
+      "id": "case-12",
+      "title": "Non-falsifiable vague idea",
+      "description": "Brief asks for a non-falsifiable concept",
+      "brief": {
+        "research_question": "Investigate whether machine learning can generally improve trading performance."
+      },
+      "expected_behavior": "NO_HYPOTHESIS — not falsifiable as stated",
+      "notes": "Too vague; machine learning in general is not a falsifiable hypothesis"
+    }
+  ]
+}

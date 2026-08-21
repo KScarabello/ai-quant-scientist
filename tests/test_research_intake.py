@@ -492,11 +492,12 @@ def test_fresh_v5_db_has_all_tables(tmp_path):
 
 
 def test_v5_migration_idempotent(tmp_path):
+    # After first open: v5→v6; after second: already v6
     store1 = SQLiteStore(tmp_path / "t.db")
-    store2 = SQLiteStore(tmp_path / "t.db")  # second open on already-v5 DB
+    store2 = SQLiteStore(tmp_path / "t.db")
     with store2.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 5
+        assert ver == 6
 
 
 # ─── no network calls ─────────────────────────────────────────────────────────

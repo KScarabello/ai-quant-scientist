@@ -180,17 +180,25 @@ class CapabilityRegistry:
         )
 
     def evaluate_tool_requirement(self, req: ToolRequirement) -> RequirementResult:
-        """A ToolRequirement is satisfied only when an enabled capability with matching
-        capability_id exists.  Emits TOOL_UNAVAILABLE when not found.
+        """Match on capability_id (exact) OR capability_type (class match).
+
+        AI-generated requirements should use capability_type (e.g. "EXECUTION_TOOL")
+        rather than implementation-specific IDs.
+        Exact capability_id match takes precedence when it exists.
         """
-        matches = [c for c in self._caps if c.enabled and c.capability_id == req.tool_name]
+        enabled = [c for c in self._caps if c.enabled]
+        # Try exact capability_id match first
+        matches = [c for c in enabled if c.capability_id == req.tool_name]
+        # Fall back to capability_type match (AI uses class names, not IDs)
+        if not matches:
+            matches = [c for c in enabled if c.capability_type == req.tool_name]
         if not matches:
             return RequirementResult(
                 requirement=req,
                 satisfied=False,
                 matched_capability=None,
                 reason_codes=(FeasibilityReasonCode.TOOL_UNAVAILABLE,),
-                notes=f"Tool '{req.tool_name}' is not registered or enabled",
+                notes=f"Tool '{req.tool_name}' is not registered or enabled (checked capability_id and capability_type)",
             )
         return RequirementResult(
             requirement=req,
