@@ -1,0 +1,27 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787204011,
+  "results": [
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "b98764d4-f456-40a4-a631-e0b7b951c819",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 1.5
+        },
+        "rationale": "Only 3 trades triggered the TOO_FEW_TRADES diagnosis. Lowering the existing signal eligibility threshold is a direct, bounded test of whether the low observation count is caused by overly restrictive signal gating.",
+        "prediction": "Reducing signal_threshold from 2.0 to 1.5 should increase signal eligibility and trade count; the result will measure the sensitivity of trade frequency to the threshold.",
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_067c7467b0449622016a8691ac9e8c819b945df62ff533eb37\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204012.0, \"completed_at\": 1787204015.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 175, \"reasoning_tokens\": 44, \"cached_tokens\": 0}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"Only 3 trades triggered the TOO_FEW_TRADES diagnosis. Lowering the existing signal eligibility threshold is a direct, bounded test of whether the low observation count is caused by overly restrictive signal gating.\\\",\\\"prediction\\\":\\\"Reducing signal_threshold from 2.0 to 1.5 should increase signal eligibility and trade count; the result will measure the sensitivity of trade frequency to the threshold.\\\",\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:33:36.070886+00:00"
+      }
+    }
+  ]
+}

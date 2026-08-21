@@ -1,0 +1,133 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787276741,
+  "repeats": 5,
+  "cases": [
+    {
+      "case_id": "case-03",
+      "repetitions": [
+        {
+          "repeat_index": 0,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "d134c846-c35a-4dd9-ad23-5445866480d7",
+            "research_run_id": "run-03",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-03",
+            "changes": null,
+            "rationale": "Negative PnL alone does not identify a mechanism, a responsible parameter, or an informative perturbation direction. No parameter-specific sensitivity or diagnosed observation-frequency issue is supplied.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_01f5ec75dc14abe7016a87adc578d087d0acfa6a153478536d\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276741.0, \"completed_at\": 1787276743.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 76, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"Negative PnL alone does not identify a mechanism, a responsible parameter, or an informative perturbation direction. No parameter-specific sensitivity or diagnosed observation-frequency issue is supplied.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:43.284569+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 1,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "2b8bcda7-81f6-4cb7-a57c-41b845bab88b",
+            "research_run_id": "run-03",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-03",
+            "changes": null,
+            "rationale": "Only negative PnL is identified. There is no evidence linking lookback or signal_threshold to a specific failure mode, and no lineage or sensitivity evidence to make a bounded change diagnostically informative.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_085d98fa0fab640e016a87adc768dc87d0b00d82eb25cdcb51\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276743.0, \"completed_at\": 1787276745.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 103, \"reasoning_tokens\": 20, \"cached_tokens\": 1501}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"Only negative PnL is identified. There is no evidence linking lookback or signal_threshold to a specific failure mode, and no lineage or sensitivity evidence to make a bounded change diagnostically informative.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:45.145093+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 2,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "f5cf1695-f760-45ae-9488-13f8208d27df",
+            "research_run_id": "run-03",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-03",
+            "changes": null,
+            "rationale": "Negative PnL alone does not identify a parameter-specific issue or a mechanism that lookback or signal_threshold can diagnostically probe. With no sensitivity evidence or lineage, a bounded change would be unsupported optimization.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_049d41a20f4c96f9016a87adc967c087d0a03ec4ec18f010f9\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276745.0, \"completed_at\": 1787276747.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 103, \"reasoning_tokens\": 18, \"cached_tokens\": 1501}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"Negative PnL alone does not identify a parameter-specific issue or a mechanism that lookback or signal_threshold can diagnostically probe. With no sensitivity evidence or lineage, a bounded change would be unsupported optimization.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:47.843708+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 3,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "c6934c86-4c81-4079-af67-64fbc1590a70",
+            "research_run_id": "run-03",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-03",
+            "changes": null,
+            "rationale": "NEGATIVE_PNL alone does not identify a mechanism implicating lookback or signal_threshold, nor is either parameter flagged as sensitive. A one-parameter change would be unsupported optimization rather than a diagnostic experiment.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0e2552ec896eca30016a87adcc050487d0bf2a18a5906d62e9\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276748.0, \"completed_at\": 1787276749.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 109, \"reasoning_tokens\": 24, \"cached_tokens\": 1501}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"NEGATIVE_PNL alone does not identify a mechanism implicating lookback or signal_threshold, nor is either parameter flagged as sensitive. A one-parameter change would be unsupported optimization rather than a diagnostic experiment.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:49.643100+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 4,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "5047a491-2b74-468c-ad79-c1b9f98a750c",
+            "research_run_id": "run-03",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-03",
+            "changes": null,
+            "rationale": "Only negative PnL is identified. No evidence diagnoses whether lookback or signal_threshold is responsible, nor flags either parameter as sensitive; a bounded change would be unsupported optimization.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_00161c5cd4fcc793016a87adcdc85887d0a2dab9d15ab0e9d8\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276749.0, \"completed_at\": 1787276751.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 77, \"reasoning_tokens\": 0, \"cached_tokens\": 1501}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"Only negative PnL is identified. No evidence diagnoses whether lookback or signal_threshold is responsible, nor flags either parameter as sensitive; a bounded change would be unsupported optimization.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:51.102583+00:00"
+          },
+          "error": null
+        }
+      ],
+      "aggregate": {
+        "total_runs": 5,
+        "successful_runs": 5,
+        "failed_runs": 0,
+        "PROPOSE_REVISION": 0,
+        "NO_USEFUL_REVISION": 5,
+        "decision_agreement_rate": 1.0,
+        "majority_decision": "NO_USEFUL_REVISION",
+        "confidence_distribution": {
+          "high": 5
+        },
+        "input_tokens_total": 7520,
+        "output_tokens_total": 468,
+        "reasoning_tokens_total": 62
+      }
+    }
+  ],
+  "summary": {
+    "total_invocations": 5,
+    "total_successful": 5,
+    "total_failed": 0,
+    "total_input_tokens": 7520,
+    "total_output_tokens": 468,
+    "total_reasoning_tokens": 62,
+    "unanimous_cases": 1,
+    "mixed_cases": 0
+  }
+}

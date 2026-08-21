@@ -1,0 +1,136 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787276751,
+  "repeats": 5,
+  "cases": [
+    {
+      "case_id": "case-05",
+      "repetitions": [
+        {
+          "repeat_index": 0,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "59cac914-88e4-4635-a625-a16aaeb5f376",
+            "research_run_id": "run-05",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-05-v3",
+            "changes": null,
+            "rationale": "The only identified evidence is a degrading series while signal_threshold was increased from 2.0 to 3.0 at fixed lookback. Continuing that direction is contraindicated, while changing lookback or reversing the threshold lacks a specific diagnosed mechanism or sensitivity evidence.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_04a2dd142310ce7d016a87add05b8c87d08c8d5e69c47ff616\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276752.0, \"completed_at\": 1787276755.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 158, \"reasoning_tokens\": 60, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only identified evidence is a degrading series while signal_threshold was increased from 2.0 to 3.0 at fixed lookback. Continuing that direction is contraindicated, while changing lookback or reversing the threshold lacks a specific diagnosed mechanism or sensitivity evidence.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:55.249755+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 1,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "a8348d75-02a9-458e-b924-64728765477f",
+            "research_run_id": "run-05",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-05-v3",
+            "changes": null,
+            "rationale": "The only varied parameter in lineage is signal_threshold, and the evaluator flags a degrading series as it increased from 2.0 to 3.0. Continuing upward is contradicted by lineage; lowering it would merely assume an untested opposite direction is useful, without evidence identifying a mechanism or parameter-specific uncertainty to probe.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0d4c5d30be457b81016a87add36ac487d08800fe38f1421e16\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276755.0, \"completed_at\": 1787276759.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 282, \"reasoning_tokens\": 172, \"cached_tokens\": 1574}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only varied parameter in lineage is signal_threshold, and the evaluator flags a degrading series as it increased from 2.0 to 3.0. Continuing upward is contradicted by lineage; lowering it would merely assume an untested opposite direction is useful, without evidence identifying a mechanism or parameter-specific uncertainty to probe.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:45:59.759967+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 2,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "cb01686d-65d1-4afb-b8e9-443c65e4315d",
+            "research_run_id": "run-05",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-05-v3",
+            "changes": null,
+            "rationale": "The only identified issue is a degrading series across prior iterations, which have already changed signal_threshold upward. No evidence isolates lookback, and further threshold changes would either repeat tested values or continue an apparently degrading direction without a new mechanistic diagnosis.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_08dc9263049e8bcd016a87add7e29087d091819ff3b456ddd5\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276759.0, \"completed_at\": 1787276763.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 188, \"reasoning_tokens\": 94, \"cached_tokens\": 1574}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only identified issue is a degrading series across prior iterations, which have already changed signal_threshold upward. No evidence isolates lookback, and further threshold changes would either repeat tested values or continue an apparently degrading direction without a new mechanistic diagnosis.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:46:03.176950+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 3,
+          "decision": "NO_USEFUL_REVISION",
+          "parsed": {
+            "id": "5262d31b-8328-445a-868b-7227517880ea",
+            "research_run_id": "run-05",
+            "decision_type": "NO_USEFUL_REVISION",
+            "parent_spec_id": "spec-05-v3",
+            "changes": null,
+            "rationale": "DEGRADING_SERIES provides no specific, parameter-linked diagnosis. The only lineage variation is successive increases in signal_threshold (2.0\u21922.5\u21923.0), and the series is flagged as degrading; continuing that direction is unsupported, while an untested opposite change is not justified by the supplied evidence.",
+            "prediction": null,
+            "confidence": "high",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0f18992f3ed78717016a87addb55cc87d0b4070f5e00c26df8\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276763.0, \"completed_at\": 1787276766.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 199, \"reasoning_tokens\": 89, \"cached_tokens\": 1574}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"DEGRADING_SERIES provides no specific, parameter-linked diagnosis. The only lineage variation is successive increases in signal_threshold (2.0\\u21922.5\\u21923.0), and the series is flagged as degrading; continuing that direction is unsupported, while an untested opposite change is not justified by the supplied evidence.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+            "created_at": "2026-08-21T01:46:06.454544+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 4,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "8596aff4-c3c8-47aa-bbde-84b9e951518d",
+            "research_run_id": "run-05",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-05-v3",
+            "changes": {
+              "signal_threshold": 1.5
+            },
+            "rationale": "With lookback fixed at 20, the lineage varies only signal_threshold and the evaluator flags a degrading series as the threshold was raised from 2.0 to 3.0. Lowering it to an untested value provides a bounded, non-redundant sensitivity test of whether threshold strictness drives the observed degradation.",
+            "prediction": "A lower signal_threshold should admit more eligible signals and increase trade count, making the relationship between threshold strictness, activity, and the degrading series observable.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_09a82c65d6877adb016a87adde954487d08c798c850157d959\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276766.0, \"completed_at\": 1787276771.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 409, \"reasoning_tokens\": 255, \"cached_tokens\": 1574}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":3.0,\\\"to\\\":1.5},\\\"rationale\\\":\\\"With lookback fixed at 20, the lineage varies only signal_threshold and the evaluator flags a degrading series as the threshold was raised from 2.0 to 3.0. Lowering it to an untested value provides a bounded, non-redundant sensitivity test of whether threshold strictness drives the observed degradation.\\\",\\\"prediction\\\":\\\"A lower signal_threshold should admit more eligible signals and increase trade count, making the relationship between threshold strictness, activity, and the degrading series observable.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:12.048592+00:00"
+          },
+          "error": null
+        }
+      ],
+      "aggregate": {
+        "total_runs": 5,
+        "successful_runs": 5,
+        "failed_runs": 0,
+        "PROPOSE_REVISION": 1,
+        "NO_USEFUL_REVISION": 4,
+        "decision_agreement_rate": 0.8,
+        "majority_decision": "NO_USEFUL_REVISION",
+        "confidence_distribution": {
+          "high": 4,
+          "medium": 1
+        },
+        "input_tokens_total": 7885,
+        "output_tokens_total": 1236,
+        "reasoning_tokens_total": 670
+      }
+    }
+  ],
+  "summary": {
+    "total_invocations": 5,
+    "total_successful": 5,
+    "total_failed": 0,
+    "total_input_tokens": 7885,
+    "total_output_tokens": 1236,
+    "total_reasoning_tokens": 670,
+    "unanimous_cases": 0,
+    "mixed_cases": 1
+  }
+}

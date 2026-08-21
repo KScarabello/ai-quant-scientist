@@ -1,0 +1,281 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787204069,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "42ed592b-0779-4ebb-97e9-da28df9afa03",
+        "research_run_id": "run-01",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-01",
+        "changes": null,
+        "rationale": "The only diagnostic is failure to meet the Sharpe threshold. This does not identify lookback or signal_threshold as responsible, nor does it establish a mechanism that a bounded change would probe.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0fa395129a35ee8b016a8691e585348199a292ac39862d00de\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204069.0, \"completed_at\": 1787204071.0, \"store\": false, \"usage\": {\"input_tokens\": 1524, \"output_tokens\": 104, \"reasoning_tokens\": 23, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-01\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only diagnostic is failure to meet the Sharpe threshold. This does not identify lookback or signal_threshold as responsible, nor does it establish a mechanism that a bounded change would probe.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:31.578077+00:00"
+      }
+    },
+    {
+      "case_id": "case-02",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "77f21f61-a169-4f36-bbc5-4f08f177d4f4",
+        "research_run_id": "run-02",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-02",
+        "changes": {
+          "signal_threshold": 1.0
+        },
+        "rationale": "TOO_FEW_TRADES identifies insufficient signal eligibility. Lowering the existing signal threshold directly tests whether threshold gating is suppressing trade generation.",
+        "prediction": "Reducing signal_threshold from 2.0 to 1.0 should increase eligible signals and trade count; the result will reveal whether threshold stringency is the source of the low observation count.",
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_064734de972e93ce016a8691e7b010819883f5e5e92fdc9b69\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204071.0, \"completed_at\": 1787204073.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 121, \"reasoning_tokens\": 0, \"cached_tokens\": 1505}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-02\\\",\\\"change\\\":{\\\"parameter\\\":\\\"signal_threshold\\\",\\\"from\\\":2.0,\\\"to\\\":1.0},\\\"rationale\\\":\\\"TOO_FEW_TRADES identifies insufficient signal eligibility. Lowering the existing signal threshold directly tests whether threshold gating is suppressing trade generation.\\\",\\\"prediction\\\":\\\"Reducing signal_threshold from 2.0 to 1.0 should increase eligible signals and trade count; the result will reveal whether threshold stringency is the source of the low observation count.\\\",\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:33.683453+00:00"
+      }
+    },
+    {
+      "case_id": "case-03",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "23a05688-465b-47d9-99a7-519eb50bcb88",
+        "research_run_id": "run-03",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-03",
+        "changes": null,
+        "rationale": "Only negative PnL is identified. There is no diagnosed mechanism implicating lookback or signal_threshold, no parameter sensitivity evidence, and no observation-frequency or other operational issue to probe with a bounded one-parameter change.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_031beef0fa092828016a8691e9d67c819b92b8979b8421d11b\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204073.0, \"completed_at\": 1787204075.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 86, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-03\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"Only negative PnL is identified. There is no diagnosed mechanism implicating lookback or signal_threshold, no parameter sensitivity evidence, and no observation-frequency or other operational issue to probe with a bounded one-parameter change.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:35.625017+00:00"
+      }
+    },
+    {
+      "case_id": "case-04",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "4939458f-3ff9-4a47-a222-e419a2ac2b31",
+        "research_run_id": "run-04",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-04-v2",
+        "changes": null,
+        "rationale": "The only diagnosis is minimum Sharpe not met. No evidence identifies lookback or signal_threshold as causally related to that issue, and the prior specification provides no metrics to establish parameter sensitivity or an isolating lineage effect.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_02862d016113bb1f016a8691ebb51c8199b0514861420db9e0\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204075.0, \"completed_at\": 1787204077.0, \"store\": false, \"usage\": {\"input_tokens\": 1546, \"output_tokens\": 140, \"reasoning_tokens\": 50, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-04-v2\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only diagnosis is minimum Sharpe not met. No evidence identifies lookback or signal_threshold as causally related to that issue, and the prior specification provides no metrics to establish parameter sensitivity or an isolating lineage effect.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:37.743475+00:00"
+      }
+    },
+    {
+      "case_id": "case-05",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "93bce2d3-04a6-416c-9bab-4a7da83990c1",
+        "research_run_id": "run-05",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-05-v3",
+        "changes": null,
+        "rationale": "The only identified pattern is degradation across the lineage while signal_threshold was increased from 2.0 to 3.0 with lookback fixed. Continuing that direction is unsupported, and testing a lower unobserved threshold would be speculative: no evidence identifies insufficient trade frequency or another mechanism that lower eligibility would diagnose. Lookback is not implicated by the lineage.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_030fcbe9fba5f720016a8691eddb0c819885abf1c5ac41a766\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204077.0, \"completed_at\": 1787204081.0, \"store\": false, \"usage\": {\"input_tokens\": 1577, \"output_tokens\": 237, \"reasoning_tokens\": 120, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-05-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only identified pattern is degradation across the lineage while signal_threshold was increased from 2.0 to 3.0 with lookback fixed. Continuing that direction is unsupported, and testing a lower unobserved threshold would be speculative: no evidence identifies insufficient trade frequency or another mechanism that lower eligibility would diagnose. Lookback is not implicated by the lineage.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:41.611113+00:00"
+      }
+    },
+    {
+      "case_id": "case-06",
+      "decision": "PROPOSE_REVISION",
+      "parsed": {
+        "id": "341a5018-5099-4e8f-b9ea-17f0b5d8706d",
+        "research_run_id": "run-06",
+        "decision_type": "PROPOSE_REVISION",
+        "parent_spec_id": "spec-06",
+        "changes": {
+          "lookback": 20
+        },
+        "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, increasing lookback is a non-redundant bounded perturbation that isolates the effect of a less reactive estimation window.",
+        "prediction": "If the strategy is sensitive to lookback, increasing it from 10 to 20 should produce an observable change in signal and trade frequency, measuring the effect of temporal smoothing.",
+        "confidence": "medium",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0d99b5ef5fd856aa016a8691f1b50887d096d47c4f5dc2a8eb\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204081.0, \"completed_at\": 1787204084.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 125, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, increasing lookback is a non-redundant bounded perturbation that isolates the effect of a less reactive estimation window.\\\",\\\"prediction\\\":\\\"If the strategy is sensitive to lookback, increasing it from 10 to 20 should produce an observable change in signal and trade frequency, measuring the effect of temporal smoothing.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+        "created_at": "2026-08-20T05:34:44.328691+00:00"
+      }
+    },
+    {
+      "case_id": "case-07",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "dee43cc8-8b80-4f5f-bc36-46c768a46df1",
+        "research_run_id": "run-07",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-07",
+        "changes": null,
+        "rationale": "MIXED_SIGNALS and the aggregate metrics do not identify a specific mechanism or implicate either lookback or signal_threshold. With no lineage or parameter-sensitivity evidence, changing either parameter would be unsupported optimization rather than a diagnostic experiment.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_06e95986ecebe260016a8691f469bc87d08f92860801be3c0b\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204084.0, \"completed_at\": 1787204086.0, \"store\": false, \"usage\": {\"input_tokens\": 1506, \"output_tokens\": 138, \"reasoning_tokens\": 47, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-07\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"MIXED_SIGNALS and the aggregate metrics do not identify a specific mechanism or implicate either lookback or signal_threshold. With no lineage or parameter-sensitivity evidence, changing either parameter would be unsupported optimization rather than a diagnostic experiment.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:46.597496+00:00"
+      }
+    },
+    {
+      "case_id": "case-08",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "909e272c-9091-44fc-9439-1427a920f5ce",
+        "research_run_id": "run-08",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-08",
+        "changes": null,
+        "rationale": "The only diagnosed issue is a missing indicator suggestion, which requires strategy structure beyond the permitted lookback and signal_threshold parameters. Negative PnL and low Sharpe do not isolate either parameter as a relevant bounded diagnostic.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0c8eef5f12e0f09c016a8691f6b13c8198b3dacbb5cb7b83a0\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204086.0, \"completed_at\": 1787204087.0, \"store\": false, \"usage\": {\"input_tokens\": 1514, \"output_tokens\": 85, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-08\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only diagnosed issue is a missing indicator suggestion, which requires strategy structure beyond the permitted lookback and signal_threshold parameters. Negative PnL and low Sharpe do not isolate either parameter as a relevant bounded diagnostic.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:48.082454+00:00"
+      }
+    },
+    {
+      "case_id": "case-09",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "9e7fb630-af80-45d7-a0ea-7d717a37872f",
+        "research_run_id": "run-09",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-09",
+        "changes": null,
+        "rationale": "The only diagnosis is STRUCTURE_ISSUE. This indicates a problem requiring strategy structure beyond tuning lookback or signal_threshold; no evidence specifically implicates either permitted parameter or defines a diagnostic direction.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0ef0b3475e16e488016a8691f8365c87d0994518ef327d813b\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204088.0, \"completed_at\": 1787204090.0, \"store\": false, \"usage\": {\"input_tokens\": 1506, \"output_tokens\": 81, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-09\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only diagnosis is STRUCTURE_ISSUE. This indicates a problem requiring strategy structure beyond tuning lookback or signal_threshold; no evidence specifically implicates either permitted parameter or defines a diagnostic direction.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:50.414046+00:00"
+      }
+    },
+    {
+      "case_id": "case-10",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "06559c62-ca24-493a-86d2-4c57c1c87358",
+        "research_run_id": "run-10",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-10",
+        "changes": null,
+        "rationale": "EDGE_CASE and the supplied metrics do not identify a specific diagnosed issue that lookback or signal_threshold can isolate. With no parameter-specific evidence or lineage, a one-parameter change would be unsupported optimization.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_078fefddfac106c3016a8691fa8e8c87d097e5047c1eed7868\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204090.0, \"completed_at\": 1787204092.0, \"store\": false, \"usage\": {\"input_tokens\": 1500, \"output_tokens\": 125, \"reasoning_tokens\": 41, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-10\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"EDGE_CASE and the supplied metrics do not identify a specific diagnosed issue that lookback or signal_threshold can isolate. With no parameter-specific evidence or lineage, a one-parameter change would be unsupported optimization.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:52.440024+00:00"
+      }
+    },
+    {
+      "case_id": "case-11",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "29685219-3bed-4547-accf-544fd825501e",
+        "research_run_id": "run-11",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-11",
+        "changes": null,
+        "rationale": "MIXED_SIGNALS and aggregate metrics alone do not identify a specific mechanism or flag either permitted parameter as sensitive. With no lineage or diagnostic evidence linking lookback or signal_threshold to an observed issue, a one-parameter change would be unsupported optimization.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_06c21dbaef4d2e50016a8691fc8fb087d0b79a9bb001af763c\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204092.0, \"completed_at\": 1787204094.0, \"store\": false, \"usage\": {\"input_tokens\": 1506, \"output_tokens\": 116, \"reasoning_tokens\": 22, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-11\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"MIXED_SIGNALS and aggregate metrics alone do not identify a specific mechanism or flag either permitted parameter as sensitive. With no lineage or diagnostic evidence linking lookback or signal_threshold to an observed issue, a one-parameter change would be unsupported optimization.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:54.369023+00:00"
+      }
+    },
+    {
+      "case_id": "case-12",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "40fd14b2-baaf-4ddd-b2ba-d760bf1d6564",
+        "research_run_id": "run-12",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-12",
+        "changes": null,
+        "rationale": "NEAR_PROMOTION and the aggregate metrics do not identify a specific diagnosed issue or implicate lookback versus signal_threshold. With no lineage or parameter-sensitivity evidence, any parameter change would be unsupported optimization.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_0d99c5fb339abc21016a8691fe785487d0a9f85aeccff54c0d\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204094.0, \"completed_at\": 1787204096.0, \"store\": false, \"usage\": {\"input_tokens\": 1504, \"output_tokens\": 108, \"reasoning_tokens\": 23, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-12\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"NEAR_PROMOTION and the aggregate metrics do not identify a specific diagnosed issue or implicate lookback versus signal_threshold. With no lineage or parameter-sensitivity evidence, any parameter change would be unsupported optimization.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:56.139103+00:00"
+      }
+    },
+    {
+      "case_id": "case-13",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "35200312-a595-46f7-85d3-9e962cb8f5ef",
+        "research_run_id": "run-13",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-13-v2",
+        "changes": null,
+        "rationale": "The only evidence is that the current specification was a repeated test. No diagnosed mechanism, parameter sensitivity finding, or performance comparison is supplied that would justify changing lookback or signal_threshold.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_089f106bd5b094b8016a8692004a10819aa74dbfa07b9b1465\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204096.0, \"completed_at\": 1787204098.0, \"store\": false, \"usage\": {\"input_tokens\": 1575, \"output_tokens\": 80, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-13-v2\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The only evidence is that the current specification was a repeated test. No diagnosed mechanism, parameter sensitivity finding, or performance comparison is supplied that would justify changing lookback or signal_threshold.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:34:58.278540+00:00"
+      }
+    },
+    {
+      "case_id": "case-14",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "57455c54-28f5-4276-bb8d-74f613358e27",
+        "research_run_id": "run-14",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-14-v3",
+        "changes": null,
+        "rationale": "The evaluator flags CONTRADICTORY_LINEAGE, while the supplied lineage contains no per-spec outcome evidence that isolates lookback or signal_threshold. A further parameter change would therefore be unsupported rather than diagnostic.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_00450ee92f10a5d0016a869202626481989f30e713d5c6725c\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204098.0, \"completed_at\": 1787204100.0, \"store\": false, \"usage\": {\"input_tokens\": 1616, \"output_tokens\": 119, \"reasoning_tokens\": 33, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-14-v3\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The evaluator flags CONTRADICTORY_LINEAGE, while the supplied lineage contains no per-spec outcome evidence that isolates lookback or signal_threshold. A further parameter change would therefore be unsupported rather than diagnostic.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:35:00.113949+00:00"
+      }
+    },
+    {
+      "case_id": "case-15",
+      "decision": "NO_USEFUL_REVISION",
+      "parsed": {
+        "id": "dcddbaf0-1724-4eb2-91c0-7000ca63c19f",
+        "research_run_id": "run-15",
+        "decision_type": "NO_USEFUL_REVISION",
+        "parent_spec_id": "spec-15",
+        "changes": null,
+        "rationale": "The evaluator explicitly identifies EXHAUSTED_PARAMETERS. The supplied results contain no parameter-specific diagnostic or sensitivity evidence, and the sparse lineage changes both parameters across specifications, so it cannot isolate an informative one-parameter follow-up.",
+        "prediction": null,
+        "confidence": "high",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "raw_response": "{\"response_id\": \"resp_01346f79d7c4f695016a869204369487d08b958267181b1cc6\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787204100.0, \"completed_at\": 1787204101.0, \"store\": false, \"usage\": {\"input_tokens\": 1575, \"output_tokens\": 86, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"NO_USEFUL_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-15\\\",\\\"change\\\":null,\\\"rationale\\\":\\\"The evaluator explicitly identifies EXHAUSTED_PARAMETERS. The supplied results contain no parameter-specific diagnostic or sensitivity evidence, and the sparse lineage changes both parameters across specifications, so it cannot isolate an informative one-parameter follow-up.\\\",\\\"prediction\\\":null,\\\"confidence\\\":\\\"high\\\"}\"}",
+        "created_at": "2026-08-20T05:35:01.593714+00:00"
+      }
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787276772,
+  "repeats": 5,
+  "cases": [
+    {
+      "case_id": "case-06",
+      "repetitions": [
+        {
+          "repeat_index": 0,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "9d8a5dfe-86a0-4144-b87d-2bc57180ba53",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 20
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage, a bounded one-parameter perturbation of lookback isolates its effect without repeating a prior specification.",
+            "prediction": "Increasing lookback from 10 to 20 will reveal the strategy's sensitivity to a less reactive estimation window, observable through changes in trade count and resulting performance metrics.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_085bc655c3827c61016a87ade52cd887d09a83401539a72afe\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276773.0, \"completed_at\": 1787276774.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 117, \"reasoning_tokens\": 0, \"cached_tokens\": 1296}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no lineage, a bounded one-parameter perturbation of lookback isolates its effect without repeating a prior specification.\\\",\\\"prediction\\\":\\\"Increasing lookback from 10 to 20 will reveal the strategy's sensitivity to a less reactive estimation window, observable through changes in trade count and resulting performance metrics.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:15.134146+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 1,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "cc876c7c-842e-4b46-a0d9-91f3038364ea",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 20
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates how a longer estimation window affects the strategy and directly measures lookback sensitivity.",
+            "prediction": "Changing lookback from 10 to 20 will reveal whether the strategy's trade count and aggregate outcomes are materially sensitive to a longer signal-estimation window.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0abf2f09848ea6b5016a87ade7423887d0ad4cbc34ae7e54e7\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276775.0, \"completed_at\": 1787276777.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 119, \"reasoning_tokens\": 0, \"cached_tokens\": 1505}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates how a longer estimation window affects the strategy and directly measures lookback sensitivity.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 20 will reveal whether the strategy's trade count and aggregate outcomes are materially sensitive to a longer signal-estimation window.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:17.481509+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 2,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "24abcf37-abb4-4b74-9e57-fc7c0184faf6",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 20
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates the effect of lookback length without repeating a tested specification.",
+            "prediction": "Increasing lookback from 10 to 20 will reveal the strategy's sensitivity to a less reactive historical window, observable in changed trade count and resulting performance metrics.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_03c44eda3570d34f016a87ade99a9087d09eccb53e537ff4ad\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276777.0, \"completed_at\": 1787276779.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 117, \"reasoning_tokens\": 0, \"cached_tokens\": 1505}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-parameter increase isolates the effect of lookback length without repeating a tested specification.\\\",\\\"prediction\\\":\\\"Increasing lookback from 10 to 20 will reveal the strategy's sensitivity to a less reactive historical window, observable in changed trade count and resulting performance metrics.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:19.398689+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 3,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "f4ce2334-7552-40b7-83fc-7d7ae3ac0ef2",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 20
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, an isolated bounded lookback perturbation is a non-redundant sensitivity test.",
+            "prediction": "Changing lookback from 10 to 20 will reveal whether signal generation and trade count are materially sensitive to the strategy's observation window.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_057961ba84d0c71e016a87adeb8e0487d0bac9385ae410b9b2\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276779.0, \"completed_at\": 1787276781.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 110, \"reasoning_tokens\": 0, \"cached_tokens\": 1505}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, an isolated bounded lookback perturbation is a non-redundant sensitivity test.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 20 will reveal whether signal generation and trade count are materially sensitive to the strategy's observation window.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:21.497554+00:00"
+          },
+          "error": null
+        },
+        {
+          "repeat_index": 4,
+          "decision": "PROPOSE_REVISION",
+          "parsed": {
+            "id": "f5350c39-437e-4ac6-9c2b-dccf9fb22cdd",
+            "research_run_id": "run-06",
+            "decision_type": "PROPOSE_REVISION",
+            "parent_spec_id": "spec-06",
+            "changes": {
+              "lookback": 20
+            },
+            "rationale": "The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-variable increase isolates the effect of a longer estimation window.",
+            "prediction": "Changing lookback from 10 to 20 will reveal the strategy's sensitivity to estimation-window length through measurable changes in trade count and aggregate performance metrics.",
+            "confidence": "medium",
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "raw_response": "{\"response_id\": \"resp_0482d73f22317ead016a87aded9f0487d08ed67a9266638b29\", \"model\": \"gpt-5.6-terra\", \"status\": \"completed\", \"created_at\": 1787276781.0, \"completed_at\": 1787276783.0, \"store\": false, \"usage\": {\"input_tokens\": 1508, \"output_tokens\": 110, \"reasoning_tokens\": 0, \"cached_tokens\": 1505}, \"output_text\": \"{\\\"decision\\\":\\\"PROPOSE_REVISION\\\",\\\"parent_spec_id\\\":\\\"spec-06\\\",\\\"change\\\":{\\\"parameter\\\":\\\"lookback\\\",\\\"from\\\":10,\\\"to\\\":20},\\\"rationale\\\":\\\"The evaluator explicitly flags LOOKBACK_SENSITIVITY. With no prior lineage, a bounded one-variable increase isolates the effect of a longer estimation window.\\\",\\\"prediction\\\":\\\"Changing lookback from 10 to 20 will reveal the strategy's sensitivity to estimation-window length through measurable changes in trade count and aggregate performance metrics.\\\",\\\"confidence\\\":\\\"medium\\\"}\"}",
+            "created_at": "2026-08-21T01:46:23.329837+00:00"
+          },
+          "error": null
+        }
+      ],
+      "aggregate": {
+        "total_runs": 5,
+        "successful_runs": 5,
+        "failed_runs": 0,
+        "PROPOSE_REVISION": 5,
+        "NO_USEFUL_REVISION": 0,
+        "decision_agreement_rate": 1.0,
+        "majority_decision": "PROPOSE_REVISION",
+        "confidence_distribution": {
+          "medium": 5
+        },
+        "input_tokens_total": 7540,
+        "output_tokens_total": 573,
+        "reasoning_tokens_total": 0
+      }
+    }
+  ],
+  "summary": {
+    "total_invocations": 5,
+    "total_successful": 5,
+    "total_failed": 0,
+    "total_input_tokens": 7540,
+    "total_output_tokens": 573,
+    "total_reasoning_tokens": 0,
+    "unanimous_cases": 1,
+    "mixed_cases": 0
+  }
+}
