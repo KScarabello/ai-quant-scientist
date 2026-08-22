@@ -119,6 +119,7 @@ def materialize_research_candidate(
 
     Deterministically assigns id, source, and created_at.
     The AI cannot influence these governance fields.
+    The resulting candidate remains pre-spec and broad by design.
     """
     from ..capabilities.gate import ResearchCandidate
 
@@ -246,7 +247,7 @@ class FakeHypothesisScientist:
 
     provider = "fake"
     model = "fake-v1"
-    prompt_version = "v2"
+    prompt_version = "v3"
 
     def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
         from ..capabilities.models import DataKind, AssetClass, Resolution
@@ -271,7 +272,6 @@ class FakeHypothesisScientist:
                 requirement_id="data",
                 data_kind=DataKind.SYNTHETIC_PARAMETRIC,
                 asset_class=AssetClass.SYNTHETIC,
-                required_parameters=("signal_threshold", "lookback"),
             ),
             ToolRequirement(
                 requirement_id="tool",

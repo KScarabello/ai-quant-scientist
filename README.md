@@ -33,7 +33,7 @@ Hypothesis Scientist path:
 -> deterministic validator
 -> `ResearchCandidate`
 -> `GovernedResearchIntake`
--> deterministic feasibility gate
+-> deterministic candidate feasibility gate
 -> `READY_FOR_SPEC` or `BLOCKED_CAPABILITY`
 
 Key implementation files:
@@ -63,11 +63,12 @@ It may not:
 
 Prompt status:
 - `v1` is preserved as the original live-tested prompt
-- `v2` is the current default output-contract prompt
+- `v2` is preserved as the hardened requirement-contract prompt
+- `v3` is the current default candidate-feasibility boundary prompt
 
 Current OpenAI adapter defaults:
 - model: `gpt-5.6-terra`
-- prompt version: `v2`
+- prompt version: `v3`
 
 ### Research Critic
 
@@ -110,12 +111,13 @@ Important deterministic components:
 - `V0.12A`: bounded Hypothesis Scientist, eval harness, schema `v6` invocation persistence
 - `V0.12B`: hardened requirement contract between the Hypothesis Scientist and the CapabilityRegistry
 - `V0.12C`: deterministic requirement ontology projection, ontology provenance, and scientist eval repair
+- `V0.12D`: candidate-feasibility / future spec-feasibility boundary and AI contract cleanup
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
 ## Hypothesis Scientist
 
-`V0.12B` and `V0.12C` harden the requirement language between stochastic proposal generation and deterministic feasibility governance.
+`V0.12B-V0.12D` harden the requirement language between stochastic proposal generation and deterministic feasibility governance.
 
 Current contract:
 - canonical `ToolKind`
@@ -123,7 +125,6 @@ Current contract:
 - no fuzzy matching
 - AI does not know concrete capability IDs
 - primitive canonical `required_fields`
-- first-class `required_parameters`
 - bounded `PriorCandidateSummary`
 - deterministic AI-safe requirement ontology snapshot with version and fingerprint
 - ontology vocabulary is exposed to the scientist, but capability availability is withheld
@@ -131,10 +132,13 @@ Current contract:
 
 Semantic boundary:
 - `DataRequirement` means prerequisite input data needed before deterministic execution or analysis
+- `ToolRequirement` means a broad deterministic tool class needed before design can proceed
 - generated outputs such as `execution_price`, `trade_count`, `net_pnl`, or Sharpe are not prerequisite input fields
-- `required_parameters` means explicit input parameters the supplying data or simulation capability must support, not arbitrary future `ResearchSpec` design
+- new AI-authored candidates normally leave `required_parameters=None`
+- `required_parameters` remains available for historical/manual capability-detail matching and persisted historical evidence
+- exact parameter grids, strategy rules, sample windows, execution settings, and other frozen-spec details belong after `READY_FOR_SPEC`
 
-This keeps historical evidence readable while preventing new authoritative candidates from using ambiguous tool names, pseudo-fields, or generated-output placeholders.
+This keeps historical evidence readable while preventing new AI-authored candidates from smuggling future `ResearchSpec` design into pre-spec requirements.
 
 Primary files:
 - `src/ai_quant_scientist/capabilities/models.py`
@@ -169,7 +173,7 @@ Current registered production capability:
   - `data_kind`: `SYNTHETIC_PARAMETRIC`
   - `asset_class`: `SYNTHETIC`
   - `resolution`: `N/A`
-  - `supported_parameters`: `signal_threshold`, `lookback`
+  - `supported_parameters`: `signal_threshold`, `lookback` (retained for historical/manual compatibility)
   - `supported_tool_kinds`: `BACKTEST_EXECUTION`
 
 Not currently registered as production reality:
@@ -184,6 +188,8 @@ The feasibility boundary is deterministic and fail-closed:
 - unmet requirements become `BLOCKED_CAPABILITY`
 - blocked candidates remain durable for later re-evaluation
 - no capability is inferred from prose or missing metadata
+- `READY_FOR_SPEC` means broad prerequisites are present so deterministic design may begin
+- `READY_FOR_SPEC` does not authorize execution
 
 Primary files:
 - `src/ai_quant_scientist/capabilities/v1_registry.py`
@@ -214,7 +220,7 @@ Primary file:
 
 Deterministic suite status:
 - `PYTHONPATH=src pytest -q`
-- current verified result: `405 passed`
+- current verified result: `411 passed`
 
 Research Critic eval support:
 - deterministic harness
@@ -225,12 +231,13 @@ Hypothesis Scientist eval support:
 - guarded live runner requiring `--allow-live-api`
 - default invocation makes zero API calls
 - eval artifacts now record ontology version and ontology fingerprint alongside model, prompt version, and parsed output
+- eval metadata such as `expected_tool_kinds` remains human-only and is not sent to the model
 
-Recent `gpt-5.6-terra` + Prompt `v2` live findings that motivated `V0.12C`:
+Latest `gpt-5.6-terra` + Prompt `v2` artifacts that motivated `V0.12D`:
 - `case-06`: passed with canonical `QUOTES` fields and `STATISTICAL_ANALYSIS`
-- `case-07`: failed closed because `execution_price` was used like prerequisite input data
-- `case-10`: failed closed because `close` was used instead of the synthetic scalar price vocabulary, but the prior-candidate summary successfully induced novelty
-- `case-11`: returned structurally valid `NO_HYPOTHESIS`, indicating the old fixture mixed multiplicity temptation with underspecification
+- `case-07`: structurally passed, but manually failed requirement completeness because it omitted `BACKTEST_EXECUTION` and pushed future-spec design into `required_parameters`
+- `case-10`: manually passed for ontology projection and novelty behavior, with a remaining caveat that `one_step_forward_change` may be derived evidence rather than prerequisite input
+- `case-11`: returned structurally valid `NO_HYPOTHESIS`, indicating the prior fixture still mixed multiplicity temptation with underspecification and needed a fuller synthetic brief
 
 Primary files:
 - `src/ai_quant_scientist/evals/critic_eval.py`
@@ -254,9 +261,10 @@ PYTHONPATH=src pytest -q
 
 - no autonomous loop
 - no production Spec Builder after `READY_FOR_SPEC`
+- no production Spec Feasibility validator after frozen `ResearchSpec`
 - no RAG or vector canonical memory
 - no fake real-market capabilities
-- no post-fix `V0.12C` live scientist rerun artifacts yet
+- no post-fix `V0.12D` live scientist rerun artifacts yet
 - plain `pytest` still requires `PYTHONPATH=src`
 
 ## Historical Integrity Note
@@ -267,4 +275,5 @@ Examples:
 - pre-fix critic live eval artifacts that lacked full constraint plumbing
 - pre-`V0.12B` scientist live artifacts produced before canonical tool/data contract hardening
 - pre-`V0.12C` scientist `v2` artifacts that exposed ontology-projection gaps and the original case-11 fixture ambiguity
+- pre-`V0.12D` scientist `v2` artifacts that still used the older AI-facing `required_parameters` contract
 - older milestone-era architecture notes preserved in git history rather than presented as current README state

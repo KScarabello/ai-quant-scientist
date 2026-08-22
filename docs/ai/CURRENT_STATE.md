@@ -3,11 +3,11 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.12C` implementation changes verified on `2026-08-21` Arizona project-local time (`2026-08-22` UTC)
+- Working tree status: contains uncommitted `V0.12D` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v6`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `405 passed`
-- Date: `2026-08-21` (Arizona project-local verification date; `2026-08-22` UTC)
+- Verified test count: `411 passed`
+- Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
 - `src/ai_quant_scientist/storage/sqlite_store.py`
@@ -48,6 +48,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - Hypothesis Scientist cannot declare feasibility, construct a `ResearchSpec`, or start research.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
+- `READY_FOR_SPEC` means broad prerequisites are satisfied so deterministic design may begin; it does not authorize execution.
+  Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `src/ai_quant_scientist/capabilities/intake.py`
 - No autonomous loop exists today.
   Evidence: `README.md`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 - No RAG or vector memory is canonical state.
@@ -76,6 +78,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/serialization.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`
 - `V0.12C`: deterministic requirement ontology projection, ontology provenance, and eval repair.
   Evidence: `src/ai_quant_scientist/services/scientist_requirement_ontology.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `evals/scientist_v1.json`
+- `V0.12D`: candidate-feasibility / future spec-feasibility boundary and AI candidate contract cleanup.
+  Evidence: `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `evals/scientist_v1.json`
 
 ## Current AI Components
 
@@ -92,17 +96,21 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/evals/critic_eval.py`, `tests/test_context_plumbing.py`
 
 ### Hypothesis Scientist
-- Prompt history now has immutable `v1` plus hardened `v2`; default adapter prompt is `v2`.
+- Prompt history now has immutable `v1`, preserved hardened `v2`, and current boundary-cleanup `v3`; default adapter prompt is `v3`.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`
 - Authority boundary remains exactly one bounded hypothesis or `NO_HYPOTHESIS`; no feasibility claims, no `ResearchSpec`, no research execution.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - Every invocation now receives a deterministic AI-safe requirement ontology snapshot with `version` and `fingerprint`, while capability availability remains withheld.
   Evidence: `src/ai_quant_scientist/services/scientist_requirement_ontology.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
+- Current AI-authored candidate contract is broad and pre-spec: `DataRequirement` is prerequisite data, `ToolRequirement` is broad deterministic tool class, and exact spec configuration is deferred until after `READY_FOR_SPEC`.
+  Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/capabilities/gate.py`
+- `DataRequirement.required_parameters` remains readable and matchable for historical/manual paths but is no longer part of the new AI-authored candidate contract.
+  Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/registry.py`
 - Invocation persistence remains schema `v6`.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Eval harness remains `12` cases in `evals/scientist_v1.json`.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `evals/scientist_v1.json`
-- Observability now includes exact requirement objects, canonical `tool_kind`, `required_parameters`, ontology provenance, prompt provenance, and human-only eval metadata separation.
+- Observability now includes exact requirement objects, canonical `tool_kind`, ontology provenance, prompt provenance, and human-only eval metadata separation; historical/manual `required_parameters` remain observable when present.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `tests/test_hypothesis_scientist.py`
 
 ## Current Deterministic Components
@@ -128,7 +136,7 @@ Governance keeps the scientist honest.
   - `data_kind`: `SYNTHETIC_PARAMETRIC`
   - `asset_class`: `SYNTHETIC`
   - `resolution`: `N/A`
-  - supported parameters: `signal_threshold`, `lookback`
+  - supported parameters: `signal_threshold`, `lookback` (retained for historical/manual compatibility)
 - No real market data, no real equities, no real futures, no real order book, and no real PIT fundamentals are registered as available.
 
 Evidence:
@@ -142,12 +150,12 @@ Evidence:
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787359890.json`
 - `case-06`: post-`V0.12B` Terra Prompt `v2` passed using primitive `QUOTES` fields (`bid_price`, `ask_price`, `bid_size`, `ask_size`) plus canonical `STATISTICAL_ANALYSIS`.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362976.json`
-- `case-07`: post-`V0.12B` Terra Prompt `v2` failed closed because `execution_price` was treated like prerequisite input data rather than generated tool output.
-  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362982.json`, `src/ai_quant_scientist/capabilities/models.py`
-- `case-10`: post-`V0.12B` Terra Prompt `v2` produced a scientifically strong distinct hypothesis, confirming that bounded `PriorCandidateSummary` is useful, but failed closed because it used `close` instead of the synthetic scalar price vocabulary.
-  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362988.json`, `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
-- `case-11`: post-`V0.12B` Terra Prompt `v2` returned valid `NO_HYPOTHESIS`, indicating the original fixture mixed multiplicity temptation with underspecification and needed repair.
-  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787363000.json`, `evals/scientist_v1.json`
+- `case-07`: latest available post-`V0.12C` Terra Prompt `v2` artifact structurally passed, but manually failed requirement completeness because it omitted `BACKTEST_EXECUTION` and pushed future-spec design into `required_parameters`.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364131.json`, `evals/scientist_v1.json`
+- `case-10`: latest available post-`V0.12C` Terra Prompt `v2` artifact manually passed for ontology projection and novelty behavior; remaining caveat is that `one_step_forward_change` may be derived evidence rather than prerequisite input.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364141.json`, `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
+- `case-11`: latest available post-`V0.12C` Terra Prompt `v2` artifact returned valid `NO_HYPOTHESIS`, attributing refusal to underspecification; the fixture is now repaired with a fully specified OU/process/strategy brief so it tests multiplicity only.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364150.json`, `evals/scientist_v1.json`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -160,32 +168,38 @@ These are useful live observations, not statistically exhaustive model evaluatio
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787359882.json`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787359918.json`
 - Pre-fix `V0.12C` Terra Prompt `v2` artifacts captured ontology-projection gaps and the original case-11 fixture ambiguity; they remain useful historical diagnostics but not post-fix validation.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362976.json`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787363000.json`
+- Pre-`V0.12D` Terra Prompt `v2` artifacts still reflect the older AI-facing `required_parameters` contract and should not be treated as validation of the new candidate/spec boundary.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364131.json`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364150.json`
 
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
 2. `READY_FOR_SPEC` still stops before a production Spec Builder.
    Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
-3. Post-fix `V0.12C` live scientist evals have not yet been rerun; the latest Terra Prompt `v2` artifacts still reflect pre-fix ontology projection and the original case-11 fixture.
-   Evidence: `src/ai_quant_scientist/evals/run_live_scientist_eval.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362976.json`
+3. Exact frozen-spec feasibility and implementation validation still do not exist.
+   Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
+4. Post-fix `V0.12D` live scientist evals have not yet been rerun; the latest available Terra artifacts are still Prompt `v2` / pre-`V0.12D` contract evidence.
+   Evidence: `src/ai_quant_scientist/evals/run_live_scientist_eval.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364131.json`
 
 ## Current Milestone
-`V0.12C - Scientist Requirement Ontology Projection + Eval Repair`
+`V0.12D - Candidate Feasibility / Spec Feasibility Boundary`
 
 Status:
-- Implemented in the working tree on `2026-08-21` Arizona project-local time (`2026-08-22` UTC)
+- Implemented in the working tree on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Not prompt-science tuning
-- Projects authoritative requirement ontology to the scientist without exposing capability availability
+- Cleans the AI-authored candidate contract so it stays broad and pre-spec
+- Preserves historical/manual `required_parameters` behavior without reinterpreting old evidence
 - Not yet complete from a live-evidence standpoint until post-fix diagnostics are rerun
 
-## Exact V0.12C Goals
-- Deterministic requirement ontology snapshot with version and fingerprint
-- Ontology vocabulary projected to the scientist on every invocation
-- Capability availability withheld from scientist context
-- `DataRequirement` clarified as prerequisite input data, not generated execution evidence
-- `required_parameters` clarified as supported input-parameter semantics, not arbitrary future spec design
-- `case-11` fixture repaired into a pure multiplicity test
-- Eval artifacts carry ontology provenance
+## Exact V0.12D Goals
+- Distinguish broad candidate feasibility from future exact spec feasibility
+- Remove `required_parameters` from the new AI-authored scientist contract
+- Preserve historical/manual `required_parameters` behavior and persisted evidence exactly
+- Keep candidate-stage `ToolRequirement` coarse
+- Clarify that `READY_FOR_SPEC` means permission to proceed to deterministic design, not execution
+- Repair `case-11` with a fully specified multiplicity-only synthetic brief
+- Record `case-07` manual completeness expectations without leaking eval metadata into model input
+- Preserve live-tested ontology/prompt history without silent rewrites
 - Production registry remains truthful
 - Preserve Prompt `v1` and Prompt `v2` exactly
 - No live API calls during implementation
@@ -216,7 +230,7 @@ Status:
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_id>`
 
 ## Exact Next Task
-Run a small post-fix live scientist eval rerun under prompt `v2`, starting with `case-06`, `case-07`, `case-10`, and `case-11`, then compare those artifacts against the pre-fix `V0.12C` diagnostics.
+Run a small post-fix live scientist eval rerun under prompt `v3`, starting with `case-07`, `case-10`, and `case-11`, plus `case-06` as a regression check, then compare those artifacts against the pre-`V0.12D` Prompt `v2` diagnostics.
 
 ## Stop Conditions / Do Not Do
 - No live API calls

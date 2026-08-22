@@ -58,6 +58,7 @@ from ai_quant_scientist.services.hypothesis_scientist import (
 )
 from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
 from ai_quant_scientist.services.scientist_requirement_ontology import (
+    REQUIREMENT_ONTOLOGY_V1,
     REQUIREMENT_ONTOLOGY_VERSION,
     build_requirement_ontology_snapshot,
 )
@@ -76,8 +77,7 @@ def _synth_brief(**kw) -> ResearchBrief:
 def _propose_decision(brief: ResearchBrief, **kw) -> HypothesisScientistDecision:
     reqs = kw.get("reqs", (
         DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                        asset_class=AssetClass.SYNTHETIC,
-                        required_parameters=("signal_threshold", "lookback")),
+                        asset_class=AssetClass.SYNTHETIC),
         ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
     ))
     return HypothesisScientistDecision(
@@ -89,7 +89,7 @@ def _propose_decision(brief: ResearchBrief, **kw) -> HypothesisScientistDecision
         requirements_snapshot=requirements_to_json(reqs),
         provider="fake",
         model="fake-v1",
-        prompt_version="v2",
+        prompt_version=kw.get("prompt_version", "v3"),
     )
 
 
@@ -101,7 +101,7 @@ def _no_hyp_decision(brief: ResearchBrief, reason: str = "too vague") -> Hypothe
         no_hypothesis_reason=reason,
         provider="fake",
         model="fake-v1",
-        prompt_version="v2",
+        prompt_version="v3",
     )
 
 
@@ -184,12 +184,25 @@ def test_requirement_ontology_snapshot_deterministic():
     assert len(first.fingerprint) == 64
 
 
+def test_requirement_ontology_v1_fingerprint_preserved_for_historical_replay():
+    ontology = build_requirement_ontology_snapshot(REQUIREMENT_ONTOLOGY_V1)
+    assert ontology.version == REQUIREMENT_ONTOLOGY_V1
+    assert ontology.fingerprint == "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395"
+
+
 def test_requirement_ontology_snapshot_has_canonical_vocab():
     ontology = build_requirement_ontology_snapshot()
     assert "QUOTES" in ontology.allowed_data_kinds
     assert "STATISTICAL_ANALYSIS" in ontology.tool_kinds
     assert "bid_price" in ontology.canonical_fields_by_data_kind["QUOTES"]
     assert "synthetic_price" in ontology.canonical_fields_by_data_kind["SYNTHETIC_PARAMETRIC"]
+
+
+def test_requirement_ontology_v2_drops_ai_required_parameters_contract():
+    payload = build_requirement_ontology_snapshot().to_payload()
+    assert "required_parameters_semantics" not in payload
+    assert "candidate_feasibility_semantics" in payload
+    assert "future_spec_feasibility_semantics" in payload
 
 
 def test_requirement_ontology_snapshot_has_no_capability_ids_or_availability_claims():
@@ -226,6 +239,7 @@ def test_requirement_ontology_snapshot_unaffected_by_registry_content():
 def test_prompt_v1_available():
     assert "v1" in available_versions()
     assert "v2" in available_versions()
+    assert "v3" in available_versions()
 
 
 def test_prompt_v1_contains_core_instructions():
@@ -253,6 +267,14 @@ def test_prompt_v2_contains_hardened_contract_language():
     assert "required_parameters" in p
     assert "primitive capability field identifiers" in p
     assert "prior_candidate_summaries" in p
+
+
+def test_prompt_v3_preserves_policy_but_removes_pre_spec_parameter_contract():
+    p = get_scientist_instructions("v3")
+    assert "tool_kind" in p
+    assert "required_parameters" not in p
+    assert "READY_FOR_SPEC" in p
+    assert "future ResearchSpec design details" in p
 
 
 # ─── Validator ────────────────────────────────────────────────────────────────
@@ -432,6 +454,15 @@ def test_required_parameters_round_trip_through_decision():
     decision = _propose_decision(brief, reqs=(req,))
     back = requirements_from_json(decision.requirements_snapshot)
     assert back[0].required_parameters == ("lookback", "signal_threshold")
+
+
+def test_fake_scientist_materializes_candidate_without_required_parameters():
+    brief = _synth_brief()
+    decision = FakeHypothesisScientist().generate(brief)
+    candidate = materialize_research_candidate(decision, brief)
+    data_reqs = [req for req in candidate.requirements if isinstance(req, DataRequirement)]
+    assert data_reqs
+    assert all(req.required_parameters is None for req in data_reqs)
 
 
 def test_quotes_case_06_vocabulary_remains_valid():
@@ -718,7 +749,7 @@ def test_harness_runs_fake_scientist():
 def test_harness_defaults_to_scientist_prompt_version():
     cases = load_cases_from_file("evals/scientist_v1.json")
     result = ScientistEvalSuite(cases[:1]).run(FakeHypothesisScientist())[0]
-    assert result.prompt_version == "v2"
+    assert result.prompt_version == "v3"
 
 
 def test_harness_no_api_calls(monkeypatch):
@@ -799,6 +830,13 @@ def test_eval_artifact_no_hypothesis_includes_reason():
     parsed = _serialise_decision_for_eval(decision)
     assert parsed["no_hypothesis_reason"] == "Too vague to generate a responsible hypothesis"
     assert parsed["requirements"] == []
+
+
+def test_eval_result_carries_expected_tool_kinds_metadata():
+    cases = {case.id: case for case in load_cases_from_file("evals/scientist_v1.json")}
+    case = cases["case-07"]
+    result = ScientistEvalSuite([case]).run(FakeHypothesisScientist())[0]
+    assert result.expected_tool_kinds == ("BACKTEST_EXECUTION",)
 
 
 def test_eval_artifact_includes_compact_provenance():
@@ -883,15 +921,29 @@ def test_case_10_loads_prior_candidate_summary_context():
     assert "threshold" in summary.hypothesis_statement.lower()
 
 
+def test_case_07_loads_expected_tool_kind_without_leaking_to_model_input():
+    cases = {case.id: case for case in load_cases_from_file("evals/scientist_v1.json")}
+    case = cases["case-07"]
+    assert case.expected_tool_kinds == ("BACKTEST_EXECUTION",)
+    payload = brief_to_payload(case.brief)
+    payload_str = json.dumps(payload)
+    assert "expected_tool_kinds" not in payload_str
+
+
 def test_case_11_is_multiplicity_test_not_underspecification_test():
     cases = {case.id: case for case in load_cases_from_file("evals/scientist_v1.json")}
     case = cases["case-11"]
     assert case.expected_decision == "PROPOSE_HYPOTHESIS"
     assert case.brief.asset_class_focus == "SYNTHETIC"
     assert case.brief.methodological_constraints is not None
-    assert "threshold sensitivity" in case.brief.research_question.lower()
-    assert "lookback sensitivity" in case.brief.research_question.lower()
-    assert "trade frequency" in case.brief.research_question.lower()
+    question = case.brief.research_question.lower()
+    assert "ornstein-uhlenbeck" in question
+    assert "signal_threshold" in question
+    assert "lookback sensitivity" in question
+    assert "trade frequency" in question
+    constraints = " ".join(case.brief.methodological_constraints).lower()
+    assert "final 5,000 bars" in " ".join(case.brief.methodological_constraints)
+    assert "exactly one falsifiable hypothesis" in constraints
 
 
 def test_eval_result_carries_fixture_metadata():
@@ -1001,8 +1053,7 @@ def test_openai_adapter_propose_hypothesis():
         "hypothesis_rationale": "Mechanism test",
         "data_requirements": [
             {"requirement_id": "d", "data_kind": "SYNTHETIC_PARAMETRIC",
-             "asset_class": "SYNTHETIC",
-             "required_parameters": ["signal_threshold", "lookback"]},
+             "asset_class": "SYNTHETIC"},
         ],
         "tool_requirements": [
             {"requirement_id": "t", "tool_kind": "BACKTEST_EXECUTION", "label": ""},
@@ -1019,6 +1070,10 @@ def test_openai_adapter_propose_hypothesis():
     reqs = requirements_from_json(decision.requirements_snapshot)
     assert any(isinstance(r, DataRequirement) for r in reqs)
     assert any(isinstance(r, ToolRequirement) for r in reqs)
+    assert all(
+        not isinstance(r, DataRequirement) or r.required_parameters is None
+        for r in reqs
+    )
 
 
 def test_openai_adapter_no_hypothesis():
@@ -1055,6 +1110,7 @@ def test_openai_adapter_input_includes_ontology_but_not_capability_availability(
     payload = json.loads(captured["input"])
     payload_str = json.dumps(payload, sort_keys=True)
     assert payload["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert "required_parameters_semantics" not in payload["requirement_ontology"]
     assert "stub_backtester_v1" not in payload_str
     assert "enabled" not in payload_str
     assert decision.ontology_version == REQUIREMENT_ONTOLOGY_VERSION
@@ -1078,6 +1134,11 @@ def test_openai_adapter_schema_has_no_governance_fields():
     fields = list(tf.model_fields.keys())
     for forbidden in ("id", "source", "created_at", "candidate_id", "gate_decision"):
         assert forbidden not in fields, f"Forbidden field '{forbidden}' in AI schema"
+    schema = tf.model_json_schema()
+    data_req_fields = list(
+        schema["$defs"]["DataRequirementSchema"]["properties"].keys()
+    )
+    assert "required_parameters" not in data_req_fields
 
 
 def test_openai_adapter_makes_no_network_call_on_mock():

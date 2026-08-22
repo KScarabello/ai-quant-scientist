@@ -7,7 +7,7 @@ Future Hypothesis Scientist → ResearchCandidate → GovernedResearchIntake
     → persist candidate
     → evaluate via ResearchFeasibilityGate
     → persist FeasibilityDecision
-    → READY_FOR_SPEC or BLOCKED_CAPABILITY (never auto-creates a spec)
+    → READY_FOR_SPEC or BLOCKED_CAPABILITY (never auto-creates a spec or starts research)
 """
 from __future__ import annotations
 
@@ -81,6 +81,8 @@ class GovernedResearchIntake:
     Low-level constructors (SQLiteStore, Orchestrator) remain available for
     unit tests and internal tooling, but this class is the governed entry point.
 
+    READY_FOR_SPEC permits deterministic design work to begin.
+    It does not create a ResearchSpec or a ResearchRun automatically.
     BLOCKED_CAPABILITY does not create a ResearchSpec or a ResearchRun.
     AI cannot override feasibility decisions.
     """

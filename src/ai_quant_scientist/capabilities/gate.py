@@ -1,9 +1,10 @@
-"""ResearchCandidate and deterministic ResearchFeasibilityGate (V0.10).
+"""ResearchCandidate and deterministic candidate-feasibility gate (V0.10).
 
 Policy version: research_feasibility_gate_v1
 
 The future Hypothesis Scientist will produce ResearchCandidate objects.
 The gate deterministically decides whether the candidate can proceed to Spec creation.
+It does not validate exact frozen-spec executability.
 
 Same candidate + same registry → same logical gate decision.
 Makes no LLM calls. AI cannot override feasibility.
@@ -91,6 +92,7 @@ class ResearchFeasibilityDecision:
     Records registry provenance so the decision is auditable even after registry changes.
     BLOCKED_CAPABILITY does not mean the hypothesis is scientifically invalid.
     It means the current system cannot test it.
+    READY_FOR_SPEC means broad prerequisites are present so deterministic design may begin.
     """
     candidate_id: str
     decision: GateDecision
@@ -114,10 +116,11 @@ class ResearchFeasibilityDecision:
 # ─── ResearchFeasibilityGate ─────────────────────────────────────────────────
 
 class ResearchFeasibilityGate:
-    """Deterministic feasibility gate — the boundary between candidate and spec.
+    """Deterministic candidate-feasibility gate — the boundary between candidate and spec.
 
     AI cannot override its decisions.
     Same candidate + registry + gate policy → same logical decision.
+    Exact implementation compatibility is deferred until a future frozen-spec stage.
     """
 
     def evaluate(
@@ -127,9 +130,9 @@ class ResearchFeasibilityGate:
     ) -> ResearchFeasibilityDecision:
         """Evaluate a ResearchCandidate against a CapabilityRegistry.
 
-        Returns READY_FOR_SPEC if all requirements are satisfied.
+        Returns READY_FOR_SPEC if all broad candidate requirements are satisfied.
         Returns BLOCKED_CAPABILITY if any requirement is not met.
-        Never constructs a ResearchSpec.  Never calls an LLM.
+        Never constructs a ResearchSpec.  Never authorizes execution.  Never calls an LLM.
         """
         feasibility = registry.evaluate(list(candidate.requirements))
 

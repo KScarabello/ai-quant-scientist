@@ -1,0 +1,80 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v2",
+  "timestamp": 1787364141,
+  "results": [
+    {
+      "case_id": "case-10",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v2",
+      "ontology_version": "requirement_ontology_v1",
+      "ontology_fingerprint": "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 2,
+      "hypothesis_statement": "In synthetic parametric series, conditional on volatility regime, a larger signed deviation of synthetic_price from latent_equilibrium_value predicts a one-step-forward change of the opposite sign.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "proposes distinct hypothesis when bounded prior-candidate summary context is provided",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "In synthetic parametric series, conditional on volatility regime, a larger signed deviation of synthetic_price from latent_equilibrium_value predicts a one-step-forward change of the opposite sign.",
+        "hypothesis_rationale": "If the synthetic process incorporates equilibrium-restoring dynamics, deviations from its latent equilibrium should generate conditional mean reversion; volatility-regime conditioning distinguishes this mechanism from changes in the magnitude or persistence of shocks across regimes.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_equilibrium_path",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "latent_equilibrium_value",
+              "one_step_forward_change",
+              "synthetic_price",
+              "timestamp",
+              "volatility_regime_label"
+            ],
+            "instruments": null,
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "conditional_predictive_analysis",
+            "tool_kind": "STATISTICAL_ANALYSIS",
+            "legacy_tool_name": null,
+            "label": "Test conditional association between signed equilibrium deviations and one-step-forward changes by volatility regime"
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v2",
+        "ontology_version": "requirement_ontology_v1",
+        "ontology_fingerprint": "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395",
+        "compact_provenance": {
+          "response_id": "resp_04f966bd1e25ef72016a89032f4be087d084a68225f5ebc31c",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787364143.0,
+          "completed_at": 1787364149.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 2466,
+            "output_tokens": 491,
+            "reasoning_tokens": 250
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"In synthetic parametric series, conditional on volatility regime, a larger signed deviation of synthetic_price from latent_equilibrium_value predicts a one-step-forward change of the opposite sign.\",\"hypothesis_rationale\":\"If the synthetic process incorporates equilibrium-restoring dynamics, deviations from its latent equilibrium should generate conditional mean reversion; volatility-regime conditioning distinguishes this mechanism from changes in the magnitude or persistence of shocks across regimes.\",\"data_requirements\":[{\"requirement_id\":\"synthetic_equilibrium_path\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"timestamp\",\"synthetic_price\",\"latent_equilibrium_value\",\"volatility_regime_label\",\"one_step_forward_change\"],\"instruments\":null,\"point_in_time_required\":true,\"required_parameters\":null}],\"tool_requirements\":[{\"requirement_id\":\"conditional_predictive_analysis\",\"tool_kind\":\"STATISTICAL_ANALYSIS\",\"label\":\"Test conditional association between signed equilibrium deviations and one-step-forward changes by volatility regime\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

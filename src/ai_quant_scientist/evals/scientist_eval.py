@@ -78,6 +78,7 @@ class ScientistEvalCase:
     expected_decision: str | None = None
     evaluation_focus: str | None = None
     manual_success_criteria: str | None = None
+    expected_tool_kinds: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -100,6 +101,8 @@ class ScientistEvalResult:
     # Eval fixture metadata (for artifact context; never in model input)
     expected_decision: str | None = None
     evaluation_focus: str | None = None
+    manual_success_criteria: str | None = None
+    expected_tool_kinds: tuple[str, ...] | None = None
     notes: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -130,6 +133,7 @@ def load_cases_from_file(path: str) -> list[ScientistEvalCase]:
             expected_decision=c.get("expected_decision"),
             evaluation_focus=c.get("evaluation_focus"),
             manual_success_criteria=c.get("manual_success_criteria"),
+            expected_tool_kinds=tuple(c["expected_tool_kinds"]) if c.get("expected_tool_kinds") else None,
         ))
     return cases
 
@@ -172,6 +176,8 @@ class ScientistEvalSuite:
                     parsed_decision=_serialise_decision_for_eval(decision),
                     expected_decision=case.expected_decision,
                     evaluation_focus=case.evaluation_focus,
+                    manual_success_criteria=case.manual_success_criteria,
+                    expected_tool_kinds=case.expected_tool_kinds,
                 ))
             except Exception as exc:
                 results.append(ScientistEvalResult(
@@ -191,6 +197,8 @@ class ScientistEvalSuite:
                     parsed_decision=None,
                     expected_decision=case.expected_decision,
                     evaluation_focus=case.evaluation_focus,
+                    manual_success_criteria=case.manual_success_criteria,
+                    expected_tool_kinds=case.expected_tool_kinds,
                     notes=str(exc),
                 ))
         return results

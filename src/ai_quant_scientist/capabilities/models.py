@@ -173,6 +173,8 @@ class DataRequirement:
     Only constrained dimensions are evaluated during matching.
     This model describes inputs required before deterministic tool execution.
     It does not represent generated backtest outputs or experiment evidence.
+    New AI-authored candidates should keep this broad and pre-spec.
+    Historical/manual paths may still use required_parameters for capability-detail checks.
     """
     requirement_id: str
     data_kind: DataKind
@@ -188,8 +190,10 @@ class DataRequirement:
     start_date: date | None = None
     end_date: date | None = None
     point_in_time_required: bool = False
-    # Explicit input parameters the supplying capability must support.
-    # This is not a placeholder for arbitrary future ResearchSpec design.
+    # Historical/manual capability-detail constraint.
+    # New AI-authored candidates should normally leave this unset so pre-spec
+    # candidate feasibility stays broad and exact design compatibility can be
+    # validated later against a frozen ResearchSpec.
     required_parameters: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:

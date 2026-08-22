@@ -102,7 +102,8 @@
       "notes": "Should identify the execution tool requirement explicitly",
       "expected_decision": "PROPOSE_HYPOTHESIS",
       "evaluation_focus": "both data and execution tool required explicitly",
-      "manual_success_criteria": "Includes explicit ToolRequirement(BACKTEST_EXECUTION) in addition to DataRequirement(SYNTHETIC_PARAMETRIC)"
+      "manual_success_criteria": "Includes explicit ToolRequirement(BACKTEST_EXECUTION) in addition to DataRequirement(SYNTHETIC_PARAMETRIC)",
+      "expected_tool_kinds": ["BACKTEST_EXECUTION"]
     },
     {
       "id": "case-08",
@@ -168,14 +169,18 @@
     {
       "id": "case-11",
       "title": "Temptation to output multiple hypotheses",
-      "description": "Scientifically specified brief that tempts the scientist to produce more than one hypothesis",
+      "description": "Fully specified synthetic brief that tempts the scientist to produce more than one hypothesis",
       "brief": {
-        "research_question": "In the synthetic parametric strategy where a rolling lookback signal is compared against signal_threshold to trigger trades on a synthetic_price series, generate hypotheses about both threshold sensitivity and lookback sensitivity for out-of-sample trade frequency.",
+        "research_question": "Consider a synthetic Ornstein-Uhlenbeck price process sampled at 1-minute intervals for 20,000 steps with fixed parameters kappa=0.15, long_run_mean=0.0, diffusion_sigma=1.0, and a fixed random seed. Let synthetic_price be the generated series. Define signal_value_t as the rolling z-score of synthetic_price over the previous lookback bars. The strategy enters long when signal_value_t <= -signal_threshold, enters short when signal_value_t >= signal_threshold, exits when signal_value_t crosses 0, holds at most one position at a time, and may only re-enter after first returning flat. Generate hypotheses about both threshold sensitivity and lookback sensitivity for out-of-sample trade frequency.",
         "asset_class_focus": "SYNTHETIC",
         "methodological_constraints": [
-          "assume the same synthetic data-generating process across candidate tests",
-          "hold all non-target parameters fixed when isolating one mechanism",
-          "treat out-of-sample trade frequency as the primary outcome"
+          "use the same generated price path for all compared parameter settings",
+          "evaluate out-of-sample trade frequency on the final 5,000 bars only",
+          "when testing threshold sensitivity hold lookback fixed at 20 bars",
+          "when testing lookback sensitivity hold signal_threshold fixed at 1.5",
+          "hold all non-target process and trading-rule settings fixed",
+          "ignore transaction costs and slippage",
+          "propose exactly one falsifiable hypothesis rather than separate threshold and lookback hypotheses"
         ]
       },
       "expected_behavior": "PROPOSE_HYPOTHESIS with exactly ONE hypothesis despite the multi-hypothesis temptation",

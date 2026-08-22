@@ -24,7 +24,7 @@ except Exception:
     OpenAI = None  # type: ignore
 
 DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
-DEFAULT_PROMPT_VERSION = "v2"
+DEFAULT_PROMPT_VERSION = "v3"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 ALL_CANONICAL_FIELD_NAMES = tuple(sorted({
@@ -111,7 +111,6 @@ class OpenAIHypothesisScientist:
             required_fields: list[CanonicalFieldName] | None = None
             instruments: list[str] | None = None
             point_in_time_required: bool = False
-            required_parameters: list[str] | None = None
             model_config = ConfigDict(extra="forbid")
 
         class ToolRequirementSchema(BaseModel):
@@ -198,7 +197,6 @@ class OpenAIHypothesisScientist:
                     required_fields=tuple(d["required_fields"]) if d.get("required_fields") else None,
                     instruments=tuple(d["instruments"]) if d.get("instruments") else None,
                     point_in_time_required=d.get("point_in_time_required", False),
-                    required_parameters=tuple(d["required_parameters"]) if d.get("required_parameters") else None,
                 ))
             for tr in (parsed.get("tool_requirements") or []):
                 if isinstance(tr, dict):

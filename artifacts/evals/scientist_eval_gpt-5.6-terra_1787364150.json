@@ -1,0 +1,54 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v2",
+  "timestamp": 1787364150,
+  "results": [
+    {
+      "case_id": "case-11",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v2",
+      "ontology_version": "requirement_ontology_v1",
+      "ontology_fingerprint": "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "emits exactly ONE hypothesis despite multi-hypothesis temptation",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": null,
+        "hypothesis_rationale": null,
+        "requirements": [],
+        "no_hypothesis_reason": "The rolling signal definition, its normalization across lookbacks, threshold comparison direction, and trade-entry/re-entry rules are unspecified. These choices determine whether increasing a threshold or changing a lookback should raise or lower trade frequency, so a directional, mechanistic threshold-and-lookback hypothesis would require inventing material strategy details.",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v2",
+        "ontology_version": "requirement_ontology_v1",
+        "ontology_fingerprint": "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395",
+        "compact_provenance": {
+          "response_id": "resp_05cd81f848f44619016a8903366f7887d09514eb21d2f3b75e",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787364150.0,
+          "completed_at": 1787364158.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 2461,
+            "output_tokens": 598,
+            "reasoning_tokens": 483
+          },
+          "output_text": "{\"decision\":\"NO_HYPOTHESIS\",\"hypothesis_statement\":null,\"hypothesis_rationale\":null,\"data_requirements\":null,\"tool_requirements\":null,\"no_hypothesis_reason\":\"The rolling signal definition, its normalization across lookbacks, threshold comparison direction, and trade-entry/re-entry rules are unspecified. These choices determine whether increasing a threshold or changing a lookback should raise or lower trade frequency, so a directional, mechanistic threshold-and-lookback hypothesis would require inventing material strategy details.\"}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 0,
+    "no_hypothesis_count": 1
+  }
+}

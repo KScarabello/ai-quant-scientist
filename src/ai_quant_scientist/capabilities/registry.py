@@ -62,6 +62,7 @@ class CapabilityRegistry:
 
         A requirement is satisfied only when an ENABLED capability EXPLICITLY
         covers every constrained dimension.  Fail-closed on every dimension.
+        This is candidate-feasibility matching, not exact frozen-spec execution validation.
         """
         enabled = [c for c in self._caps if c.enabled]
 
@@ -181,8 +182,9 @@ class CapabilityRegistry:
                 )
 
         # Filter: required parameters
-        # DataRequirement.required_parameters names explicit input parameters that the
-        # supplying capability must support. It is not a free-form ResearchSpec design field.
+        # Historical/manual capability-detail check only.
+        # New AI-authored candidates should normally not rely on this field; exact
+        # parameter compatibility belongs to later ResearchSpec validation.
         # Capability.supported_parameters=None means NOT DECLARED — fails a constrained requirement.
         if req.required_parameters is not None:
             req_params = set(req.required_parameters)
@@ -251,7 +253,7 @@ class CapabilityRegistry:
         )
 
     def evaluate(self, requirements: Sequence[DataRequirement | ToolRequirement]) -> FeasibilityResult:
-        """Evaluate a collection of DataRequirements.
+        """Evaluate candidate-stage broad requirements.
 
         TESTABLE only if every requirement is individually satisfied.
         Designed for future Hypothesis Scientist integration:
