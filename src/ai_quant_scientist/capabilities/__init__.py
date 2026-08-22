@@ -10,7 +10,11 @@ from .models import (
     FeasibilityStatus,
     RequirementResult,
     Resolution,
+    ToolKind,
     ToolRequirement,
+    CANONICAL_FIELDS_BY_DATA_KIND,
+    validate_required_field_names,
+    validate_required_parameter_names,
     compute_registry_fingerprint,
 )
 from .registry import CapabilityRegistry, REGISTRY_VERSION
@@ -53,7 +57,11 @@ __all__ = [
     "ResearchFeasibilityDecision",
     "ResearchFeasibilityGate",
     "Resolution",
+    "ToolKind",
     "ToolRequirement",
+    "CANONICAL_FIELDS_BY_DATA_KIND",
     "build_v1_registry",
     "compute_registry_fingerprint",
+    "validate_required_field_names",
+    "validate_required_parameter_names",
 ]

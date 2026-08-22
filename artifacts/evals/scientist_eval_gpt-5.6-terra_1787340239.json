@@ -1,0 +1,22 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787340239,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 2,
+      "hypothesis_statement": "In the synthetic parametric strategy, increasing signal_threshold weakly decreases trade frequency because fewer signal observations satisfy the strategy\u2019s eligibility gate.",
+      "notes": ""
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

@@ -30,7 +30,8 @@ def _req_to_dict(req) -> dict:
     return {
         "type": "ToolRequirement",
         "requirement_id": req.requirement_id,
-        "tool_name": req.tool_name,
+        "tool_kind": req.tool_kind.value if req.tool_kind is not None else None,
+        "legacy_tool_name": req.legacy_tool_name,
         "label": req.label,
     }
 
@@ -113,6 +114,7 @@ def load_cases_from_file(path: str) -> list[ScientistEvalCase]:
             methodological_constraints=brief_data.get("methodological_constraints"),
             exclusions=brief_data.get("exclusions"),
             prior_candidate_fingerprints=brief_data.get("prior_candidate_fingerprints"),
+            prior_candidate_summaries=brief_data.get("prior_candidate_summaries"),
         )
         cases.append(ScientistEvalCase(
             id=c["id"],
@@ -132,9 +134,10 @@ class ScientistEvalSuite:
     def __init__(self, cases: list[ScientistEvalCase]) -> None:
         self.cases = cases
 
-    def run(self, scientist, prompt_version: str = "v1") -> list[ScientistEvalResult]:
+    def run(self, scientist, prompt_version: str | None = None) -> list[ScientistEvalResult]:
         results = []
         validator = HypothesisProposalValidator()
+        effective_prompt_version = prompt_version or getattr(scientist, "prompt_version", None)
         for case in self.cases:
             try:
                 decision = scientist.generate(case.brief)
@@ -153,7 +156,7 @@ class ScientistEvalSuite:
                     scientist_name=type(scientist).__name__,
                     provider=getattr(scientist, "provider", None),
                     model=getattr(scientist, "model", None),
-                    prompt_version=prompt_version,
+                    prompt_version=effective_prompt_version,
                     decision_type=decision.decision_type.value if decision.decision_type else None,
                     contract_passed=valid,
                     validation_errors=errors,
@@ -170,7 +173,7 @@ class ScientistEvalSuite:
                     scientist_name=type(scientist).__name__,
                     provider=getattr(scientist, "provider", None),
                     model=getattr(scientist, "model", None),
-                    prompt_version=prompt_version,
+                    prompt_version=effective_prompt_version,
                     decision_type=None,
                     contract_passed=False,
                     validation_errors={"infrastructure_error": str(exc)},

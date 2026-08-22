@@ -1,0 +1,112 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359918,
+  "results": [
+    {
+      "case_id": "case-11",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 5,
+      "hypothesis_statement": "In a synthetic Ornstein\u2013Uhlenbeck mean-reversion strategy that enters when the rolling z-score exceeds an absolute threshold and exits at zero, out-of-sample performance is more sensitive to changes in the entry threshold than to equal proportional changes in lookback length when the lookback is within a band around the process half-life.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "emits exactly ONE hypothesis despite multi-hypothesis temptation",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "In a synthetic Ornstein\u2013Uhlenbeck mean-reversion strategy that enters when the rolling z-score exceeds an absolute threshold and exits at zero, out-of-sample performance is more sensitive to changes in the entry threshold than to equal proportional changes in lookback length when the lookback is within a band around the process half-life.",
+        "hypothesis_rationale": "The lookback controls estimation noise versus signal adaptation, and values near the mean-reversion half-life should yield similar estimates of the local equilibrium and volatility. By contrast, the entry threshold directly changes the trade-off between capturing modest reversals and filtering noise, altering both trade frequency and conditional expected reversion; therefore its local performance gradient should be larger.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_ou_paths",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "OU_diffusion_volatility",
+              "OU_long_run_mean",
+              "OU_mean_reversion_speed",
+              "in_sample_out_of_sample_split",
+              "simulation_seed",
+              "synthetic_price",
+              "timestamp"
+            ],
+            "instruments": [
+              "synthetic Ornstein-Uhlenbeck price paths spanning multiple mean-reversion speeds, volatilities, and random seeds"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "strategy_evaluation_outputs",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "entry_threshold",
+              "half_life",
+              "lookback_length",
+              "out_of_sample_net_pnl",
+              "out_of_sample_sharpe_or_risk_adjusted_return",
+              "parameter_perturbation_magnitude",
+              "trade_count",
+              "transaction_cost_assumption",
+              "turnover"
+            ],
+            "instruments": [
+              "z-score mean-reversion strategy evaluations on the synthetic paths"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "path_simulation",
+            "tool_name": "SIMULATION_TOOL",
+            "label": "Generate reproducible Ornstein\u2013Uhlenbeck paths across controlled parameter grids and random seeds."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "strategy_backtest",
+            "tool_name": "BACKTESTING_TOOL",
+            "label": "Execute rolling-z-score strategy variants with explicit transaction-cost modeling and out-of-sample evaluation."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "sensitivity_inference",
+            "tool_name": "STATISTICAL_ANALYSIS_TOOL",
+            "label": "Estimate and compare local performance sensitivity to threshold and lookback perturbations across simulation replications."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_086aab2d815a2e09016a88f2af188487d0987373a27cded86f",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359919.0,
+          "completed_at": 1787359927.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1164,
+            "output_tokens": 642,
+            "reasoning_tokens": 123
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"In a synthetic Ornstein\u2013Uhlenbeck mean-reversion strategy that enters when the rolling z-score exceeds an absolute threshold and exits at zero, out-of-sample performance is more sensitive to changes in the entry threshold than to equal proportional changes in lookback length when the lookback is within a band around the process half-life.\",\"hypothesis_rationale\":\"The lookback controls estimation noise versus signal adaptation, and values near the mean-reversion half-life should yield similar estimates of the local equilibrium and volatility. By contrast, the entry threshold directly changes the trade-off between capturing modest reversals and filtering noise, altering both trade frequency and conditional expected reversion; therefore its local performance gradient should be larger.\",\"data_requirements\":[{\"requirement_id\":\"synthetic_ou_paths\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"timestamp\",\"synthetic_price\",\"OU_mean_reversion_speed\",\"OU_long_run_mean\",\"OU_diffusion_volatility\",\"simulation_seed\",\"in_sample_out_of_sample_split\"],\"instruments\":[\"synthetic Ornstein-Uhlenbeck price paths spanning multiple mean-reversion speeds, volatilities, and random seeds\"],\"point_in_time_required\":false},{\"requirement_id\":\"strategy_evaluation_outputs\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"entry_threshold\",\"lookback_length\",\"half_life\",\"out_of_sample_net_pnl\",\"out_of_sample_sharpe_or_risk_adjusted_return\",\"trade_count\",\"turnover\",\"transaction_cost_assumption\",\"parameter_perturbation_magnitude\"],\"instruments\":[\"z-score mean-reversion strategy evaluations on the synthetic paths\"],\"point_in_time_required\":false}],\"tool_requirements\":[{\"requirement_id\":\"path_simulation\",\"tool_name\":\"SIMULATION_TOOL\",\"label\":\"Generate reproducible Ornstein\u2013Uhlenbeck paths across controlled parameter grids and random seeds.\"},{\"requirement_id\":\"strategy_backtest\",\"tool_name\":\"BACKTESTING_TOOL\",\"label\":\"Execute rolling-z-score strategy variants with explicit transaction-cost modeling and out-of-sample evaluation.\"},{\"requirement_id\":\"sensitivity_inference\",\"tool_name\":\"STATISTICAL_ANALYSIS_TOOL\",\"label\":\"Estimate and compare local performance sensitivity to threshold and lookback perturbations across simulation replications.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

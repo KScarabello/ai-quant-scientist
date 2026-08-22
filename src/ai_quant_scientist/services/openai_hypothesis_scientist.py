@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Optional
 
-from ..capabilities.models import DataKind, AssetClass, Resolution
+from ..capabilities.models import AssetClass, DataKind, Resolution, ToolKind
 from ..capabilities.serialization import requirements_to_json
 from ..models.hypothesis_scientist import (
     HypothesisScientistDecision,
@@ -23,7 +23,7 @@ except Exception:
     OpenAI = None  # type: ignore
 
 DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
-DEFAULT_PROMPT_VERSION = "v1"
+DEFAULT_PROMPT_VERSION = "v2"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 
@@ -103,12 +103,17 @@ class OpenAIHypothesisScientist:
             required_fields: list[str] | None = None
             instruments: list[str] | None = None
             point_in_time_required: bool = False
+            required_parameters: list[str] | None = None
             model_config = ConfigDict(extra="forbid")
 
         class ToolRequirementSchema(BaseModel):
             requirement_id: str
-            # Use capability class (e.g. "EXECUTION_TOOL"), not internal IDs
-            tool_name: str
+            tool_kind: Literal[
+                "BACKTEST_EXECUTION",
+                "SYNTHETIC_DATA_GENERATION",
+                "STATISTICAL_ANALYSIS",
+                "MARKET_DATA_RESEARCH",
+            ]
             label: str = ""
             model_config = ConfigDict(extra="forbid")
 
@@ -184,6 +189,7 @@ class OpenAIHypothesisScientist:
                     required_fields=tuple(d["required_fields"]) if d.get("required_fields") else None,
                     instruments=tuple(d["instruments"]) if d.get("instruments") else None,
                     point_in_time_required=d.get("point_in_time_required", False),
+                    required_parameters=tuple(d["required_parameters"]) if d.get("required_parameters") else None,
                 ))
             for tr in (parsed.get("tool_requirements") or []):
                 if isinstance(tr, dict):
@@ -192,7 +198,7 @@ class OpenAIHypothesisScientist:
                     t = tr
                 reqs.append(ToolRequirement(
                     requirement_id=t.get("requirement_id", new_id()),
-                    tool_name=t["tool_name"],
+                    tool_kind=ToolKind(t["tool_kind"]),
                     label=t.get("label", ""),
                 ))
             requirements_snapshot = requirements_to_json(tuple(reqs))

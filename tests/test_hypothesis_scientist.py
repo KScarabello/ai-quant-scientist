@@ -18,6 +18,7 @@ from ai_quant_scientist.capabilities import (
     DataRequirement,
     GateDecision,
     Resolution,
+    ToolKind,
     ToolRequirement,
     build_v1_registry,
 )
@@ -37,6 +38,7 @@ from ai_quant_scientist.models.hypothesis_scientist import (
     HypothesisScientistDecision,
     HypothesisScientistDecisionType,
     HypothesisScientistInvocation,
+    PriorCandidateSummary,
     ResearchBrief,
 )
 from ai_quant_scientist.services.hypothesis_prompts import (
@@ -68,8 +70,9 @@ def _synth_brief(**kw) -> ResearchBrief:
 def _propose_decision(brief: ResearchBrief, **kw) -> HypothesisScientistDecision:
     reqs = kw.get("reqs", (
         DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                        asset_class=AssetClass.SYNTHETIC),
-        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+                        asset_class=AssetClass.SYNTHETIC,
+                        required_parameters=("signal_threshold", "lookback")),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
     ))
     return HypothesisScientistDecision(
         id="dec-01",
@@ -80,7 +83,7 @@ def _propose_decision(brief: ResearchBrief, **kw) -> HypothesisScientistDecision
         requirements_snapshot=requirements_to_json(reqs),
         provider="fake",
         model="fake-v1",
-        prompt_version="v1",
+        prompt_version="v2",
     )
 
 
@@ -92,7 +95,7 @@ def _no_hyp_decision(brief: ResearchBrief, reason: str = "too vague") -> Hypothe
         no_hypothesis_reason=reason,
         provider="fake",
         model="fake-v1",
-        prompt_version="v1",
+        prompt_version="v2",
     )
 
 
@@ -114,12 +117,44 @@ def test_brief_optional_fields():
         asset_class_focus="FUTURES",
         instrument_focus=["MES"],
         exclusions=["options"],
-        prior_candidate_fingerprints=["abc123"],
+        prior_candidate_summaries=[{
+            "fingerprint": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+            "hypothesis_statement": "Prior threshold sensitivity hypothesis",
+            "hypothesis_rationale_summary": "Threshold gating may drive trade count",
+        }],
     )
     assert b.asset_class_focus == "FUTURES"
     assert "MES" in b.instrument_focus
     assert "options" in b.exclusions
-    assert "abc123" in b.prior_candidate_fingerprints
+    assert b.prior_candidate_summaries is not None
+    assert b.prior_candidate_summaries[0].hypothesis_statement == "Prior threshold sensitivity hypothesis"
+    assert (
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abcd"
+        in b.prior_candidate_fingerprints
+    )
+
+
+def test_brief_rejects_mismatched_prior_fingerprint_lists():
+    with pytest.raises(ValueError, match="must match prior_candidate_summaries"):
+        ResearchBrief.create(
+            research_question="test",
+            prior_candidate_fingerprints=["f" * 64],
+            prior_candidate_summaries=[{
+                "fingerprint": "e" * 64,
+                "hypothesis_statement": "prior",
+            }],
+        )
+
+
+def test_brief_bounds_prior_candidate_summary_count():
+    with pytest.raises(ValueError, match="at most"):
+        ResearchBrief.create(
+            research_question="test",
+            prior_candidate_summaries=[
+                {"fingerprint": f"{i:064x}", "hypothesis_statement": f"prior {i}"}
+                for i in range(6)
+            ],
+        )
 
 
 def test_brief_empty_question_rejected():
@@ -137,6 +172,7 @@ def test_brief_is_immutable():
 
 def test_prompt_v1_available():
     assert "v1" in available_versions()
+    assert "v2" in available_versions()
 
 
 def test_prompt_v1_contains_core_instructions():
@@ -156,6 +192,14 @@ def test_prompt_v1_forbids_governance_fields():
 def test_unknown_prompt_version_raises():
     with pytest.raises(KeyError):
         get_scientist_instructions("v99")
+
+
+def test_prompt_v2_contains_hardened_contract_language():
+    p = get_scientist_instructions("v2")
+    assert "tool_kind" in p
+    assert "required_parameters" in p
+    assert "primitive capability field identifiers" in p
+    assert "prior_candidate_summaries" in p
 
 
 # ─── Validator ────────────────────────────────────────────────────────────────
@@ -252,18 +296,18 @@ def test_data_requirement_round_trip_through_decision():
 
 def test_tool_requirement_round_trip_through_decision():
     brief = _synth_brief()
-    req = ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL")
+    req = ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION)
     decision = _propose_decision(brief, reqs=(req,))
     back = requirements_from_json(decision.requirements_snapshot)
     assert isinstance(back[0], ToolRequirement)
-    assert back[0].tool_name == "EXECUTION_TOOL"
+    assert back[0].tool_kind == ToolKind.BACKTEST_EXECUTION
 
 
 def test_mixed_requirements_round_trip():
     brief = _synth_brief()
     reqs = (
         DataRequirement(requirement_id="d", data_kind=DataKind.ORDER_BOOK, asset_class=AssetClass.FUTURES),
-        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
     )
     decision = _propose_decision(brief, reqs=reqs)
     back = requirements_from_json(decision.requirements_snapshot)
@@ -272,9 +316,9 @@ def test_mixed_requirements_round_trip():
     assert isinstance(back[1], ToolRequirement)
 
 
-# ─── ToolRequirement capability_type matching ─────────────────────────────────
+# ─── ToolRequirement ontology ────────────────────────────────────────────────
 
-def test_tool_requirement_matches_capability_type():
+def test_tool_requirement_matches_supported_tool_kind():
     from ai_quant_scientist.capabilities.registry import CapabilityRegistry
     from ai_quant_scientist.capabilities.models import Capability
     cap = Capability(
@@ -284,19 +328,57 @@ def test_tool_requirement_matches_capability_type():
         asset_classes=(AssetClass.SYNTHETIC,),
         resolutions=(Resolution.NOT_APPLICABLE,),
         supported_parameters=("signal_threshold", "lookback"),
+        supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,),
         provider="test", enabled=True, version="1",
     )
     reg = CapabilityRegistry([cap])
-    req = ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL")
+    req = ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION)
     result = reg.evaluate_tool_requirement(req)
     assert result.satisfied
 
 
-def test_tool_requirement_also_matches_capability_id():
-    """Existing exact-id matching preserved."""
-    req = ToolRequirement(requirement_id="t", tool_name="stub_backtester_v1")
+def test_legacy_tool_requirement_still_reads_by_exact_capability_id():
+    req = ToolRequirement(requirement_id="t", legacy_tool_name="stub_backtester_v1")
     result = build_v1_registry().evaluate_tool_requirement(req)
     assert result.satisfied
+
+
+def test_free_form_tool_synonym_rejected_for_new_contract():
+    brief = _synth_brief()
+    decision = _propose_decision(brief, reqs=(
+        DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC),
+        ToolRequirement(requirement_id="t", legacy_tool_name="BACKTESTING_TOOL"),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "t_tool_kind" in errors
+
+
+def test_pseudo_field_identifier_rejected_for_new_contract():
+    brief = _synth_brief()
+    decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="d",
+            data_kind=DataKind.QUOTES,
+            required_fields=("bid_price", "ask_price", "mid_price_or_fields_to_compute_mid"),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.MARKET_DATA_RESEARCH),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "d_required_fields" in errors
+
+
+def test_required_parameters_round_trip_through_decision():
+    brief = _synth_brief()
+    req = DataRequirement(
+        requirement_id="r1",
+        data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+        required_parameters=("signal_threshold", "lookback"),
+    )
+    decision = _propose_decision(brief, reqs=(req,))
+    back = requirements_from_json(decision.requirements_snapshot)
+    assert back[0].required_parameters == ("lookback", "signal_threshold")
 
 
 # ─── Materialization ──────────────────────────────────────────────────────────
@@ -327,8 +409,9 @@ def test_materialization_copies_requirements_exactly():
     brief = _synth_brief()
     reqs = (
         DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                        asset_class=AssetClass.SYNTHETIC),
-        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+                        asset_class=AssetClass.SYNTHETIC,
+                        required_parameters=("signal_threshold", "lookback")),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
     )
     decision = _propose_decision(brief, reqs=reqs)
     candidate = materialize_research_candidate(decision, brief)
@@ -494,6 +577,12 @@ def test_harness_runs_fake_scientist():
         assert r.contract_passed or r.decision_type is not None
 
 
+def test_harness_defaults_to_scientist_prompt_version():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    result = ScientistEvalSuite(cases[:1]).run(FakeHypothesisScientist())[0]
+    assert result.prompt_version == "v2"
+
+
 def test_harness_no_api_calls(monkeypatch):
     import urllib.request
     called = []
@@ -550,7 +639,7 @@ def test_eval_artifact_mixed_requirement_ordering_preserved():
     brief = _synth_brief()
     reqs = (
         DataRequirement(requirement_id="d1", data_kind=DataKind.ORDER_BOOK, asset_class=AssetClass.FUTURES),
-        ToolRequirement(requirement_id="t1", tool_name="EXECUTION_TOOL"),
+        ToolRequirement(requirement_id="t1", tool_kind=ToolKind.BACKTEST_EXECUTION),
         DataRequirement(requirement_id="d2", data_kind=DataKind.SYNTHETIC_PARAMETRIC),
     )
     decision = HypothesisScientistDecision(
@@ -558,7 +647,7 @@ def test_eval_artifact_mixed_requirement_ordering_preserved():
         research_brief_id=brief.id,
         hypothesis_statement="test", hypothesis_rationale="test",
         requirements_snapshot=requirements_to_json(reqs),
-        provider="fake", model="fake", prompt_version="v1",
+        provider="fake", model="fake", prompt_version="v2",
     )
     parsed = _serialise_decision_for_eval(decision)
     types = [r["type"] for r in parsed["requirements"]]
@@ -637,6 +726,16 @@ def test_fixture_cases_have_eval_metadata():
         assert case.evaluation_focus is not None, f"{case.id} missing evaluation_focus"
 
 
+def test_case_10_loads_prior_candidate_summary_context():
+    cases = {case.id: case for case in load_cases_from_file("evals/scientist_v1.json")}
+    case = cases["case-10"]
+    assert case.brief.prior_candidate_summaries is not None
+    assert len(case.brief.prior_candidate_summaries) == 1
+    summary = case.brief.prior_candidate_summaries[0]
+    assert summary.fingerprint in case.brief.prior_candidate_fingerprints
+    assert "threshold" in summary.hypothesis_statement.lower()
+
+
 def test_eval_result_carries_fixture_metadata():
     cases = load_cases_from_file("evals/scientist_v1.json")
     suite = ScientistEvalSuite(cases[:1])
@@ -672,7 +771,7 @@ def test_mes_ohlcv_candidate_becomes_blocked(tmp_path):
         DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
                         asset_class=AssetClass.FUTURES, instruments=("MES",),
                         resolution=Resolution.SECOND_1),
-        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.MARKET_DATA_RESEARCH),
     )
     decision = HypothesisScientistDecision(
         id="dec-mes", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
@@ -680,7 +779,7 @@ def test_mes_ohlcv_candidate_becomes_blocked(tmp_path):
         hypothesis_statement="Order-book imbalance predicts MES returns",
         hypothesis_rationale="Microstructure mechanism",
         requirements_snapshot=requirements_to_json(reqs),
-        provider="fake", model="fake", prompt_version="v1",
+        provider="fake", model="fake", prompt_version="v2",
     )
     valid, _ = HypothesisProposalValidator().validate(decision, brief)
     assert valid
@@ -699,14 +798,14 @@ def test_scientist_proposes_gate_decides_independence(tmp_path):
     reqs = (
         DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
                         asset_class=AssetClass.FUTURES),
-        ToolRequirement(requirement_id="t", tool_name="EXECUTION_TOOL"),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.MARKET_DATA_RESEARCH),
     )
     decision = HypothesisScientistDecision(
         id="d", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
         research_brief_id=brief.id,
         hypothesis_statement="test", hypothesis_rationale="test",
         requirements_snapshot=requirements_to_json(reqs),
-        provider="fake", model="fake", prompt_version="v1",
+        provider="fake", model="fake", prompt_version="v2",
     )
     candidate = materialize_research_candidate(decision, brief)
     # Scientist produced a valid structural candidate; gate makes the capability call
@@ -736,10 +835,11 @@ def test_openai_adapter_propose_hypothesis():
         "hypothesis_rationale": "Mechanism test",
         "data_requirements": [
             {"requirement_id": "d", "data_kind": "SYNTHETIC_PARAMETRIC",
-             "asset_class": "SYNTHETIC"},
+             "asset_class": "SYNTHETIC",
+             "required_parameters": ["signal_threshold", "lookback"]},
         ],
         "tool_requirements": [
-            {"requirement_id": "t", "tool_name": "EXECUTION_TOOL", "label": ""},
+            {"requirement_id": "t", "tool_kind": "BACKTEST_EXECUTION", "label": ""},
         ],
         "no_hypothesis_reason": None,
     }

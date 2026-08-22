@@ -13,6 +13,7 @@ from ai_quant_scientist.capabilities import (
     AssetClass,
     Capability,
     CapabilityRegistry,
+    CANONICAL_FIELDS_BY_DATA_KIND,
     DataKind,
     DataRequirement,
     FeasibilityReasonCode,
@@ -25,6 +26,7 @@ from ai_quant_scientist.capabilities import (
     ResearchCandidate,
     ResearchFeasibilityDecision,
     ResearchFeasibilityGate,
+    ToolKind,
     ToolRequirement,
     build_v1_registry,
     compute_registry_fingerprint,
@@ -472,7 +474,7 @@ def test_cli_capabilities_command_exits_zero():
 # ─── ToolRequirement ─────────────────────────────────────────────────────────
 
 def test_tool_requirement_satisfied_when_registered():
-    req = ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1")
+    req = ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION)
     result = DEFAULT_REGISTRY.evaluate_tool_requirement(req)
     assert result.satisfied
     assert result.matched_capability is not None
@@ -480,7 +482,7 @@ def test_tool_requirement_satisfied_when_registered():
 
 
 def test_tool_requirement_fails_when_not_registered():
-    req = ToolRequirement(requirement_id="tool", tool_name="databento_backtester")
+    req = ToolRequirement(requirement_id="tool", tool_kind=ToolKind.STATISTICAL_ANALYSIS)
     result = DEFAULT_REGISTRY.evaluate_tool_requirement(req)
     assert not result.satisfied
     assert FeasibilityReasonCode.TOOL_UNAVAILABLE in result.reason_codes
@@ -488,8 +490,21 @@ def test_tool_requirement_fails_when_not_registered():
 
 def test_tool_unavailable_can_be_emitted():
     reg = CapabilityRegistry([])  # empty
-    req = ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1")
+    req = ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION)
     result = reg.evaluate_tool_requirement(req)
+    assert FeasibilityReasonCode.TOOL_UNAVAILABLE in result.reason_codes
+
+
+def test_legacy_tool_requirement_exact_capability_id_still_readable():
+    req = ToolRequirement(requirement_id="tool", legacy_tool_name="stub_backtester_v1")
+    result = DEFAULT_REGISTRY.evaluate_tool_requirement(req)
+    assert result.satisfied
+
+
+def test_legacy_tool_requirement_no_fuzzy_matching():
+    req = ToolRequirement(requirement_id="tool", legacy_tool_name="EXECUTION_TOOL")
+    result = DEFAULT_REGISTRY.evaluate_tool_requirement(req)
+    assert not result.satisfied
     assert FeasibilityReasonCode.TOOL_UNAVAILABLE in result.reason_codes
 
 
@@ -498,7 +513,7 @@ def test_data_available_but_tool_missing_is_blocked():
     data_cap = _make_cap(capability_id="some_data", capability_type="DATA_FEED")
     reg = CapabilityRegistry([data_cap])
     data_req = DataRequirement(requirement_id="data", data_kind=DataKind.OHLCV)
-    tool_req = ToolRequirement(requirement_id="tool", tool_name="my_backtester")
+    tool_req = ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION)
     result = reg.evaluate([data_req, tool_req])
     assert result.status == FeasibilityStatus.NOT_TESTABLE
     assert "tool" in result.unsatisfied_ids
@@ -508,12 +523,30 @@ def test_data_available_but_tool_missing_is_blocked():
 
 def test_tool_and_data_both_available():
     cap = _make_cap(capability_id="my_tool", capability_type="EXECUTION_TOOL",
-                    data_kind=DataKind.OHLCV)
+                    data_kind=DataKind.OHLCV, supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,))
     reg = CapabilityRegistry([cap])
     data_req = DataRequirement(requirement_id="data", data_kind=DataKind.OHLCV)
-    tool_req = ToolRequirement(requirement_id="tool", tool_name="my_tool")
+    tool_req = ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION)
     result = reg.evaluate([data_req, tool_req])
     assert result.status == FeasibilityStatus.TESTABLE
+
+
+def test_invalid_pseudo_field_fails_closed():
+    req = DataRequirement(
+        requirement_id="q",
+        data_kind=DataKind.QUOTES,
+        required_fields=("bid_price", "ask_price", "mid_price_or_fields_to_compute_mid"),
+    )
+    result = CapabilityRegistry([_make_cap(data_kind=DataKind.QUOTES, available_fields=("bid_price", "ask_price"))]).evaluate_requirement(req)
+    assert not result.satisfied
+    assert FeasibilityReasonCode.REQUIRED_FIELD_MISSING in result.reason_codes
+
+
+def test_canonical_field_catalog_contains_order_book_primitives():
+    fields = set(CANONICAL_FIELDS_BY_DATA_KIND[DataKind.ORDER_BOOK])
+    assert "best_bid_price" in fields
+    assert "best_ask_price" in fields
+    assert "contract_expiry" in fields
 
 
 # ─── V0.9 hardening regressions ──────────────────────────────────────────────
@@ -575,8 +608,9 @@ def _synthetic_candidate() -> ResearchCandidate:
         hypothesis_rationale="TOO_FEW_TRADES suggests threshold is too strict",
         requirements=[
             DataRequirement(requirement_id="data", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                            asset_class=AssetClass.SYNTHETIC),
-            ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1"),
+                            asset_class=AssetClass.SYNTHETIC,
+                            required_parameters=("signal_threshold", "lookback")),
+            ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
         ],
     )
 
@@ -589,7 +623,7 @@ def _ohlcv_mes_candidate() -> ResearchCandidate:
             DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
                             asset_class=AssetClass.FUTURES, instruments=("MES",),
                             resolution=Resolution.SECOND_1),
-            ToolRequirement(requirement_id="tool", tool_name="futures_backtester"),
+            ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
         ],
     )
 

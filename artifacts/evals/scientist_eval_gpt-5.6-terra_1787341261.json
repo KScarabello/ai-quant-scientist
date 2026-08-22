@@ -1,0 +1,121 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787341261,
+  "results": [
+    {
+      "case_id": "case-01",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 2,
+      "hypothesis_statement": "In the synthetic parametric strategy, increasing signal_threshold decreases trade frequency because fewer signal observations satisfy the strategy's eligibility condition, holding all other parameters and the synthetic input path fixed.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-02",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "notes": ""
+    },
+    {
+      "case_id": "case-03",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "notes": ""
+    },
+    {
+      "case_id": "case-04",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "notes": ""
+    },
+    {
+      "case_id": "case-05",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "Within a point-in-time, survivorship-bias-free universe of listed common equities, stocks with higher trailing 20-trading-day adjusted-close returns will have higher subsequent 5-trading-day adjusted-close returns in cross-sectional tests.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-06",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 4,
+      "hypothesis_statement": "For MES futures, a higher best-level bid-ask order-book imbalance measured at the end of a 1-second interval predicts a more positive mid-price return over the subsequent 1-second interval, while a lower imbalance predicts a more negative subsequent return.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-07",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 4,
+      "hypothesis_statement": "In a synthetic parametric strategy with all non-threshold parameters held fixed, increasing the absolute signal-entry threshold will monotonically decrease the number of executed entry trades, and variation in that threshold will explain more trade-count variation than variation in any individually tested non-threshold parameter over the specified parameter ranges.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-08",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 1,
+      "hypothesis_statement": "For the CME E-mini S&P 500 (ES) front-month futures contract, sessions whose first 30 minutes have volume above the trailing 60-session 80th percentile for that same time-of-day are more likely to have a close-to-first-30-minute return in the same direction as the first-30-minute return than sessions with first-30-minute volume at or below that threshold.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-09",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "For US-listed liquid common equities during regular continuous trading, a positive top-of-book depth imbalance\u2014bid size minus ask size normalized by total displayed size\u2014predicts a positive 1-second future midquote return after conditioning on quoted spread and recent trade-sign imbalance.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-10",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "For synthetic AR(1)-GARCH(1,1) return processes with a fixed innovation distribution and fixed unconditional variance, increasing GARCH volatility persistence will increase the out-of-sample calibration error of an AR(1)-only one-step predictive distribution, even when the AR coefficient is held constant.",
+      "notes": ""
+    },
+    {
+      "case_id": "case-11",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "notes": ""
+    },
+    {
+      "case_id": "case-12",
+      "decision_type": "NO_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 0,
+      "hypothesis_statement": null,
+      "notes": ""
+    }
+  ],
+  "summary": {
+    "total_cases": 12,
+    "contract_passed": 12,
+    "propose_count": 7,
+    "no_hypothesis_count": 5
+  }
+}

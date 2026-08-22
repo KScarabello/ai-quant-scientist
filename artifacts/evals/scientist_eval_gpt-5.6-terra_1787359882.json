@@ -1,0 +1,86 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359882,
+  "results": [
+    {
+      "case_id": "case-02",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 4,
+      "hypothesis_statement": "In a synthetic parametric trend-following process with persistent returns, increasing the strategy\u2019s lookback window will improve risk-adjusted out-of-sample performance up to a finite range, after which performance will deteriorate because signal responsiveness becomes insufficient to capture regime changes.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "lookback sensitivity",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "In a synthetic parametric trend-following process with persistent returns, increasing the strategy\u2019s lookback window will improve risk-adjusted out-of-sample performance up to a finite range, after which performance will deteriorate because signal responsiveness becomes insufficient to capture regime changes.",
+        "hypothesis_rationale": "The lookback window controls a bias\u2013variance and responsiveness trade-off: short windows produce noisy estimates of the latent trend, whereas long windows smooth noise but lag changes in the trend regime. A parameterized synthetic generator with explicitly varied persistence and regime-switching behavior permits this proposed non-monotonic relationship to be falsified across controlled scenarios.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_parametric_price_paths",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "1d",
+            "required_fields": [
+              "generator_parameters",
+              "random_seed",
+              "synthetic_price_or_return",
+              "timestamp",
+              "train_test_split_or_regime_labels"
+            ],
+            "instruments": [
+              "Parameterized synthetic trend-and-regime-switching return processes"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "synthetic_simulation",
+            "tool_name": "SYNTHETIC_DATA_GENERATION_TOOL",
+            "label": "Generate reproducible synthetic price/return paths across persistence, noise, and regime-switching parameter settings."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "strategy_backtesting",
+            "tool_name": "BACKTESTING_TOOL",
+            "label": "Evaluate fixed strategy logic over a prespecified grid of lookback windows using separated in-sample and out-of-sample path segments."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "statistical_inference",
+            "tool_name": "STATISTICAL_ANALYSIS_TOOL",
+            "label": "Estimate the relationship between lookback length and out-of-sample risk-adjusted performance, including uncertainty across simulation seeds and generator settings."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_05ed99ad359a2c88016a88f28c07e087d092e8efbb25c2fa62",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359884.0,
+          "completed_at": 1787359889.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1181,
+            "output_tokens": 391,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"In a synthetic parametric trend-following process with persistent returns, increasing the strategy\u2019s lookback window will improve risk-adjusted out-of-sample performance up to a finite range, after which performance will deteriorate because signal responsiveness becomes insufficient to capture regime changes.\",\"hypothesis_rationale\":\"The lookback window controls a bias\u2013variance and responsiveness trade-off: short windows produce noisy estimates of the latent trend, whereas long windows smooth noise but lag changes in the trend regime. A parameterized synthetic generator with explicitly varied persistence and regime-switching behavior permits this proposed non-monotonic relationship to be falsified across controlled scenarios.\",\"data_requirements\":[{\"requirement_id\":\"synthetic_parametric_price_paths\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"1d\",\"required_fields\":[\"timestamp\",\"synthetic_price_or_return\",\"generator_parameters\",\"random_seed\",\"train_test_split_or_regime_labels\"],\"instruments\":[\"Parameterized synthetic trend-and-regime-switching return processes\"],\"point_in_time_required\":false}],\"tool_requirements\":[{\"requirement_id\":\"synthetic_simulation\",\"tool_name\":\"SYNTHETIC_DATA_GENERATION_TOOL\",\"label\":\"Generate reproducible synthetic price/return paths across persistence, noise, and regime-switching parameter settings.\"},{\"requirement_id\":\"strategy_backtesting\",\"tool_name\":\"BACKTESTING_TOOL\",\"label\":\"Evaluate fixed strategy logic over a prespecified grid of lookback windows using separated in-sample and out-of-sample path segments.\"},{\"requirement_id\":\"statistical_inference\",\"tool_name\":\"STATISTICAL_ANALYSIS_TOOL\",\"label\":\"Estimate the relationship between lookback length and out-of-sample risk-adjusted performance, including uncertainty across simulation seeds and generator settings.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359890,
+  "results": [
+    {
+      "case_id": "case-05",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 5,
+      "hypothesis_statement": "Among liquid U.S. common equities, stocks in the top decile of trailing 20-trading-day return, measured at each market close, have a higher mean close-to-close 5-trading-day forward return than stocks in the bottom decile after excluding the most recent trading day from the momentum measurement.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "OHLCV equity momentum hypothesis with correct requirements",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "Among liquid U.S. common equities, stocks in the top decile of trailing 20-trading-day return, measured at each market close, have a higher mean close-to-close 5-trading-day forward return than stocks in the bottom decile after excluding the most recent trading day from the momentum measurement.",
+        "hypothesis_rationale": "A delayed cross-sectional continuation effect may arise because information is incorporated into prices gradually and investors underreact to firm-specific news; excluding the most recent day reduces sensitivity to short-horizon reversal and microstructure effects. The hypothesis is falsified if the top-minus-bottom decile forward-return spread is not positive in an out-of-sample evaluation under the stated universe and construction.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "dr_daily_us_equity_ohlcv",
+            "data_kind": "OHLCV",
+            "asset_class": "EQUITY",
+            "resolution": "1d",
+            "required_fields": [
+              "adjusted_close",
+              "close",
+              "high",
+              "instrument_id",
+              "low",
+              "open",
+              "trade_date",
+              "volume"
+            ],
+            "instruments": [
+              "U.S.-listed common equities, including delisted securities where historically applicable"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "dr_equity_corporate_actions",
+            "data_kind": "CORPORATE_ACTIONS",
+            "asset_class": "EQUITY",
+            "resolution": "N/A",
+            "required_fields": [
+              "action_type",
+              "cash_dividend",
+              "delisting_date",
+              "delisting_return",
+              "ex_date",
+              "instrument_id",
+              "split_ratio"
+            ],
+            "instruments": [
+              "U.S.-listed common equities, including delisted securities where historically applicable"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "dr_point_in_time_universe",
+            "data_kind": "FUNDAMENTALS",
+            "asset_class": "EQUITY",
+            "resolution": "1d",
+            "required_fields": [
+              "exchange",
+              "instrument_id",
+              "listing_status",
+              "market_cap",
+              "primary_listing_flag",
+              "security_type",
+              "trade_date"
+            ],
+            "instruments": [
+              "U.S.-listed common equities, including delisted securities where historically applicable"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "tr_cross_sectional_backtest",
+            "tool_name": "BACKTESTING_TOOL",
+            "label": "Point-in-time cross-sectional portfolio construction, return calculation, and out-of-sample hypothesis testing"
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "tr_statistical_inference",
+            "tool_name": "STATISTICAL_ANALYSIS_TOOL",
+            "label": "Estimation of top-minus-bottom return spreads and inference robust to serial correlation"
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_09d4726de56c7da3016a88f292a1f087d092031f3680585df6",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359890.0,
+          "completed_at": 1787359896.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1176,
+            "output_tokens": 512,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"Among liquid U.S. common equities, stocks in the top decile of trailing 20-trading-day return, measured at each market close, have a higher mean close-to-close 5-trading-day forward return than stocks in the bottom decile after excluding the most recent trading day from the momentum measurement.\",\"hypothesis_rationale\":\"A delayed cross-sectional continuation effect may arise because information is incorporated into prices gradually and investors underreact to firm-specific news; excluding the most recent day reduces sensitivity to short-horizon reversal and microstructure effects. The hypothesis is falsified if the top-minus-bottom decile forward-return spread is not positive in an out-of-sample evaluation under the stated universe and construction.\",\"data_requirements\":[{\"requirement_id\":\"dr_daily_us_equity_ohlcv\",\"data_kind\":\"OHLCV\",\"asset_class\":\"EQUITY\",\"resolution\":\"1d\",\"required_fields\":[\"instrument_id\",\"trade_date\",\"open\",\"high\",\"low\",\"close\",\"volume\",\"adjusted_close\"],\"instruments\":[\"U.S.-listed common equities, including delisted securities where historically applicable\"],\"point_in_time_required\":true},{\"requirement_id\":\"dr_equity_corporate_actions\",\"data_kind\":\"CORPORATE_ACTIONS\",\"asset_class\":\"EQUITY\",\"resolution\":\"N/A\",\"required_fields\":[\"instrument_id\",\"ex_date\",\"action_type\",\"split_ratio\",\"cash_dividend\",\"delisting_date\",\"delisting_return\"],\"instruments\":[\"U.S.-listed common equities, including delisted securities where historically applicable\"],\"point_in_time_required\":true},{\"requirement_id\":\"dr_point_in_time_universe\",\"data_kind\":\"FUNDAMENTALS\",\"asset_class\":\"EQUITY\",\"resolution\":\"1d\",\"required_fields\":[\"instrument_id\",\"trade_date\",\"security_type\",\"primary_listing_flag\",\"exchange\",\"listing_status\",\"market_cap\"],\"instruments\":[\"U.S.-listed common equities, including delisted securities where historically applicable\"],\"point_in_time_required\":true}],\"tool_requirements\":[{\"requirement_id\":\"tr_cross_sectional_backtest\",\"tool_name\":\"BACKTESTING_TOOL\",\"label\":\"Point-in-time cross-sectional portfolio construction, return calculation, and out-of-sample hypothesis testing\"},{\"requirement_id\":\"tr_statistical_inference\",\"tool_name\":\"STATISTICAL_ANALYSIS_TOOL\",\"label\":\"Estimation of top-minus-bottom return spreads and inference robust to serial correlation\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

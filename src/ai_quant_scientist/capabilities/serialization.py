@@ -17,6 +17,7 @@ from .models import (
     FeasibilityReasonCode,
     FeasibilityResult,
     Resolution,
+    ToolKind,
     ToolRequirement,
     AnyRequirement,
 )
@@ -51,12 +52,20 @@ def requirements_to_json(requirements: tuple[AnyRequirement, ...]) -> str:
                 "required_parameters": sorted(req.required_parameters) if req.required_parameters is not None else None,
             })
         elif isinstance(req, ToolRequirement):
-            items.append({
-                "type": "ToolRequirement",
-                "requirement_id": req.requirement_id,
-                "tool_name": req.tool_name,
-                "label": req.label,
-            })
+            if req.tool_kind is not None:
+                items.append({
+                    "type": "ToolRequirement",
+                    "requirement_id": req.requirement_id,
+                    "tool_kind": req.tool_kind.value,
+                    "label": req.label,
+                })
+            else:
+                items.append({
+                    "type": "ToolRequirement",
+                    "requirement_id": req.requirement_id,
+                    "tool_name": req.tool_name,
+                    "label": req.label,
+                })
         else:
             raise TypeError(f"Unknown requirement type: {type(req)}")
     return json.dumps(items, sort_keys=True, separators=(",", ":"))
@@ -82,11 +91,18 @@ def requirements_from_json(s: str) -> tuple[AnyRequirement, ...]:
                 required_parameters=tuple(d["required_parameters"]) if d.get("required_parameters") is not None else None,
             ))
         elif req_type == "ToolRequirement":
-            result.append(ToolRequirement(
-                requirement_id=d["requirement_id"],
-                tool_name=d["tool_name"],
-                label=d.get("label", ""),
-            ))
+            if d.get("tool_kind"):
+                result.append(ToolRequirement(
+                    requirement_id=d["requirement_id"],
+                    tool_kind=ToolKind(d["tool_kind"]),
+                    label=d.get("label", ""),
+                ))
+            else:
+                result.append(ToolRequirement(
+                    requirement_id=d["requirement_id"],
+                    legacy_tool_name=d["tool_name"],
+                    label=d.get("label", ""),
+                ))
         else:
             raise ValueError(f"Unknown requirement type in persisted JSON: {req_type!r}")
     return tuple(result)

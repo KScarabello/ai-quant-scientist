@@ -1,0 +1,100 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359904,
+  "results": [
+    {
+      "case_id": "case-07",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 4,
+      "hypothesis_statement": "For a synthetic parametric strategy with all non-threshold parameters held fixed, increasing the signal-entry threshold monotonically decreases the number of generated entry trades because fewer signal observations satisfy the threshold gate.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "both data and execution tool required explicitly",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "For a synthetic parametric strategy with all non-threshold parameters held fixed, increasing the signal-entry threshold monotonically decreases the number of generated entry trades because fewer signal observations satisfy the threshold gate.",
+        "hypothesis_rationale": "The entry threshold directly determines the subset of otherwise unchanged signal observations eligible to open a position; a controlled parameter sweep can therefore test whether threshold gating alone explains variation in trade count. The hypothesis is falsified if trade counts do not weakly decrease as the threshold rises under identical synthetic paths, execution rules, and non-threshold parameters.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_strategy_spec",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "all fixed non-threshold strategy parameters",
+              "complete signal-generation function",
+              "entry and exit rules",
+              "entry-threshold parameter definition and sweep range",
+              "position-state and cooldown rules",
+              "transaction-cost and execution assumptions"
+            ],
+            "instruments": [
+              "synthetic parametric strategy under study"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_signal_paths",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "random seed or path identifier",
+              "signal value",
+              "synthetic price or state path",
+              "timestamp or step index"
+            ],
+            "instruments": [
+              "synthetic instrument or simulated paths used by the strategy"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "controlled_parameter_sweep",
+            "tool_name": "SYNTHETIC_SIMULATION_TOOL",
+            "label": "Run identical synthetic paths across a threshold grid while holding all other parameters fixed and record generated trade counts."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "monotonicity_test",
+            "tool_name": "STATISTICAL_ANALYSIS_TOOL",
+            "label": "Evaluate the threshold\u2013trade-count relationship and test for monotonic non-increase across simulated paths."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_0312d91870755cb3016a88f2a0ace887d0ad6d23eed80ea325",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359904.0,
+          "completed_at": 1787359909.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1184,
+            "output_tokens": 418,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"For a synthetic parametric strategy with all non-threshold parameters held fixed, increasing the signal-entry threshold monotonically decreases the number of generated entry trades because fewer signal observations satisfy the threshold gate.\",\"hypothesis_rationale\":\"The entry threshold directly determines the subset of otherwise unchanged signal observations eligible to open a position; a controlled parameter sweep can therefore test whether threshold gating alone explains variation in trade count. The hypothesis is falsified if trade counts do not weakly decrease as the threshold rises under identical synthetic paths, execution rules, and non-threshold parameters.\",\"data_requirements\":[{\"requirement_id\":\"synthetic_strategy_spec\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"complete signal-generation function\",\"entry-threshold parameter definition and sweep range\",\"all fixed non-threshold strategy parameters\",\"entry and exit rules\",\"position-state and cooldown rules\",\"transaction-cost and execution assumptions\"],\"instruments\":[\"synthetic parametric strategy under study\"],\"point_in_time_required\":false},{\"requirement_id\":\"synthetic_signal_paths\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"timestamp or step index\",\"signal value\",\"synthetic price or state path\",\"random seed or path identifier\"],\"instruments\":[\"synthetic instrument or simulated paths used by the strategy\"],\"point_in_time_required\":false}],\"tool_requirements\":[{\"requirement_id\":\"controlled_parameter_sweep\",\"tool_name\":\"SYNTHETIC_SIMULATION_TOOL\",\"label\":\"Run identical synthetic paths across a threshold grid while holding all other parameters fixed and record generated trade counts.\"},{\"requirement_id\":\"monotonicity_test\",\"tool_name\":\"STATISTICAL_ANALYSIS_TOOL\",\"label\":\"Evaluate the threshold\u2013trade-count relationship and test for monotonic non-increase across simulated paths.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

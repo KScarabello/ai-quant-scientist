@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -70,6 +71,98 @@ class FeasibilityReasonCode(str, Enum):
     REQUIRED_PARAMETER_MISSING = "REQUIRED_PARAMETER_MISSING"
 
 
+class ToolKind(str, Enum):
+    """Canonical semantic tool kinds that AI may request."""
+    BACKTEST_EXECUTION = "BACKTEST_EXECUTION"
+    SYNTHETIC_DATA_GENERATION = "SYNTHETIC_DATA_GENERATION"
+    STATISTICAL_ANALYSIS = "STATISTICAL_ANALYSIS"
+    MARKET_DATA_RESEARCH = "MARKET_DATA_RESEARCH"
+
+
+_FIELD_IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+CANONICAL_FIELDS_BY_DATA_KIND: dict[DataKind, tuple[str, ...]] = {
+    DataKind.OHLCV: (
+        "instrument_id", "trade_date", "timestamp", "open", "high", "low",
+        "close", "adjusted_close", "volume",
+    ),
+    DataKind.TRADES: (
+        "timestamp", "instrument_id", "trade_price", "trade_size", "exchange_or_venue",
+    ),
+    DataKind.QUOTES: (
+        "timestamp", "instrument_id", "bid_price", "ask_price", "bid_size",
+        "ask_size", "exchange_or_venue", "contract_expiry",
+    ),
+    DataKind.ORDER_BOOK: (
+        "timestamp", "instrument_id", "best_bid_price", "best_ask_price",
+        "best_bid_size", "best_ask_size", "exchange_or_venue", "contract_expiry",
+    ),
+    DataKind.FUNDAMENTALS: (
+        "instrument_id", "trade_date", "security_type", "primary_listing_flag",
+        "exchange", "listing_status", "market_cap",
+    ),
+    DataKind.CORPORATE_ACTIONS: (
+        "instrument_id", "ex_date", "action_type", "split_ratio", "cash_dividend",
+        "delisting_date", "delisting_return",
+    ),
+    DataKind.EARNINGS: (
+        "instrument_id", "report_date", "fiscal_period", "eps_actual", "eps_estimate",
+    ),
+    DataKind.BORROW: (
+        "instrument_id", "trade_date", "borrow_rate", "borrow_availability",
+    ),
+    DataKind.ALTERNATIVE: (
+        "timestamp", "instrument_id", "feature_value",
+    ),
+    DataKind.SYNTHETIC_PARAMETRIC: (
+        "timestamp", "signal_value", "synthetic_price", "synthetic_return",
+        "random_seed", "generator_parameters", "train_test_split_label",
+        "regime_label", "volatility_regime_label", "latent_equilibrium_value",
+        "contemporaneous_volatility", "one_step_forward_change",
+        "process_parameters", "simulation_seed", "in_sample_out_of_sample_split",
+        "OU_mean_reversion_speed", "OU_long_run_mean", "OU_diffusion_volatility",
+        "trade_count", "out_of_sample_net_pnl", "out_of_sample_sharpe",
+        "turnover", "transaction_cost_assumption", "parameter_perturbation_magnitude",
+        "half_life", "entry_threshold", "lookback_length",
+    ),
+}
+
+
+def validate_required_field_names(data_kind: DataKind, fields: tuple[str, ...] | None) -> None:
+    """Validate canonical primitive field identifiers for new authoritative requirements."""
+    if fields is None:
+        return
+    allowed = set(CANONICAL_FIELDS_BY_DATA_KIND.get(data_kind, ()))
+    for field_name in fields:
+        if not field_name or not field_name.strip():
+            raise ValueError("required_fields entries must be non-empty")
+        if not _FIELD_IDENTIFIER_RE.match(field_name):
+            raise ValueError(f"required_fields entry is not a primitive identifier: {field_name!r}")
+        if "_or_" in field_name.lower():
+            raise ValueError(f"required_fields entry encodes logical alternatives: {field_name!r}")
+        if field_name not in allowed:
+            raise ValueError(
+                f"required_fields entry {field_name!r} is not registered for data_kind={data_kind.value}"
+            )
+
+
+def validate_required_parameter_names(parameters: tuple[str, ...] | None) -> None:
+    """Validate explicit parameter identifiers without inferring semantics."""
+    if parameters is None:
+        return
+    for parameter_name in parameters:
+        if not parameter_name or not parameter_name.strip():
+            raise ValueError("required_parameters entries must be non-empty")
+        if not _FIELD_IDENTIFIER_RE.match(parameter_name):
+            raise ValueError(
+                f"required_parameters entry is not a canonical identifier: {parameter_name!r}"
+            )
+        if "_or_" in parameter_name.lower():
+            raise ValueError(
+                f"required_parameters entry encodes logical alternatives: {parameter_name!r}"
+            )
+
+
 # ─── DataRequirement ──────────────────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
@@ -96,18 +189,42 @@ class DataRequirement:
     # For synthetic/parametric research: the spec parameters required
     required_parameters: tuple[str, ...] | None = None
 
+    def __post_init__(self) -> None:
+        if self.instruments is not None:
+            object.__setattr__(self, "instruments", tuple(sorted(self.instruments)))
+        if self.required_fields is not None:
+            object.__setattr__(self, "required_fields", tuple(sorted(self.required_fields)))
+        if self.required_parameters is not None:
+            object.__setattr__(self, "required_parameters", tuple(sorted(self.required_parameters)))
+
 
 @dataclass(frozen=True, slots=True)
 class ToolRequirement:
-    """Explicit requirement for a named execution tool capability.
+    """Explicit requirement for a semantic tool capability.
 
-    Matches capabilities by capability_id.
-    Separates tool availability from data availability so
-    TOOL_UNAVAILABLE can be emitted independently.
+    New authoritative requirements use tool_kind.
+    Historical snapshots may still carry a legacy_tool_name string and are kept
+    readable without being silently reinterpreted.
     """
     requirement_id: str
-    tool_name: str   # must match Capability.capability_id
+    tool_kind: ToolKind | None = None
     label: str = ""
+    legacy_tool_name: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.tool_kind is None and not self.legacy_tool_name:
+            raise ValueError("ToolRequirement requires tool_kind or legacy_tool_name")
+        if self.tool_kind is not None and self.legacy_tool_name is not None:
+            raise ValueError("ToolRequirement cannot carry both tool_kind and legacy_tool_name")
+
+    @property
+    def tool_name(self) -> str:
+        """Backward-compatible display/accessor used by older tests and artifacts."""
+        return self.tool_kind.value if self.tool_kind is not None else (self.legacy_tool_name or "")
+
+    @property
+    def is_legacy(self) -> bool:
+        return self.legacy_tool_name is not None
 
 
 # Union type for all requirement kinds
@@ -144,6 +261,8 @@ class Capability:
     point_in_time: bool = False
     # None = NOT DECLARED (does not satisfy any required-parameter constraint)
     supported_parameters: tuple[str, ...] | None = None
+    # None = NOT DECLARED (does not satisfy semantic tool requirements)
+    supported_tool_kinds: tuple[ToolKind, ...] | None = None
 
     provider: str = ""
     enabled: bool = True
@@ -200,6 +319,11 @@ def _capability_to_canon(cap: Capability) -> dict:
         "coverage_end": cap.coverage_end.isoformat() if cap.coverage_end else None,
         "point_in_time": cap.point_in_time,
         "supported_parameters": sorted(cap.supported_parameters) if cap.supported_parameters is not None else None,
+        "supported_tool_kinds": (
+            sorted(kind.value for kind in cap.supported_tool_kinds)
+            if cap.supported_tool_kinds is not None
+            else None
+        ),
         "provider": cap.provider,
         "enabled": cap.enabled,
         "version": cap.version,

@@ -1,0 +1,99 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359897,
+  "results": [
+    {
+      "case_id": "case-06",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "For MES futures, a more positive best-level bid-ask order-book imbalance at the end of a 1-second interval predicts a more positive mid-price return over the subsequent 1-second interval, while a more negative imbalance predicts a more negative subsequent return.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "ORDER_BOOK futures MES hypothesis with correct resolution and instrument",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "For MES futures, a more positive best-level bid-ask order-book imbalance at the end of a 1-second interval predicts a more positive mid-price return over the subsequent 1-second interval, while a more negative imbalance predicts a more negative subsequent return.",
+        "hypothesis_rationale": "Imbalance between displayed bid and ask depth at the best prices can proxy for immediate net liquidity pressure: relatively greater bid-side depth may make upward price movement more likely as sell-side liquidity is depleted or buy demand persists, with the converse for ask-side depth. The relationship is falsifiable by estimating the signed association between end-of-second imbalance and the following second's mid-price return out of sample, including realistic timestamp ordering and periods across trading sessions.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "mes_l1_order_book_1s",
+            "data_kind": "ORDER_BOOK",
+            "asset_class": "FUTURES",
+            "resolution": "1s",
+            "required_fields": [
+              "best_ask_price",
+              "best_ask_size",
+              "best_bid_price",
+              "best_bid_size",
+              "contract_expiry_or_continuous_contract_mapping",
+              "exchange_or_venue",
+              "instrument_id",
+              "timestamp"
+            ],
+            "instruments": [
+              "MES"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "mes_quote_or_trade_prices_1s",
+            "data_kind": "QUOTES",
+            "asset_class": "FUTURES",
+            "resolution": "1s",
+            "required_fields": [
+              "ask_price",
+              "bid_price",
+              "contract_expiry_or_continuous_contract_mapping",
+              "exchange_or_venue",
+              "instrument_id",
+              "mid_price_or_fields_to_compute_mid",
+              "timestamp"
+            ],
+            "instruments": [
+              "MES"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "order_book_signal_research",
+            "tool_name": "MARKET_DATA_RESEARCH_TOOL",
+            "label": "Capability to align point-in-time order-book snapshots with subsequent returns, construct imbalance features, and conduct time-series and out-of-sample statistical tests."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_08152b2e2b9618bc016a88f29a1a4887d08b78d472bd94f0a9",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359898.0,
+          "completed_at": 1787359903.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1186,
+            "output_tokens": 408,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"For MES futures, a more positive best-level bid-ask order-book imbalance at the end of a 1-second interval predicts a more positive mid-price return over the subsequent 1-second interval, while a more negative imbalance predicts a more negative subsequent return.\",\"hypothesis_rationale\":\"Imbalance between displayed bid and ask depth at the best prices can proxy for immediate net liquidity pressure: relatively greater bid-side depth may make upward price movement more likely as sell-side liquidity is depleted or buy demand persists, with the converse for ask-side depth. The relationship is falsifiable by estimating the signed association between end-of-second imbalance and the following second's mid-price return out of sample, including realistic timestamp ordering and periods across trading sessions.\",\"data_requirements\":[{\"requirement_id\":\"mes_l1_order_book_1s\",\"data_kind\":\"ORDER_BOOK\",\"asset_class\":\"FUTURES\",\"resolution\":\"1s\",\"required_fields\":[\"timestamp\",\"instrument_id\",\"best_bid_price\",\"best_ask_price\",\"best_bid_size\",\"best_ask_size\",\"exchange_or_venue\",\"contract_expiry_or_continuous_contract_mapping\"],\"instruments\":[\"MES\"],\"point_in_time_required\":true},{\"requirement_id\":\"mes_quote_or_trade_prices_1s\",\"data_kind\":\"QUOTES\",\"asset_class\":\"FUTURES\",\"resolution\":\"1s\",\"required_fields\":[\"timestamp\",\"instrument_id\",\"bid_price\",\"ask_price\",\"mid_price_or_fields_to_compute_mid\",\"exchange_or_venue\",\"contract_expiry_or_continuous_contract_mapping\"],\"instruments\":[\"MES\"],\"point_in_time_required\":true}],\"tool_requirements\":[{\"requirement_id\":\"order_book_signal_research\",\"tool_name\":\"MARKET_DATA_RESEARCH_TOOL\",\"label\":\"Capability to align point-in-time order-book snapshots with subsequent returns, construct imbalance features, and conduct time-series and out-of-sample statistical tests.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

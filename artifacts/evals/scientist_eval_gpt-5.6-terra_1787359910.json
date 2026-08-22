@@ -1,0 +1,82 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787359910,
+  "results": [
+    {
+      "case_id": "case-10",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "In synthetic mean-reverting price processes with time-varying volatility, deviations from the latent equilibrium normalized by contemporaneous volatility will have more stable one-step-ahead reversal association across volatility regimes than unnormalized deviations.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "proposes distinct hypothesis when prior fingerprint provided",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "In synthetic mean-reverting price processes with time-varying volatility, deviations from the latent equilibrium normalized by contemporaneous volatility will have more stable one-step-ahead reversal association across volatility regimes than unnormalized deviations.",
+        "hypothesis_rationale": "When volatility changes, a fixed raw deviation mixes equilibrium displacement with changes in noise scale; volatility normalization should isolate the displacement component that is attributable to mean reversion. The hypothesis is falsified if the conditional association between normalized deviations and subsequent reversals is not more stable across predefined volatility regimes than the association for raw deviations.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "DR1",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "N/A",
+            "required_fields": [
+              "contemporaneous_volatility",
+              "latent_equilibrium_value",
+              "one_step_forward_change",
+              "process_parameters",
+              "random_seed",
+              "simulated_time_series_value",
+              "volatility_regime_label"
+            ],
+            "instruments": [
+              "Synthetic mean-reverting processes with stochastic or regime-switching volatility"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "TR1",
+            "tool_name": "SYNTHETIC_DATA_GENERATION_TOOL",
+            "label": "Generate controlled mean-reverting stochastic processes with configurable volatility dynamics and reproducible seeds"
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "TR2",
+            "tool_name": "STATISTICAL_ANALYSIS_TOOL",
+            "label": "Compute volatility-normalized and raw deviations, stratify observations by volatility regime, and test comparative stability of reversal associations"
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v1",
+        "compact_provenance": {
+          "response_id": "resp_09c223ef6cc61642016a88f2a6e2a487d09688a3d79598d179",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787359910.0,
+          "completed_at": 1787359917.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1209,
+            "output_tokens": 569,
+            "reasoning_tokens": 238
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"In synthetic mean-reverting price processes with time-varying volatility, deviations from the latent equilibrium normalized by contemporaneous volatility will have more stable one-step-ahead reversal association across volatility regimes than unnormalized deviations.\",\"hypothesis_rationale\":\"When volatility changes, a fixed raw deviation mixes equilibrium displacement with changes in noise scale; volatility normalization should isolate the displacement component that is attributable to mean reversion. The hypothesis is falsified if the conditional association between normalized deviations and subsequent reversals is not more stable across predefined volatility regimes than the association for raw deviations.\",\"data_requirements\":[{\"requirement_id\":\"DR1\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"N/A\",\"required_fields\":[\"simulated_time_series_value\",\"latent_equilibrium_value\",\"one_step_forward_change\",\"contemporaneous_volatility\",\"volatility_regime_label\",\"process_parameters\",\"random_seed\"],\"instruments\":[\"Synthetic mean-reverting processes with stochastic or regime-switching volatility\"],\"point_in_time_required\":false}],\"tool_requirements\":[{\"requirement_id\":\"TR1\",\"tool_name\":\"SYNTHETIC_DATA_GENERATION_TOOL\",\"label\":\"Generate controlled mean-reverting stochastic processes with configurable volatility dynamics and reproducible seeds\"},{\"requirement_id\":\"TR2\",\"tool_name\":\"STATISTICAL_ANALYSIS_TOOL\",\"label\":\"Compute volatility-normalized and raw deviations, stratify observations by volatility regime, and test comparative stability of reversal associations\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

@@ -13,11 +13,11 @@
         "research_question": "Does signal_threshold control trade frequency through eligibility gating in the synthetic parametric strategy?",
         "asset_class_focus": "SYNTHETIC"
       },
-      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(SYNTHETIC_PARAMETRIC) and ToolRequirement(EXECUTION_TOOL)",
+      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(SYNTHETIC_PARAMETRIC) and ToolRequirement(BACKTEST_EXECUTION)",
       "notes": "Should propose a mechanistic hypothesis about threshold gating",
       "expected_decision": "PROPOSE_HYPOTHESIS",
       "evaluation_focus": "threshold sensitivity mechanism",
-      "manual_success_criteria": "Proposes threshold-controls-trade-frequency; requires SYNTHETIC_PARAMETRIC data and EXECUTION_TOOL"
+      "manual_success_criteria": "Proposes threshold-controls-trade-frequency; requires SYNTHETIC_PARAMETRIC data, required_parameters such as signal_threshold/lookback, and ToolRequirement(BACKTEST_EXECUTION)"
     },
     {
       "id": "case-02",
@@ -31,7 +31,7 @@
       "notes": "Should propose a parameter sensitivity experiment",
       "expected_decision": "PROPOSE_HYPOTHESIS",
       "evaluation_focus": "lookback sensitivity",
-      "manual_success_criteria": "Proposes lookback sensitivity hypothesis; requires SYNTHETIC_PARAMETRIC data and EXECUTION_TOOL"
+      "manual_success_criteria": "Proposes lookback sensitivity hypothesis; requires SYNTHETIC_PARAMETRIC data, required_parameters such as signal_threshold/lookback, and ToolRequirement(BACKTEST_EXECUTION)"
     },
     {
       "id": "case-03",
@@ -84,11 +84,11 @@
           "MES"
         ]
       },
-      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(ORDER_BOOK, FUTURES, MES, 1s) and ToolRequirement",
+      "expected_behavior": "PROPOSE_HYPOTHESIS with DataRequirement(ORDER_BOOK, FUTURES, MES, 1s) using canonical primitive fields and ToolRequirement",
       "notes": "Will be BLOCKED by current registry; scientist should still propose",
       "expected_decision": "PROPOSE_HYPOTHESIS",
-      "evaluation_focus": "ORDER_BOOK futures MES hypothesis with correct resolution and instrument",
-      "manual_success_criteria": "Requires DataRequirement(ORDER_BOOK, FUTURES, MES, 1s or similar) and ToolRequirement"
+      "evaluation_focus": "ORDER_BOOK futures MES hypothesis with correct resolution, instrument, and primitive field semantics",
+      "manual_success_criteria": "Requires DataRequirement(ORDER_BOOK, FUTURES, MES, 1s or similar) using primitive fields such as timestamp, instrument_id, best_bid_price, best_ask_price, best_bid_size, best_ask_size, exchange_or_venue, and contract_expiry; includes a ToolRequirement with canonical tool_kind"
     },
     {
       "id": "case-07",
@@ -102,7 +102,7 @@
       "notes": "Should identify the execution tool requirement explicitly",
       "expected_decision": "PROPOSE_HYPOTHESIS",
       "evaluation_focus": "both data and execution tool required explicitly",
-      "manual_success_criteria": "Includes explicit ToolRequirement in addition to DataRequirement(SYNTHETIC_PARAMETRIC)"
+      "manual_success_criteria": "Includes explicit ToolRequirement(BACKTEST_EXECUTION) in addition to DataRequirement(SYNTHETIC_PARAMETRIC)"
     },
     {
       "id": "case-08",
@@ -144,10 +144,17 @@
     {
       "id": "case-10",
       "title": "Prior candidate fingerprint context",
-      "description": "Brief includes fingerprint of a prior similar proposal",
+      "description": "Brief includes bounded prior-candidate summary context plus authoritative fingerprint",
       "brief": {
         "research_question": "Propose a new synthetic parametric hypothesis. A prior candidate already tested threshold sensitivity.",
         "asset_class_focus": "SYNTHETIC",
+        "prior_candidate_summaries": [
+          {
+            "fingerprint": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+            "hypothesis_statement": "Threshold sensitivity governs trade frequency in the synthetic parametric strategy.",
+            "hypothesis_rationale_summary": "Prior work already explored threshold gating, so novelty should come from a different synthetic mechanism."
+          }
+        ],
         "prior_candidate_fingerprints": [
           "abc123def456abc123def456abc123def456abc123def456abc123def456abcd"
         ]
@@ -155,8 +162,8 @@
       "expected_behavior": "PROPOSE_HYPOTHESIS that is aware of and ideally differs from the prior; may still propose if scientifically distinct",
       "notes": "Scientist may still propose; the feasibility gate and fingerprint comparison decide",
       "expected_decision": "PROPOSE_HYPOTHESIS",
-      "evaluation_focus": "proposes distinct hypothesis when prior fingerprint provided",
-      "manual_success_criteria": "May propose same or different hypothesis; grader checks if scientist acknowledges prior candidate context"
+      "evaluation_focus": "proposes distinct hypothesis when bounded prior-candidate summary context is provided",
+      "manual_success_criteria": "May propose same or different hypothesis; grader checks whether the scientist uses the prior candidate summary context without treating the fingerprint as semantic content"
     },
     {
       "id": "case-11",

@@ -33,7 +33,7 @@ def _json_safe(obj):
 def run_live_scientist_eval(
     model: str,
     eval_path: str,
-    prompt_version: str = "v1",
+    prompt_version: str = "v2",
     allow_live_api: bool = False,
     max_cases: Optional[int] = None,
     case_id: Optional[str] = None,
@@ -91,7 +91,7 @@ def main(argv: List[str] = None) -> int:
     p = argparse.ArgumentParser(description="Run live Hypothesis Scientist eval")
     p.add_argument("--model", default="gpt-5.6-terra")
     p.add_argument("--eval-set", default="evals/scientist_v1.json")
-    p.add_argument("--prompt-version", default="v1")
+    p.add_argument("--prompt-version", default="v2")
     p.add_argument("--allow-live-api", action="store_true")
     p.add_argument("--max-cases", type=int, default=None)
     p.add_argument("--case-id", default=None)

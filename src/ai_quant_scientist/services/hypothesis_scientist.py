@@ -8,12 +8,20 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from ..capabilities.models import AnyRequirement, DataRequirement, ToolRequirement
+from ..capabilities.models import (
+    AnyRequirement,
+    DataRequirement,
+    ToolKind,
+    ToolRequirement,
+    validate_required_field_names,
+    validate_required_parameter_names,
+)
 from ..capabilities.serialization import requirements_from_json, requirements_to_json
 from ..models.hypothesis_scientist import (
     HypothesisScientistDecision,
     HypothesisScientistDecisionType,
     HypothesisScientistInvocation,
+    PriorCandidateSummary,
     ResearchBrief,
 )
 from ..models.research import new_id
@@ -80,6 +88,19 @@ class HypothesisProposalValidator:
                 if not isinstance(req, (DataRequirement, ToolRequirement)):
                     errors["requirements_type"] = f"Unknown requirement type: {type(req)}"
                     break
+                if isinstance(req, DataRequirement):
+                    try:
+                        validate_required_field_names(req.data_kind, req.required_fields)
+                    except ValueError as exc:
+                        errors[f"{req.requirement_id}_required_fields"] = str(exc)
+                    try:
+                        validate_required_parameter_names(req.required_parameters)
+                    except ValueError as exc:
+                        errors[f"{req.requirement_id}_required_parameters"] = str(exc)
+                if isinstance(req, ToolRequirement) and req.tool_kind is None:
+                    errors[f"{req.requirement_id}_tool_kind"] = (
+                        "PROPOSE_HYPOTHESIS requires canonical tool_kind; legacy tool names are not allowed"
+                    )
 
         # AI must not have supplied governance fields (enforced by schema, belt-and-suspenders)
         # The decision model does not even have id/source/created_at for the candidate
@@ -122,6 +143,14 @@ def brief_to_json(brief: ResearchBrief) -> str:
         "methodological_constraints": list(brief.methodological_constraints) if brief.methodological_constraints else None,
         "exclusions": list(brief.exclusions) if brief.exclusions else None,
         "prior_candidate_fingerprints": list(brief.prior_candidate_fingerprints) if brief.prior_candidate_fingerprints else None,
+        "prior_candidate_summaries": [
+            {
+                "fingerprint": s.fingerprint,
+                "hypothesis_statement": s.hypothesis_statement,
+                "hypothesis_rationale_summary": s.hypothesis_rationale_summary,
+            }
+            for s in (brief.prior_candidate_summaries or ())
+        ] or None,
         "source": brief.source,
         "created_at": brief.created_at.isoformat(),
     }, sort_keys=True)
@@ -138,7 +167,16 @@ def brief_to_payload(brief: ResearchBrief) -> dict:
         payload["methodological_constraints"] = list(brief.methodological_constraints)
     if brief.exclusions:
         payload["exclusions"] = list(brief.exclusions)
-    if brief.prior_candidate_fingerprints:
+    if brief.prior_candidate_summaries:
+        payload["prior_candidate_summaries"] = [
+            {
+                "fingerprint": s.fingerprint,
+                "hypothesis_statement": s.hypothesis_statement,
+                "hypothesis_rationale_summary": s.hypothesis_rationale_summary,
+            }
+            for s in brief.prior_candidate_summaries
+        ]
+    elif brief.prior_candidate_fingerprints:
         payload["prior_candidate_fingerprints"] = list(brief.prior_candidate_fingerprints)
     return payload
 
@@ -198,7 +236,7 @@ class FakeHypothesisScientist:
 
     provider = "fake"
     model = "fake-v1"
-    prompt_version = "v1"
+    prompt_version = "v2"
 
     def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
         from ..capabilities.models import DataKind, AssetClass, Resolution
@@ -220,10 +258,11 @@ class FakeHypothesisScientist:
                 requirement_id="data",
                 data_kind=DataKind.SYNTHETIC_PARAMETRIC,
                 asset_class=AssetClass.SYNTHETIC,
+                required_parameters=("signal_threshold", "lookback"),
             ),
             ToolRequirement(
                 requirement_id="tool",
-                tool_name="EXECUTION_TOOL",
+                tool_kind=ToolKind.BACKTEST_EXECUTION,
             ),
         ]
         return HypothesisScientistDecision(

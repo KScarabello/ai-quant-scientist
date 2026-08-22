@@ -12,7 +12,7 @@ Future capabilities must be registered here explicitly when a real integration e
 """
 from __future__ import annotations
 
-from .models import AssetClass, Capability, DataKind, Resolution
+from .models import AssetClass, Capability, DataKind, Resolution, ToolKind
 from .registry import CapabilityRegistry
 
 _CAPABILITIES: list[Capability] = [
@@ -32,6 +32,7 @@ _CAPABILITIES: list[Capability] = [
         point_in_time=False,
         # The two parameters this tool's research specs must have
         supported_parameters=("signal_threshold", "lookback"),
+        supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,),
         provider="StubBacktester",
         enabled=True,
         version="1",

@@ -20,7 +20,7 @@ from .capabilities.v1_registry import build_v1_registry
 from .capabilities.gate import ResearchCandidate, ResearchFeasibilityGate, GateDecision
 from .capabilities.intake import GovernedResearchIntake
 from .capabilities.models import (
-    AssetClass, DataKind, DataRequirement, Resolution, ToolRequirement,
+    AssetClass, DataKind, DataRequirement, Resolution, ToolKind, ToolRequirement,
 )
 
 
@@ -208,6 +208,11 @@ def cmd_capabilities(args: argparse.Namespace) -> int:
             "instruments": sorted(c.instruments) if c.instruments is not None else None,
             "available_fields": sorted(c.available_fields) if c.available_fields is not None else None,
             "supported_parameters": sorted(c.supported_parameters) if c.supported_parameters is not None else None,
+            "supported_tool_kinds": (
+                sorted(kind.value for kind in c.supported_tool_kinds)
+                if c.supported_tool_kinds is not None
+                else None
+            ),
             "coverage_start": c.coverage_start.isoformat() if c.coverage_start else None,
             "coverage_end": c.coverage_end.isoformat() if c.coverage_end else None,
             "point_in_time": c.point_in_time,
@@ -238,8 +243,9 @@ def cmd_feasibility_check(args: argparse.Namespace) -> int:
             hypothesis_rationale="SYNTHETIC: deterministic stub experiment",
             requirements=[
                 DataRequirement(requirement_id="data", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                                asset_class=AssetClass.SYNTHETIC),
-                ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1"),
+                                asset_class=AssetClass.SYNTHETIC,
+                                required_parameters=("signal_threshold", "lookback")),
+                ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
             ],
         )
     elif args.preset == "ohlcv-mes":
@@ -250,7 +256,7 @@ def cmd_feasibility_check(args: argparse.Namespace) -> int:
                 DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
                                 asset_class=AssetClass.FUTURES, instruments=("MES",),
                                 resolution=Resolution.SECOND_1),
-                ToolRequirement(requirement_id="tool", tool_name="futures_backtester"),
+                ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
             ],
         )
     else:

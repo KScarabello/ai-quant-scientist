@@ -28,6 +28,7 @@ from ai_quant_scientist.capabilities import (
     ResearchFeasibilityDecision,
     ResearchFeasibilityGate,
     Resolution,
+    ToolKind,
     ToolRequirement,
     build_v1_registry,
 )
@@ -57,8 +58,9 @@ def _synthetic_candidate() -> ResearchCandidate:
         hypothesis_rationale="TOO_FEW_TRADES suggests threshold is too strict",
         requirements=[
             DataRequirement(requirement_id="data", data_kind=DataKind.SYNTHETIC_PARAMETRIC,
-                            asset_class=AssetClass.SYNTHETIC),
-            ToolRequirement(requirement_id="tool", tool_name="stub_backtester_v1"),
+                            asset_class=AssetClass.SYNTHETIC,
+                            required_parameters=("signal_threshold", "lookback")),
+            ToolRequirement(requirement_id="tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
         ],
     )
 
@@ -71,7 +73,7 @@ def _blocked_candidate() -> ResearchCandidate:
             DataRequirement(requirement_id="ob", data_kind=DataKind.ORDER_BOOK,
                             asset_class=AssetClass.FUTURES, instruments=("MES",),
                             resolution=Resolution.SECOND_1),
-            ToolRequirement(requirement_id="futures_tool", tool_name="futures_backtester"),
+            ToolRequirement(requirement_id="futures_tool", tool_kind=ToolKind.BACKTEST_EXECUTION),
         ],
     )
 
@@ -114,7 +116,14 @@ def test_data_requirement_round_trip():
 
 
 def test_tool_requirement_round_trip():
-    req = ToolRequirement(requirement_id="t", tool_name="stub_backtester_v1", label="lbl")
+    req = ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION, label="lbl")
+    s = requirements_to_json((req,))
+    (r2,) = requirements_from_json(s)
+    assert r2 == req
+
+
+def test_legacy_tool_requirement_snapshot_still_round_trips():
+    req = ToolRequirement(requirement_id="t", legacy_tool_name="stub_backtester_v1", label="lbl")
     s = requirements_to_json((req,))
     (r2,) = requirements_from_json(s)
     assert r2 == req
@@ -123,14 +132,14 @@ def test_tool_requirement_round_trip():
 def test_mixed_requirements_round_trip_preserves_ordering_and_types():
     reqs = (
         DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC),
-        ToolRequirement(requirement_id="t", tool_name="stub_backtester_v1"),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
         DataRequirement(requirement_id="d2", data_kind=DataKind.OHLCV, resolution=Resolution.MINUTE_1),
     )
     s = requirements_to_json(reqs)
     back = requirements_from_json(s)
     assert len(back) == 3
     assert isinstance(back[0], DataRequirement) and back[0].requirement_id == "d"
-    assert isinstance(back[1], ToolRequirement) and back[1].tool_name == "stub_backtester_v1"
+    assert isinstance(back[1], ToolRequirement) and back[1].tool_kind == ToolKind.BACKTEST_EXECUTION
     assert isinstance(back[2], DataRequirement) and back[2].data_kind == DataKind.OHLCV
 
 
@@ -295,6 +304,7 @@ def test_candidate_can_have_multiple_feasibility_decisions(tmp_path):
         asset_classes=(AssetClass.FUTURES,),
         resolutions=(Resolution.SECOND_1,),
         instruments=("MES",),
+        supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,),
         provider="test",
         enabled=True,
         version="1",
@@ -413,6 +423,7 @@ def test_re_evaluate_blocked_then_ready(tmp_path):
         asset_classes=(AssetClass.FUTURES,),
         resolutions=(Resolution.SECOND_1,),
         instruments=("MES",),
+        supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,),
         provider="test",
         enabled=True,
         version="1",

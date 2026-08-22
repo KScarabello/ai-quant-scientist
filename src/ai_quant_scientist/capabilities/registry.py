@@ -22,6 +22,8 @@ from .models import (
     RequirementResult,
     Resolution,
     ToolRequirement,
+    validate_required_field_names,
+    validate_required_parameter_names,
     compute_registry_fingerprint,
 )
 
@@ -62,6 +64,28 @@ class CapabilityRegistry:
         covers every constrained dimension.  Fail-closed on every dimension.
         """
         enabled = [c for c in self._caps if c.enabled]
+
+        try:
+            validate_required_field_names(req.data_kind, req.required_fields)
+        except ValueError as exc:
+            return RequirementResult(
+                requirement=req,
+                satisfied=False,
+                matched_capability=None,
+                reason_codes=(FeasibilityReasonCode.REQUIRED_FIELD_MISSING,),
+                notes=str(exc),
+            )
+
+        try:
+            validate_required_parameter_names(req.required_parameters)
+        except ValueError as exc:
+            return RequirementResult(
+                requirement=req,
+                satisfied=False,
+                matched_capability=None,
+                reason_codes=(FeasibilityReasonCode.REQUIRED_PARAMETER_MISSING,),
+                notes=str(exc),
+            )
 
         # Filter: data_kind must match exactly
         kind_match = [c for c in enabled if c.data_kind == req.data_kind]
@@ -180,25 +204,42 @@ class CapabilityRegistry:
         )
 
     def evaluate_tool_requirement(self, req: ToolRequirement) -> RequirementResult:
-        """Match on capability_id (exact) OR capability_type (class match).
-
-        AI-generated requirements should use capability_type (e.g. "EXECUTION_TOOL")
-        rather than implementation-specific IDs.
-        Exact capability_id match takes precedence when it exists.
-        """
+        """Evaluate semantic tool requirements exactly, with legacy read-compatibility."""
         enabled = [c for c in self._caps if c.enabled]
-        # Try exact capability_id match first
+
+        if req.tool_kind is not None:
+            matches = [
+                c for c in enabled
+                if c.supported_tool_kinds is not None and req.tool_kind in c.supported_tool_kinds
+            ]
+            if not matches:
+                return RequirementResult(
+                    requirement=req,
+                    satisfied=False,
+                    matched_capability=None,
+                    reason_codes=(FeasibilityReasonCode.TOOL_UNAVAILABLE,),
+                    notes=(
+                        f"Canonical tool kind '{req.tool_kind.value}' is not registered or enabled"
+                    ),
+                )
+            return RequirementResult(
+                requirement=req,
+                satisfied=True,
+                matched_capability=matches[0],
+                reason_codes=(),
+            )
+
         matches = [c for c in enabled if c.capability_id == req.tool_name]
-        # Fall back to capability_type match (AI uses class names, not IDs)
-        if not matches:
-            matches = [c for c in enabled if c.capability_type == req.tool_name]
         if not matches:
             return RequirementResult(
                 requirement=req,
                 satisfied=False,
                 matched_capability=None,
                 reason_codes=(FeasibilityReasonCode.TOOL_UNAVAILABLE,),
-                notes=f"Tool '{req.tool_name}' is not registered or enabled (checked capability_id and capability_type)",
+                notes=(
+                    f"Legacy tool name '{req.tool_name}' is not registered or enabled "
+                    "(historical exact capability_id lookup only)"
+                ),
             )
         return RequirementResult(
             requirement=req,
