@@ -6,9 +6,60 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from ..capabilities.models import DataRequirement, ToolRequirement
 from ..capabilities.serialization import requirements_from_json
 from ..models.hypothesis_scientist import ResearchBrief, HypothesisScientistDecisionType
 from ..services.hypothesis_scientist import HypothesisProposalValidator
+
+
+def _req_to_dict(req) -> dict:
+    """Serialize a requirement to a type-tagged dict for the eval artifact."""
+    if isinstance(req, DataRequirement):
+        return {
+            "type": "DataRequirement",
+            "requirement_id": req.requirement_id,
+            "data_kind": req.data_kind.value,
+            "asset_class": req.asset_class.value if req.asset_class else None,
+            "resolution": req.resolution.value if req.resolution else None,
+            "required_fields": list(req.required_fields) if req.required_fields else None,
+            "instruments": list(req.instruments) if req.instruments else None,
+            "point_in_time_required": req.point_in_time_required,
+            "required_parameters": list(req.required_parameters) if req.required_parameters else None,
+            "label": req.label,
+        }
+    return {
+        "type": "ToolRequirement",
+        "requirement_id": req.requirement_id,
+        "tool_name": req.tool_name,
+        "label": req.label,
+    }
+
+
+def _serialise_decision_for_eval(decision) -> dict:
+    """Full scientific decision serialization for manual grading."""
+    reqs = []
+    if decision.requirements_snapshot:
+        try:
+            for req in requirements_from_json(decision.requirements_snapshot):
+                reqs.append(_req_to_dict(req))
+        except Exception:
+            pass
+    compact_prov = None
+    if decision.raw_response:
+        try:
+            compact_prov = json.loads(decision.raw_response)
+        except Exception:
+            compact_prov = None
+    return {
+        "hypothesis_statement": decision.hypothesis_statement,
+        "hypothesis_rationale": decision.hypothesis_rationale,
+        "requirements": reqs,
+        "no_hypothesis_reason": decision.no_hypothesis_reason,
+        "provider": decision.provider,
+        "model": decision.model,
+        "prompt_version": decision.prompt_version,
+        "compact_provenance": compact_prov,
+    }
 
 
 @dataclass(frozen=True)
@@ -20,6 +71,10 @@ class ScientistEvalCase:
     expected_behavior: str
     notes: str = ""
     eval_set_version: str = "v1"
+    # Human-grading metadata — NOT sent to the model
+    expected_decision: str | None = None
+    evaluation_focus: str | None = None
+    manual_success_criteria: str | None = None
 
 
 @dataclass
@@ -35,6 +90,11 @@ class ScientistEvalResult:
     has_requirements: bool
     requirement_count: int
     hypothesis_statement: str | None
+    # Full serialized decision for manual grading
+    parsed_decision: dict | None = None
+    # Eval fixture metadata (for artifact context; never in model input)
+    expected_decision: str | None = None
+    evaluation_focus: str | None = None
     notes: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -61,6 +121,9 @@ def load_cases_from_file(path: str) -> list[ScientistEvalCase]:
             brief=brief,
             expected_behavior=c["expected_behavior"],
             notes=c.get("notes", ""),
+            expected_decision=c.get("expected_decision"),
+            evaluation_focus=c.get("evaluation_focus"),
+            manual_success_criteria=c.get("manual_success_criteria"),
         ))
     return cases
 
@@ -97,6 +160,9 @@ class ScientistEvalSuite:
                     has_requirements=has_reqs,
                     requirement_count=req_count,
                     hypothesis_statement=decision.hypothesis_statement,
+                    parsed_decision=_serialise_decision_for_eval(decision),
+                    expected_decision=case.expected_decision,
+                    evaluation_focus=case.evaluation_focus,
                 ))
             except Exception as exc:
                 results.append(ScientistEvalResult(
@@ -111,6 +177,9 @@ class ScientistEvalSuite:
                     has_requirements=False,
                     requirement_count=0,
                     hypothesis_statement=None,
+                    parsed_decision=None,
+                    expected_decision=case.expected_decision,
+                    evaluation_focus=case.evaluation_focus,
                     notes=str(exc),
                 ))
         return results

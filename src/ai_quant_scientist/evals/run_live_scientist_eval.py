@@ -68,7 +68,10 @@ def run_live_scientist_eval(
                 "validation_errors": r.validation_errors,
                 "requirement_count": r.requirement_count,
                 "hypothesis_statement": r.hypothesis_statement,
+                "expected_decision": r.expected_decision,
+                "evaluation_focus": r.evaluation_focus,
                 "notes": r.notes,
+                "parsed": r.parsed_decision,
             }
             for r in results
         ],

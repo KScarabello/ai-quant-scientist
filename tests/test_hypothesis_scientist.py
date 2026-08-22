@@ -514,6 +514,137 @@ def test_live_runner_requires_allow_live_api():
         )
 
 
+# ─── Eval artifact shape ──────────────────────────────────────────────────────
+
+def test_eval_artifact_propose_includes_rationale():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:1])
+    results = suite.run(FakeHypothesisScientist())
+    r = results[0]
+    assert r.parsed_decision is not None
+    assert r.parsed_decision["hypothesis_rationale"] is not None
+
+
+def test_eval_artifact_propose_includes_data_requirements():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:1])
+    results = suite.run(FakeHypothesisScientist())
+    r = results[0]
+    reqs = r.parsed_decision["requirements"]
+    assert any(req["type"] == "DataRequirement" for req in reqs)
+
+
+def test_eval_artifact_propose_includes_tool_requirements():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:1])
+    results = suite.run(FakeHypothesisScientist())
+    r = results[0]
+    reqs = r.parsed_decision["requirements"]
+    assert any(req["type"] == "ToolRequirement" for req in reqs)
+
+
+def test_eval_artifact_mixed_requirement_ordering_preserved():
+    from ai_quant_scientist.capabilities.serialization import requirements_to_json
+    from ai_quant_scientist.evals.scientist_eval import _req_to_dict, _serialise_decision_for_eval
+    from ai_quant_scientist.models.hypothesis_scientist import HypothesisScientistDecision
+    brief = _synth_brief()
+    reqs = (
+        DataRequirement(requirement_id="d1", data_kind=DataKind.ORDER_BOOK, asset_class=AssetClass.FUTURES),
+        ToolRequirement(requirement_id="t1", tool_name="EXECUTION_TOOL"),
+        DataRequirement(requirement_id="d2", data_kind=DataKind.SYNTHETIC_PARAMETRIC),
+    )
+    decision = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="test", hypothesis_rationale="test",
+        requirements_snapshot=requirements_to_json(reqs),
+        provider="fake", model="fake", prompt_version="v1",
+    )
+    parsed = _serialise_decision_for_eval(decision)
+    types = [r["type"] for r in parsed["requirements"]]
+    assert types == ["DataRequirement", "ToolRequirement", "DataRequirement"]
+
+
+def test_eval_artifact_no_hypothesis_includes_reason():
+    from ai_quant_scientist.evals.scientist_eval import _serialise_decision_for_eval
+    brief = ResearchBrief.create(research_question="general explore underspecified markets")
+    decision = _no_hyp_decision(brief, reason="Too vague to generate a responsible hypothesis")
+    parsed = _serialise_decision_for_eval(decision)
+    assert parsed["no_hypothesis_reason"] == "Too vague to generate a responsible hypothesis"
+    assert parsed["requirements"] == []
+
+
+def test_eval_artifact_includes_compact_provenance():
+    import json as _json
+    from ai_quant_scientist.evals.scientist_eval import _serialise_decision_for_eval
+    from ai_quant_scientist.capabilities.serialization import requirements_to_json
+    from ai_quant_scientist.models.hypothesis_scientist import HypothesisScientistDecision
+    prov = {"response_id": "resp_test", "model": "m", "status": "completed",
+            "created_at": 1.0, "completed_at": 2.0, "store": False, "usage": None, "output_text": None}
+    brief = _synth_brief()
+    reqs = (DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC),)
+    decision = HypothesisScientistDecision(
+        id="x", decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+        research_brief_id=brief.id,
+        hypothesis_statement="test", hypothesis_rationale="test",
+        requirements_snapshot=requirements_to_json(reqs),
+        provider="openai", model="gpt-5.6-terra", prompt_version="v1",
+        raw_response=_json.dumps(prov),
+    )
+    parsed = _serialise_decision_for_eval(decision)
+    assert parsed["compact_provenance"] is not None
+    assert parsed["compact_provenance"]["response_id"] == "resp_test"
+
+
+def test_eval_artifact_does_not_expose_api_key():
+    from ai_quant_scientist.evals.scientist_eval import _serialise_decision_for_eval
+    brief = _synth_brief()
+    decision = _no_hyp_decision(brief)
+    parsed = _serialise_decision_for_eval(decision)
+    serialized = json.dumps(parsed)
+    # The compact provenance only has response_id, model, status, timestamps, usage, output_text
+    assert "api_key" not in serialized.lower()
+    assert "Authorization" not in serialized
+    assert "Bearer " not in serialized
+
+
+def test_eval_artifact_summary_fields_remain():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:2])
+    results = suite.run(FakeHypothesisScientist())
+    assert results[0].case_id is not None
+    assert results[0].contract_passed is not None
+    assert results[0].requirement_count >= 0
+    assert results[0].decision_type is not None
+
+
+def test_eval_metadata_not_in_brief_payload():
+    """expected_decision/evaluation_focus must never appear in the model input."""
+    from ai_quant_scientist.services.hypothesis_scientist import brief_to_payload
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    for case in cases:
+        payload = brief_to_payload(case.brief)
+        payload_str = json.dumps(payload)
+        assert "expected_decision" not in payload_str
+        assert "evaluation_focus" not in payload_str
+        assert "manual_success_criteria" not in payload_str
+
+
+def test_fixture_cases_have_eval_metadata():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    for case in cases:
+        assert case.expected_decision is not None, f"{case.id} missing expected_decision"
+        assert case.evaluation_focus is not None, f"{case.id} missing evaluation_focus"
+
+
+def test_eval_result_carries_fixture_metadata():
+    cases = load_cases_from_file("evals/scientist_v1.json")
+    suite = ScientistEvalSuite(cases[:1])
+    results = suite.run(FakeHypothesisScientist())
+    assert results[0].expected_decision is not None
+    assert results[0].evaluation_focus is not None
+
+
 # ─── Downstream gate boundary: scientist proposes, gate decides ────────────────
 
 def test_synthetic_candidate_from_fake_scientist_becomes_ready(tmp_path):
