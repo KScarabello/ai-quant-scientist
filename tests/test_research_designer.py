@@ -4,6 +4,7 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
+from types import MappingProxyType
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -36,6 +37,7 @@ from ai_quant_scientist.models.design import (
 )
 from ai_quant_scientist.models.research_designer import (
     RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
+    ResearchDesignerContext,
     ResearchDesignerDecision,
     ResearchDesignerDecisionType,
 )
@@ -43,6 +45,7 @@ from ai_quant_scientist.services.openai_research_designer import OpenAIResearchD
 from ai_quant_scientist.services.research_design_ontology import (
     RESEARCH_DESIGN_ONTOLOGY_VERSION,
     build_research_design_ontology_snapshot,
+    compute_research_design_ontology_fingerprint,
 )
 from ai_quant_scientist.services.research_designer import (
     FakeResearchDesigner,
@@ -189,6 +192,49 @@ class _RaisingDesigner:
         raise RuntimeError("boom")
 
 
+class _CapturingDesigner:
+    provider = "capture"
+    model = "capture-model"
+    prompt_version = "v1"
+
+    def __init__(self) -> None:
+        self.called = 0
+        self.context = None
+
+    def design(self, context):
+        self.called += 1
+        self.context = context
+        return _design_decision(
+            context.candidate_id,
+            provider=self.provider,
+            model=self.model,
+            prompt_version=self.prompt_version,
+            ontology_version=context.design_ontology_version,
+            ontology_fingerprint=context.design_ontology_fingerprint,
+        )
+
+
+def _canonical_payload_json(payload: dict) -> str:
+    return json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+
+
+def _payload_with_fingerprint(payload: dict) -> dict:
+    payload_with_fingerprint = dict(payload)
+    payload_with_fingerprint["fingerprint"] = compute_research_design_ontology_fingerprint(payload_with_fingerprint)
+    return payload_with_fingerprint
+
+
+def _context_with_payload(candidate: ResearchCandidate, payload: dict) -> ResearchDesignerContext:
+    return ResearchDesignerContext(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        design_ontology_version=payload["version"],
+        design_ontology_fingerprint=payload["fingerprint"],
+        design_ontology_payload_json=_canonical_payload_json(payload),
+        intent_contract_version=payload["intent_contract_version"],
+    )
+
+
 def test_research_design_ontology_snapshot_is_deterministic():
     first = build_research_design_ontology_snapshot()
     second = build_research_design_ontology_snapshot()
@@ -201,6 +247,7 @@ def test_research_design_ontology_v1_fingerprint_preserved():
     ontology = build_research_design_ontology_snapshot()
     assert ontology.version == RESEARCH_DESIGN_ONTOLOGY_VERSION
     assert ontology.fingerprint == "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e"
+    assert compute_research_design_ontology_fingerprint(ontology.to_payload()) == ontology.fingerprint
 
 
 def test_research_design_ontology_payload_omits_exact_materialization_values():
@@ -231,7 +278,7 @@ def test_context_contains_candidate_science_and_ontology_without_registry_leakag
         candidate_feasibility_decision_id="auth-1",
         ontology=ontology,
     )
-    payload = context_to_payload(context, ontology=ontology)
+    payload = context_to_payload(context)
     payload_str = json.dumps(payload, sort_keys=True)
     assert payload["candidate_id"] == candidate.id
     assert payload["hypothesis_statement"] == candidate.hypothesis_statement
@@ -247,6 +294,95 @@ def test_context_contains_candidate_science_and_ontology_without_registry_leakag
     assert "20" not in payload_str
 
 
+def test_context_carries_exact_canonical_ontology_payload_json():
+    ontology = build_research_design_ontology_snapshot()
+    context = build_research_designer_context(
+        candidate=_ready_candidate(),
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    assert context.design_ontology_payload_json == _canonical_payload_json(ontology.to_payload())
+
+
+def test_context_built_from_ontology_v1_passes_semantic_fingerprint_validation():
+    ontology = build_research_design_ontology_snapshot()
+    context = build_research_designer_context(
+        candidate=_ready_candidate(),
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    assert context.design_ontology_payload["fingerprint"] == ontology.fingerprint
+
+
+def test_context_mismatch_between_version_and_payload_fails_closed():
+    candidate = _ready_candidate()
+    ontology = build_research_design_ontology_snapshot()
+    payload = ontology.to_payload()
+    with pytest.raises(ValueError, match="payload version must match"):
+        ResearchDesignerContext(
+            candidate=candidate,
+            candidate_feasibility_decision_id="auth-1",
+            design_ontology_version="wrong_version",
+            design_ontology_fingerprint=payload["fingerprint"],
+            design_ontology_payload_json=_canonical_payload_json(payload),
+            intent_contract_version=payload["intent_contract_version"],
+        )
+
+
+def test_context_mismatch_between_fingerprint_and_payload_fails_closed():
+    candidate = _ready_candidate()
+    ontology = build_research_design_ontology_snapshot()
+    payload = ontology.to_payload()
+    with pytest.raises(ValueError, match="design_ontology_fingerprint must match the semantic ontology payload"):
+        ResearchDesignerContext(
+            candidate=candidate,
+            candidate_feasibility_decision_id="auth-1",
+            design_ontology_version=payload["version"],
+            design_ontology_fingerprint="0" * 64,
+            design_ontology_payload_json=_canonical_payload_json(payload),
+            intent_contract_version=payload["intent_contract_version"],
+        )
+
+
+def test_context_semantic_payload_change_with_stale_embedded_fingerprint_fails_closed():
+    candidate = _ready_candidate()
+    payload = build_research_design_ontology_snapshot().to_payload()
+    payload["parameter_sensitivity_semantics"] = "Tampered semantic boundary."
+    with pytest.raises(ValueError, match="payload fingerprint must match the semantic ontology payload"):
+        _context_with_payload(candidate, payload)
+
+
+def test_context_nested_semantic_payload_change_with_stale_embedded_fingerprint_fails_closed():
+    candidate = _ready_candidate()
+    payload = build_research_design_ontology_snapshot().to_payload()
+    payload["variable_semantics"]["signal_threshold"] = "Tampered nested variable semantics."
+    with pytest.raises(ValueError, match="payload fingerprint must match the semantic ontology payload"):
+        _context_with_payload(candidate, payload)
+
+
+def test_context_embedded_payload_fingerprint_change_alone_fails_closed():
+    candidate = _ready_candidate()
+    payload = build_research_design_ontology_snapshot().to_payload()
+    payload["fingerprint"] = "1" * 64
+    with pytest.raises(ValueError, match="payload fingerprint must match the semantic ontology payload"):
+        _context_with_payload(candidate, payload)
+
+
+def test_context_mismatch_between_contract_version_and_payload_fails_closed():
+    candidate = _ready_candidate()
+    ontology = build_research_design_ontology_snapshot()
+    payload = ontology.to_payload()
+    with pytest.raises(ValueError, match="payload intent_contract_version must match"):
+        ResearchDesignerContext(
+            candidate=candidate,
+            candidate_feasibility_decision_id="auth-1",
+            design_ontology_version=payload["version"],
+            design_ontology_fingerprint=payload["fingerprint"],
+            design_ontology_payload_json=_canonical_payload_json(payload),
+            intent_contract_version="wrong_contract_version",
+        )
+
+
 def test_validator_accepts_valid_design():
     candidate = _ready_candidate()
     ontology = build_research_design_ontology_snapshot()
@@ -260,6 +396,20 @@ def test_validator_accepts_valid_design():
     ).validate(_design_decision(candidate.id), context, ontology)
     assert valid
     assert errors == {}
+
+
+def test_research_design_ontology_snapshot_is_deeply_immutable():
+    ontology = build_research_design_ontology_snapshot()
+    assert isinstance(ontology.eligible_independent_variables_by_design_kind, MappingProxyType)
+    assert isinstance(ontology.required_controls_by_design_kind, MappingProxyType)
+    assert isinstance(ontology.variable_semantics, MappingProxyType)
+    assert isinstance(ontology.outcome_semantics, MappingProxyType)
+    with pytest.raises(TypeError):
+        ontology.variable_semantics["signal_threshold"] = "mutated"  # type: ignore[index]
+    with pytest.raises(TypeError):
+        ontology.eligible_independent_variables_by_design_kind["PARAMETER_SENSITIVITY"] = ("lookback",)  # type: ignore[index]
+    with pytest.raises(TypeError):
+        ontology.required_controls_by_design_kind["PARAMETER_SENSITIVITY"] = ("signal_threshold",)  # type: ignore[index]
 
 
 def test_validator_rejects_invalid_enum_like_values():
@@ -401,6 +551,30 @@ def test_valid_design_materializes_authoritative_intent_and_persists_invocation(
     assert invocations[0].resulting_design_intent_id == result.design_intent.id
 
 
+def test_governed_service_uses_exact_context_owned_ontology_snapshot_for_provider_and_invocation(tmp_path):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate = _ready_candidate()
+    _, latest = _submit_candidate(store, registry, candidate)
+    capturing = _CapturingDesigner()
+    governed = GovernedResearchDesigner(store=store, registry=registry, designer=capturing)
+
+    result = governed.generate_design_intent(
+        candidate_id=candidate.id,
+        candidate_feasibility_decision_id=latest.id,
+    )
+
+    assert capturing.called == 1
+    assert capturing.context is not None
+    provider_payload = context_to_payload(capturing.context)
+    invocation = store.get_research_designer_invocations(candidate.id)[0]
+    assert provider_payload["research_design_ontology"]["version"] == invocation.ontology_version
+    assert provider_payload["research_design_ontology"]["fingerprint"] == invocation.ontology_fingerprint
+    assert provider_payload["research_design_ontology"] == capturing.context.design_ontology_payload
+    assert result.invocation.ontology_version == capturing.context.design_ontology_version
+    assert result.invocation.ontology_fingerprint == capturing.context.design_ontology_fingerprint
+
+
 def test_no_valid_design_persists_invocation_without_creating_intent(tmp_path):
     store = _store(tmp_path)
     registry = _registry()
@@ -537,6 +711,126 @@ def test_openai_research_designer_adapter_parses_design():
     assert decision.controls == (DesignVariable.LOOKBACK,)
 
 
+def test_openai_research_designer_sends_exact_supplied_context_ontology_snapshot():
+    captured: dict = {}
+    parsed = {
+        "decision": "NO_VALID_DESIGN",
+        "design_kind": None,
+        "independent_variables": None,
+        "dependent_outcomes": None,
+        "controls": None,
+        "comparison_intent": None,
+        "analysis_intent": None,
+        "falsification_condition": None,
+        "rationale": None,
+        "no_valid_design_reason": "too vague",
+    }
+    resp = _make_openai_response(parsed)
+    client = MagicMock()
+    client.responses.parse.side_effect = lambda **kw: (captured.update(kw), resp)[1]
+    candidate = _ready_candidate()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=build_research_design_ontology_snapshot(),
+    )
+    decision = OpenAIResearchDesigner(client=client).design(context)
+    provider_payload = json.loads(captured["input"])
+    assert provider_payload["research_design_ontology"] == context.design_ontology_payload
+    assert decision.ontology_version == context.design_ontology_version
+    assert decision.ontology_fingerprint == context.design_ontology_fingerprint
+
+
+def test_openai_research_designer_does_not_substitute_global_current_ontology():
+    captured: dict = {}
+    parsed = {
+        "decision": "NO_VALID_DESIGN",
+        "design_kind": None,
+        "independent_variables": None,
+        "dependent_outcomes": None,
+        "controls": None,
+        "comparison_intent": None,
+        "analysis_intent": None,
+        "falsification_condition": None,
+        "rationale": None,
+        "no_valid_design_reason": "custom snapshot cannot express this candidate",
+    }
+    resp = _make_openai_response(parsed)
+    client = MagicMock()
+    client.responses.parse.side_effect = lambda **kw: (captured.update(kw), resp)[1]
+    candidate = _ready_candidate()
+    custom_payload = _payload_with_fingerprint({
+        "version": "research_design_ontology_test_injected",
+        "intent_contract_version": RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
+        "supported_design_kinds": ["PARAMETER_SENSITIVITY"],
+        "design_variables": ["signal_threshold", "lookback"],
+        "eligible_independent_variables_by_design_kind": {
+            "PARAMETER_SENSITIVITY": ["signal_threshold"]
+        },
+        "required_controls_by_design_kind": {
+            "PARAMETER_SENSITIVITY": ["lookback"]
+        },
+        "supported_dependent_outcomes": ["trade_count", "net_pnl", "sharpe"],
+        "comparison_intents": ["CONTRAST_PARAMETER_LEVELS"],
+        "analysis_intents": ["SENSITIVITY_ANALYSIS"],
+        "variable_semantics": {
+            "signal_threshold": "Injected test snapshot variable semantics.",
+            "lookback": "Injected lookback control semantics."
+        },
+        "outcome_semantics": {
+            "trade_count": "Injected trade count semantics.",
+            "net_pnl": "Injected net pnl semantics.",
+            "sharpe": "Injected sharpe semantics."
+        },
+        "parameter_sensitivity_semantics": "Injected parameter sensitivity semantics.",
+        "exact_value_boundary": "Injected exact-value boundary.",
+        "falsification_boundary": "Injected falsification boundary.",
+        "control_boundary": "Injected control boundary.",
+        "constraints": [
+            "Injected constraint one.",
+            "Injected constraint two.",
+        ],
+    })
+    context = _context_with_payload(candidate, custom_payload)
+    decision = OpenAIResearchDesigner(client=client).design(context)
+    provider_payload = json.loads(captured["input"])
+    assert provider_payload["research_design_ontology"] == custom_payload
+    assert provider_payload["research_design_ontology"]["version"] != RESEARCH_DESIGN_ONTOLOGY_VERSION
+    assert provider_payload["research_design_ontology"]["fingerprint"] == custom_payload["fingerprint"]
+    assert decision.ontology_version == custom_payload["version"]
+    assert decision.ontology_fingerprint == custom_payload["fingerprint"]
+
+
+def test_openai_research_designer_fails_closed_before_provider_invocation_on_payload_tampering():
+    parsed = {
+        "decision": "NO_VALID_DESIGN",
+        "design_kind": None,
+        "independent_variables": None,
+        "dependent_outcomes": None,
+        "controls": None,
+        "comparison_intent": None,
+        "analysis_intent": None,
+        "falsification_condition": None,
+        "rationale": None,
+        "no_valid_design_reason": "too vague",
+    }
+    client = MagicMock()
+    client.responses.parse.return_value = _make_openai_response(parsed)
+    context = build_research_designer_context(
+        candidate=_ready_candidate(),
+        candidate_feasibility_decision_id="auth-1",
+        ontology=build_research_design_ontology_snapshot(),
+    )
+    tampered_payload = context.design_ontology_payload
+    tampered_payload["constraints"] = [*tampered_payload["constraints"], "Tampered extra constraint."]
+    object.__setattr__(context, "design_ontology_payload_json", _canonical_payload_json(tampered_payload))
+
+    with pytest.raises(ValueError, match="payload fingerprint must match the semantic ontology payload"):
+        OpenAIResearchDesigner(client=client).design(context)
+
+    client.responses.parse.assert_not_called()
+
+
 def test_openai_research_designer_input_contains_ontology_without_capability_or_policy_leakage():
     captured: dict = {}
     parsed = {
@@ -633,6 +927,13 @@ def test_eval_harness_blocked_case_stays_pre_call():
     result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner())[0]
     assert result.runner_outcome == "BLOCKED_PRE_CALL"
     assert result.resulting_design_intent_id is None
+
+
+def test_blocked_pre_call_representation_remains_separate_from_contract_passed():
+    cases = {case.id: case for case in load_cases_from_file("evals/research_designer_v1.json")}
+    result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner())[0]
+    assert result.runner_outcome == "BLOCKED_PRE_CALL"
+    assert result.contract_passed is False
 
 
 def test_live_runner_requires_allow_live_api():

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 from ..capabilities.gate import ResearchCandidate
 from .design import (
@@ -34,6 +36,7 @@ class ResearchDesignerContext:
     candidate_feasibility_decision_id: str
     design_ontology_version: str
     design_ontology_fingerprint: str
+    design_ontology_payload_json: str
     intent_contract_version: str = RESEARCH_DESIGN_INTENT_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -43,12 +46,46 @@ class ResearchDesignerContext:
             raise ValueError("ResearchDesignerContext requires design_ontology_version")
         if not _SHA256_HEX_RE.match(self.design_ontology_fingerprint):
             raise ValueError("ResearchDesignerContext requires a SHA-256 ontology fingerprint")
+        if not self.design_ontology_payload_json or not self.design_ontology_payload_json.strip():
+            raise ValueError("ResearchDesignerContext requires design_ontology_payload_json")
         if not self.intent_contract_version or not self.intent_contract_version.strip():
             raise ValueError("ResearchDesignerContext requires intent_contract_version")
+        payload = self.design_ontology_payload
+        if payload.get("version") != self.design_ontology_version:
+            raise ValueError("ResearchDesignerContext ontology payload version must match design_ontology_version")
+        if payload.get("fingerprint") != self.design_ontology_fingerprint:
+            raise ValueError(
+                "ResearchDesignerContext ontology payload fingerprint must match design_ontology_fingerprint"
+            )
+        if payload.get("intent_contract_version") != self.intent_contract_version:
+            raise ValueError(
+                "ResearchDesignerContext ontology payload intent_contract_version must match context"
+            )
 
     @property
     def candidate_id(self) -> str:
         return self.candidate.id
+
+    @property
+    def design_ontology_payload(self) -> dict[str, Any]:
+        payload = json.loads(self.design_ontology_payload_json)
+        if not isinstance(payload, dict):
+            raise ValueError("ResearchDesignerContext ontology payload must decode to an object")
+        from ..services.research_design_ontology import compute_research_design_ontology_fingerprint
+
+        embedded_fingerprint = payload.get("fingerprint")
+        if not isinstance(embedded_fingerprint, str) or not _SHA256_HEX_RE.match(embedded_fingerprint):
+            raise ValueError("ResearchDesignerContext ontology payload fingerprint must be SHA-256 hex")
+        recomputed_fingerprint = compute_research_design_ontology_fingerprint(payload)
+        if embedded_fingerprint != recomputed_fingerprint:
+            raise ValueError(
+                "ResearchDesignerContext ontology payload fingerprint must match the semantic ontology payload"
+            )
+        if self.design_ontology_fingerprint != recomputed_fingerprint:
+            raise ValueError(
+                "ResearchDesignerContext design_ontology_fingerprint must match the semantic ontology payload"
+            )
+        return payload
 
 
 class ResearchDesignerDecisionType(str, Enum):

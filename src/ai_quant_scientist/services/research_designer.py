@@ -78,9 +78,7 @@ def candidate_to_json(candidate: ResearchCandidate) -> str:
 
 def context_to_payload(
     context: ResearchDesignerContext,
-    ontology: ResearchDesignOntologySnapshot | None = None,
 ) -> dict[str, Any]:
-    ontology = ontology or build_research_design_ontology_snapshot()
     candidate_payload = candidate_to_payload(context.candidate)
     return {
         "candidate_id": context.candidate_id,
@@ -91,16 +89,15 @@ def context_to_payload(
             "id": context.candidate_feasibility_decision_id,
             "decision": GateDecision.READY_FOR_SPEC.value,
         },
-        "research_design_ontology": ontology.to_payload(),
+        "research_design_ontology": context.design_ontology_payload,
         "intent_contract_version": context.intent_contract_version,
     }
 
 
 def context_to_json(
     context: ResearchDesignerContext,
-    ontology: ResearchDesignOntologySnapshot | None = None,
 ) -> str:
-    return json.dumps(context_to_payload(context, ontology=ontology), sort_keys=True)
+    return json.dumps(context_to_payload(context), sort_keys=True)
 
 
 def build_research_designer_context(
@@ -115,6 +112,12 @@ def build_research_designer_context(
         candidate_feasibility_decision_id=candidate_feasibility_decision_id,
         design_ontology_version=ontology.version,
         design_ontology_fingerprint=ontology.fingerprint,
+        design_ontology_payload_json=json.dumps(
+            ontology.to_payload(),
+            sort_keys=True,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        ),
         intent_contract_version=ontology.intent_contract_version,
     )
 
@@ -449,7 +452,6 @@ class FakeResearchDesigner:
         text = (
             f"{context.candidate.hypothesis_statement} {context.candidate.hypothesis_rationale}"
         ).lower()
-        ontology = build_research_design_ontology_snapshot()
 
         if "underspecified" in text or "general explore" in text:
             return ResearchDesignerDecision(
@@ -463,8 +465,8 @@ class FakeResearchDesigner:
                 provider=self.provider,
                 model=self.model,
                 prompt_version=self.prompt_version,
-                ontology_version=ontology.version,
-                ontology_fingerprint=ontology.fingerprint,
+                ontology_version=context.design_ontology_version,
+                ontology_fingerprint=context.design_ontology_fingerprint,
             )
 
         if (
@@ -483,8 +485,8 @@ class FakeResearchDesigner:
                 provider=self.provider,
                 model=self.model,
                 prompt_version=self.prompt_version,
-                ontology_version=ontology.version,
-                ontology_fingerprint=ontology.fingerprint,
+                ontology_version=context.design_ontology_version,
+                ontology_fingerprint=context.design_ontology_fingerprint,
             )
 
         return ResearchDesignerDecision(
@@ -512,6 +514,6 @@ class FakeResearchDesigner:
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
-            ontology_version=ontology.version,
-            ontology_fingerprint=ontology.fingerprint,
+            ontology_version=context.design_ontology_version,
+            ontology_fingerprint=context.design_ontology_fingerprint,
         )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Any
 
 from ..models.design import (
     AnalysisIntent,
@@ -13,6 +14,7 @@ from ..models.design import (
     DesignVariable,
     ResearchDesignKind,
 )
+from ..models.research import freeze_json_value, thaw_json_value
 from ..models.research_designer import RESEARCH_DESIGN_INTENT_CONTRACT_VERSION
 
 
@@ -89,6 +91,15 @@ def _compute_fingerprint(payload_without_fingerprint: dict) -> str:
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
+def compute_research_design_ontology_fingerprint(payload: dict[str, Any]) -> str:
+    """Compute the canonical ontology fingerprint for a payload object."""
+
+    if not isinstance(payload, dict):
+        raise ValueError("Research design ontology payload must be an object")
+    semantic_payload = {key: value for key, value in payload.items() if key != "fingerprint"}
+    return _compute_fingerprint(semantic_payload)
+
+
 @dataclass(frozen=True, slots=True)
 class ResearchDesignOntologySnapshot:
     version: str
@@ -109,26 +120,56 @@ class ResearchDesignOntologySnapshot:
     control_boundary: str
     constraints: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "eligible_independent_variables_by_design_kind",
+            freeze_json_value(
+                {
+                    str(key): tuple(str(item) for item in values)
+                    for key, values in self.eligible_independent_variables_by_design_kind.items()
+                }
+            ),
+        )
+        object.__setattr__(
+            self,
+            "required_controls_by_design_kind",
+            freeze_json_value(
+                {
+                    str(key): tuple(str(item) for item in values)
+                    for key, values in self.required_controls_by_design_kind.items()
+                }
+            ),
+        )
+        object.__setattr__(
+            self,
+            "variable_semantics",
+            freeze_json_value({str(key): str(value) for key, value in self.variable_semantics.items()}),
+        )
+        object.__setattr__(
+            self,
+            "outcome_semantics",
+            freeze_json_value({str(key): str(value) for key, value in self.outcome_semantics.items()}),
+        )
+
     def to_payload(self) -> dict:
+        eligible = _thaw_mapping_of_string_sequences(self.eligible_independent_variables_by_design_kind)
+        controls = _thaw_mapping_of_string_sequences(self.required_controls_by_design_kind)
+        variable_semantics = _thaw_string_mapping(self.variable_semantics)
+        outcome_semantics = _thaw_string_mapping(self.outcome_semantics)
         return {
             "version": self.version,
             "fingerprint": self.fingerprint,
             "intent_contract_version": self.intent_contract_version,
             "supported_design_kinds": list(self.supported_design_kinds),
             "design_variables": list(self.design_variables),
-            "eligible_independent_variables_by_design_kind": {
-                key: list(values)
-                for key, values in self.eligible_independent_variables_by_design_kind.items()
-            },
-            "required_controls_by_design_kind": {
-                key: list(values)
-                for key, values in self.required_controls_by_design_kind.items()
-            },
+            "eligible_independent_variables_by_design_kind": eligible,
+            "required_controls_by_design_kind": controls,
             "supported_dependent_outcomes": list(self.supported_dependent_outcomes),
             "comparison_intents": list(self.comparison_intents),
             "analysis_intents": list(self.analysis_intents),
-            "variable_semantics": dict(self.variable_semantics),
-            "outcome_semantics": dict(self.outcome_semantics),
+            "variable_semantics": variable_semantics,
+            "outcome_semantics": outcome_semantics,
             "parameter_sensitivity_semantics": self.parameter_sensitivity_semantics,
             "exact_value_boundary": self.exact_value_boundary,
             "falsification_boundary": self.falsification_boundary,
@@ -137,9 +178,23 @@ class ResearchDesignOntologySnapshot:
         }
 
 
+def _thaw_mapping_of_string_sequences(value: Any) -> dict[str, list[str]]:
+    thawed = thaw_json_value(value)
+    if not isinstance(thawed, dict):
+        raise ValueError("Expected mapping-like value")
+    return {str(key): [str(item) for item in values] for key, values in thawed.items()}
+
+
+def _thaw_string_mapping(value: Any) -> dict[str, str]:
+    thawed = thaw_json_value(value)
+    if not isinstance(thawed, dict):
+        raise ValueError("Expected mapping-like value")
+    return {str(key): str(item) for key, item in thawed.items()}
+
+
 def build_research_design_ontology_snapshot() -> ResearchDesignOntologySnapshot:
     payload = _payload_without_fingerprint()
-    fingerprint = _compute_fingerprint(payload)
+    fingerprint = compute_research_design_ontology_fingerprint(payload)
     return ResearchDesignOntologySnapshot(
         version=payload["version"],
         fingerprint=fingerprint,

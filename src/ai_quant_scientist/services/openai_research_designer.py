@@ -19,7 +19,6 @@ from ..models.research_designer import (
     ResearchDesignerDecision,
     ResearchDesignerDecisionType,
 )
-from .research_design_ontology import build_research_design_ontology_snapshot
 from .research_designer import context_to_payload
 from .research_designer_prompts import get_research_designer_instructions
 
@@ -106,9 +105,8 @@ class OpenAIResearchDesigner:
             no_valid_design_reason: str | None = None
             model_config = ConfigDict(extra="forbid")
 
-        ontology = build_research_design_ontology_snapshot()
         instructions = get_research_designer_instructions(self.prompt_version)
-        input_str = json.dumps(context_to_payload(context, ontology=ontology), sort_keys=True)
+        input_str = json.dumps(context_to_payload(context), sort_keys=True)
 
         response = self._client.responses.parse(
             model=self.model,
@@ -189,7 +187,7 @@ class OpenAIResearchDesigner:
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
-            ontology_version=ontology.version,
-            ontology_fingerprint=ontology.fingerprint,
+            ontology_version=context.design_ontology_version,
+            ontology_fingerprint=context.design_ontology_fingerprint,
             raw_response=raw_response_str,
         )

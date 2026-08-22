@@ -6,7 +6,7 @@
 - Working tree status: contains uncommitted `V0.13B` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v9`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `469 passed`
+- Verified test count: `483 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -48,6 +48,10 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/capabilities/intake.py`
 - Research Designer cannot choose exact reproducibility-critical values, condition order/count, capability IDs, or execution.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`
+- The exact ontology snapshot recorded in Research Designer context/provenance is now the same ontology payload sent to the provider; adapters do not independently rebuild "current" ontology state.
+  Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/openai_research_designer.py`
+- Research Designer ontology provenance is now cryptographically bound to the actual semantic payload: the canonical ontology fingerprint is recomputed from the payload supplied to the provider and must match both the embedded payload fingerprint and the context fingerprint before provider invocation.
+  Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `tests/test_research_designer.py`
 - `NO_VALID_DESIGN` is not scientific rejection and does not mutate candidate feasibility or lifecycle state.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`
 - `ResearchDesignIntent`s, initial experiment plans, exact condition-feasibility decisions, plan proposals, condition execution records, and contrast results are durable and append-only in practice.
@@ -138,6 +142,10 @@ Governance keeps the scientist honest.
 ### Research Designer
 - Bounded Research Designer V1 is implemented with immutable prompt `v1`, deterministic ontology `research_design_ontology_v1`, strict structured output, and append-only invocation persistence.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- Context now carries canonical ontology payload JSON plus matching version/fingerprint, and mismatch between those fields fails closed before provider invocation.
+  Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_designer.py`, `tests/test_research_designer.py`
+- Context now also fails closed if the semantic ontology payload is altered without a correspondingly recomputed canonical fingerprint, including nested semantic changes or post-construction tampering before adapter invocation.
+  Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `tests/test_research_designer.py`
 - Authority boundary is one bounded `ResearchDesignIntent` or `NO_VALID_DESIGN`; no exact values, no capability IDs, no feasibility declaration, and no downstream autonomous chaining.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/openai_research_designer.py`
 - Default adapter target is `gpt-5.6-terra` with Prompt `v1`, but no live API call was made during implementation verification on Saturday, August 22, 2026.
@@ -160,6 +168,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/intake.py`, `tests/test_research_intake.py`
 - `ResearchDesignProposalValidator`: deterministic fail-closed structural gate for AI-authored design proposals.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `tests/test_research_designer.py`
+- `ResearchDesignOntologySnapshot` is now deeply immutable in practice; semantic dict content is frozen after fingerprint computation.
+  Evidence: `src/ai_quant_scientist/services/research_design_ontology.py`, `tests/test_research_designer.py`
 - `SpecMaterializer` V2: deterministic stub-only mapping from bounded design intent to a complete precommitted contrast plan.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
 - `SpecFeasibility` V1: deterministic exact stub-only per-condition compatibility validation at materialization and again at acceptance.
