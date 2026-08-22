@@ -30,6 +30,13 @@ from .design import (
 )
 from .research import AuditEvent, ExperimentResult, Hypothesis, ResearchAttempt, ResearchRun, ResearchSpec, SpecRevisionProposal
 from .critic import CriticContext, CriticDecision, CriticInvocation, CriticDecisionType
+from .research_designer import (
+    RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
+    ResearchDesignerContext,
+    ResearchDesignerDecision,
+    ResearchDesignerDecisionType,
+    ResearchDesignerInvocation,
+)
 
 __all__ = [
     "AnalysisIntent",
@@ -74,5 +81,10 @@ __all__ = [
     "ResearchStage",
     "RunStatus",
     "ResearchAction",
+    "ResearchDesignerContext",
+    "ResearchDesignerDecision",
+    "ResearchDesignerDecisionType",
+    "ResearchDesignerInvocation",
     "SpecRevisionProposalStatus",
+    "RESEARCH_DESIGN_INTENT_CONTRACT_VERSION",
 ]

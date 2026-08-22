@@ -755,24 +755,24 @@ def test_v5_to_v6_migration(tmp_path):
         assert "research_candidates" in tables
 
 
-def test_fresh_v8_db_has_all_tables(tmp_path):
+def test_fresh_v9_db_has_all_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-    assert ver == 8
+    assert ver == 9
     for t in ("hypothesis_scientist_invocations", "research_candidates", "feasibility_decisions",
               "critic_invocations", "research_runs"):
         assert t in tables
 
 
-def test_v8_migration_idempotent(tmp_path):
+def test_v9_migration_idempotent(tmp_path):
     SQLiteStore(tmp_path / "t.db")
     SQLiteStore(tmp_path / "t.db")  # second open on current DB should stay current
     store = SQLiteStore(tmp_path / "t.db")
     with store.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 8
+        assert ver == 9
 
 
 # ─── Eval harness ─────────────────────────────────────────────────────────────

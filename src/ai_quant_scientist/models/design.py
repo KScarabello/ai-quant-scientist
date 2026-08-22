@@ -102,6 +102,8 @@ class ResearchDesignIntent:
     provider: str | None = None
     model: str | None = None
     prompt_version: str | None = None
+    ontology_version: str | None = None
+    ontology_fingerprint: str | None = None
     created_at: Any = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
@@ -119,6 +121,13 @@ class ResearchDesignIntent:
             raise ValueError("ResearchDesignIntent requires non-empty falsification_condition")
         if not self.source or not self.source.strip():
             raise ValueError("ResearchDesignIntent requires non-empty source")
+        if self.ontology_version is not None and not self.ontology_version.strip():
+            raise ValueError("ResearchDesignIntent ontology_version must be non-empty when provided")
+        if self.ontology_fingerprint is not None and (
+            len(self.ontology_fingerprint) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.ontology_fingerprint)
+        ):
+            raise ValueError("ResearchDesignIntent ontology_fingerprint must be 64-char lowercase SHA-256 hex")
 
         _validate_enum_tuple(
             self.independent_variables,
@@ -173,6 +182,8 @@ class ResearchDesignIntent:
         provider: str | None = None,
         model: str | None = None,
         prompt_version: str | None = None,
+        ontology_version: str | None = None,
+        ontology_fingerprint: str | None = None,
     ) -> "ResearchDesignIntent":
         return cls(
             id=new_id(),
@@ -189,6 +200,8 @@ class ResearchDesignIntent:
             provider=provider,
             model=model,
             prompt_version=prompt_version,
+            ontology_version=ontology_version,
+            ontology_fingerprint=ontology_fingerprint,
         )
 
 

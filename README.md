@@ -34,10 +34,19 @@ Hypothesis Scientist path:
 -> deterministic candidate feasibility gate
 -> `READY_FOR_SPEC` or `BLOCKED_CAPABILITY`
 
-Deterministic contrast-plan path after `READY_FOR_SPEC`:
+Research Designer path after explicit `READY_FOR_SPEC` authorization:
 
 `ResearchCandidate`
--> manual/supervised `ResearchDesignIntent`
+-> explicit candidate-feasibility authorization
+-> `ResearchDesigner`
+-> structured design decision
+-> deterministic validator
+-> authoritative `ResearchDesignIntent`
+-> stop
+
+Deterministic contrast-plan path after `ResearchDesignIntent`:
+
+`ResearchDesignIntent`
 -> deterministic `SpecMaterializer` V2
 -> `InitialExperimentPlan`
 -> per-condition exact feasibility
@@ -81,9 +90,30 @@ Current adapter defaults:
 
 ### Research Designer
 
-Research Designer AI is still not implemented.
+The Research Designer is now implemented and bounded.
 
-The deterministic interface it would eventually target now exists, but `ResearchDesignIntent` remains manual/supervised only.
+It may:
+- propose one bounded `ResearchDesignIntent`
+- return `NO_VALID_DESIGN` when the candidate cannot be responsibly expressed under the bounded V1 ontology
+
+It may not:
+- choose exact parameter values
+- choose baseline/comparator values
+- choose condition count or order
+- choose capability IDs
+- declare exact feasibility
+- execute research
+- automatically call the `SpecMaterializer`
+
+Current adapter defaults:
+- model: `gpt-5.6-terra`
+- prompt version: `v1`
+
+Current boundary:
+- runs only after an explicit `READY_FOR_SPEC` authorization
+- receives a deterministic AI-safe design ontology snapshot with version and fingerprint
+- persists every invocation
+- stops at `ResearchDesignIntent`
 
 ### Research Critic
 
@@ -127,6 +157,7 @@ Core invariants:
 - `V0.12D`: candidate-feasibility / future spec-feasibility boundary and AI contract cleanup
 - `V0.13A`: supervised `ResearchDesignIntent`, deterministic stub-only exact feasibility, durable materialization proposals, and explicit human acceptance
 - `V0.13A.1`: deterministic contrast plan, precommitted baseline/comparator execution, append-only acceptance-time revalidation, restart-safe condition execution records, deterministic contrast result, and semantic closure for `PARAMETER_SENSITIVITY`
+- `V0.13B`: bounded Research Designer V1, deterministic design ontology, prompt V1, governed READY_FOR_SPEC-only design service, append-only invocation persistence, and schema `v9`
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -179,13 +210,14 @@ There are now three relevant deterministic layers:
 
 ## Persistence
 
-Current schema version: `v8`
+Current schema version: `v9`
 
 SQLite persists authoritative history for:
 
 - research runs, specs, revisions, attempts, results, evaluations, and critic invocations
 - research candidates and candidate-feasibility decisions
 - hypothesis scientist invocations
+- research designer invocations
 - research design intents
 - historical single-spec materialization records from `V0.13A`
 - `InitialExperimentPlan`
@@ -201,7 +233,7 @@ SQLite persists authoritative history for:
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `441 passed`
+- result: `469 passed`
 
 Relevant scientist artifact note:
 
@@ -219,10 +251,12 @@ PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_
 PYTHONPATH=src pytest -q
 ```
 
+There is intentionally no dedicated Research Designer CLI yet. The governed service API and eval harness are the supported V0.13B interfaces.
+
 ## Current Limitations / Future Work
 
-- no Research Designer AI yet
 - no autonomous loop
+- no autonomous chaining from Research Designer into materialization, acceptance, or execution
 - no generalized multi-capability exact materializer
 - no generalized multi-condition experiment DSL
 - no RAG or vector canonical memory
@@ -235,4 +269,5 @@ Historical evidence remains in the repository, but it should not be mistaken for
 
 - `V0.13A` proved governed baseline-spec materialization.
 - `V0.13A.1` closes the semantic gap by precommitting and executing a complete deterministic parameter contrast.
+- `V0.13B` adds the bounded AI layer that may author `ResearchDesignIntent` but still cannot control exact reproducibility-critical values.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.

@@ -51,9 +51,10 @@ from ..models.design import (
     SpecMaterializationProposalStatus,
     thaw_mapping,
 )
+from ..models.research_designer import ResearchDesignerInvocation
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 class SQLiteStore:
@@ -260,6 +261,27 @@ class SQLiteStore:
                     provider TEXT,
                     model TEXT,
                     prompt_version TEXT,
+                    ontology_version TEXT,
+                    ontology_fingerprint TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                );
+                CREATE TABLE IF NOT EXISTS research_designer_invocations (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    candidate_snapshot_json TEXT NOT NULL,
+                    candidate_feasibility_decision_id TEXT NOT NULL,
+                    prompt_version TEXT NOT NULL,
+                    ontology_version TEXT NOT NULL,
+                    ontology_fingerprint TEXT NOT NULL,
+                    intent_contract_version TEXT NOT NULL,
+                    provider TEXT,
+                    model TEXT,
+                    raw_response TEXT,
+                    parsed_decision_json TEXT,
+                    validation_status TEXT,
+                    validation_errors_json TEXT,
+                    resulting_design_intent_id TEXT,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
                 );
@@ -679,6 +701,62 @@ class SQLiteStore:
                             FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
                             FOREIGN KEY (baseline_condition_id) REFERENCES initial_experiment_conditions(id),
                             FOREIGN KEY (comparator_condition_id) REFERENCES initial_experiment_conditions(id)
+                        );
+                        """
+                    )
+                    if not column_exists(connection, "research_design_intents", "ontology_version"):
+                        connection.execute("ALTER TABLE research_design_intents ADD COLUMN ontology_version TEXT")
+                    if not column_exists(connection, "research_design_intents", "ontology_fingerprint"):
+                        connection.execute("ALTER TABLE research_design_intents ADD COLUMN ontology_fingerprint TEXT")
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_designer_invocations (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            candidate_snapshot_json TEXT NOT NULL,
+                            candidate_feasibility_decision_id TEXT NOT NULL,
+                            prompt_version TEXT NOT NULL,
+                            ontology_version TEXT NOT NULL,
+                            ontology_fingerprint TEXT NOT NULL,
+                            intent_contract_version TEXT NOT NULL,
+                            provider TEXT,
+                            model TEXT,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            validation_status TEXT,
+                            validation_errors_json TEXT,
+                            resulting_design_intent_id TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
+                elif v == 8:
+                    if not column_exists(connection, "research_design_intents", "ontology_version"):
+                        connection.execute("ALTER TABLE research_design_intents ADD COLUMN ontology_version TEXT")
+                    if not column_exists(connection, "research_design_intents", "ontology_fingerprint"):
+                        connection.execute("ALTER TABLE research_design_intents ADD COLUMN ontology_fingerprint TEXT")
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_designer_invocations (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            candidate_snapshot_json TEXT NOT NULL,
+                            candidate_feasibility_decision_id TEXT NOT NULL,
+                            prompt_version TEXT NOT NULL,
+                            ontology_version TEXT NOT NULL,
+                            ontology_fingerprint TEXT NOT NULL,
+                            intent_contract_version TEXT NOT NULL,
+                            provider TEXT,
+                            model TEXT,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            validation_status TEXT,
+                            validation_errors_json TEXT,
+                            resulting_design_intent_id TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
                         );
                         """
                     )
@@ -1516,6 +1594,9 @@ class SQLiteStore:
             evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
         )
 
+    def get_feasibility_decision(self, decision_id: str):
+        return self.get_feasibility_decision_by_id(decision_id)
+
     def get_latest_feasibility_decision(self, candidate_id: str):
         decisions = self.get_feasibility_decisions(candidate_id)
         return decisions[-1] if decisions else None
@@ -1529,8 +1610,9 @@ class SQLiteStore:
                    (id, candidate_id, design_kind, independent_variables_json,
                     dependent_outcomes_json, controls_json, comparison_intent,
                     analysis_intent, falsification_condition, rationale, source,
-                    provider, model, prompt_version, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    provider, model, prompt_version, ontology_version,
+                    ontology_fingerprint, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     design_intent.id,
                     design_intent.candidate_id,
@@ -1546,6 +1628,8 @@ class SQLiteStore:
                     design_intent.provider,
                     design_intent.model,
                     design_intent.prompt_version,
+                    design_intent.ontology_version,
+                    design_intent.ontology_fingerprint,
                     design_intent.created_at.isoformat(),
                 ),
             )
@@ -1577,6 +1661,8 @@ class SQLiteStore:
             provider=row["provider"],
             model=row["model"],
             prompt_version=row["prompt_version"],
+            ontology_version=row["ontology_version"] if "ontology_version" in row.keys() else None,
+            ontology_fingerprint=row["ontology_fingerprint"] if "ontology_fingerprint" in row.keys() else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -1611,6 +1697,8 @@ class SQLiteStore:
                 provider=row["provider"],
                 model=row["model"],
                 prompt_version=row["prompt_version"],
+                ontology_version=row["ontology_version"] if "ontology_version" in row.keys() else None,
+                ontology_fingerprint=row["ontology_fingerprint"] if "ontology_fingerprint" in row.keys() else None,
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
             for row in rows
@@ -2342,6 +2430,65 @@ class SQLiteStore:
             ),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
+
+    # ─── Research designer invocations ───────────────────────────────────────
+
+    def save_research_designer_invocation(self, inv: ResearchDesignerInvocation) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO research_designer_invocations
+                   (id, candidate_id, candidate_snapshot_json, candidate_feasibility_decision_id,
+                    prompt_version, ontology_version, ontology_fingerprint, intent_contract_version,
+                    provider, model, raw_response, parsed_decision_json, validation_status,
+                    validation_errors_json, resulting_design_intent_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    inv.id,
+                    inv.candidate_id,
+                    inv.candidate_snapshot_json,
+                    inv.candidate_feasibility_decision_id,
+                    inv.prompt_version,
+                    inv.ontology_version,
+                    inv.ontology_fingerprint,
+                    inv.intent_contract_version,
+                    inv.provider,
+                    inv.model,
+                    inv.raw_response,
+                    inv.parsed_decision_json,
+                    inv.validation_status,
+                    inv.validation_errors_json,
+                    inv.resulting_design_intent_id,
+                    inv.created_at.isoformat(),
+                ),
+            )
+
+    def get_research_designer_invocations(self, candidate_id: str) -> list[ResearchDesignerInvocation]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM research_designer_invocations WHERE candidate_id = ? ORDER BY created_at, rowid",
+                (candidate_id,),
+            ).fetchall()
+        return [
+            ResearchDesignerInvocation(
+                id=row["id"],
+                candidate_id=row["candidate_id"],
+                candidate_snapshot_json=row["candidate_snapshot_json"],
+                candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+                prompt_version=row["prompt_version"],
+                ontology_version=row["ontology_version"],
+                ontology_fingerprint=row["ontology_fingerprint"],
+                intent_contract_version=row["intent_contract_version"],
+                provider=row["provider"],
+                model=row["model"],
+                raw_response=row["raw_response"],
+                parsed_decision_json=row["parsed_decision_json"],
+                validation_status=row["validation_status"],
+                validation_errors_json=row["validation_errors_json"],
+                resulting_design_intent_id=row["resulting_design_intent_id"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in rows
+        ]
 
     # ─── Hypothesis scientist invocations ─────────────────────────────────────
 

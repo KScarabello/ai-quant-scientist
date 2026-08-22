@@ -508,7 +508,7 @@ def test_v5_migration_idempotent(tmp_path):
     store2 = SQLiteStore(tmp_path / "t.db")
     with store2.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 8
+        assert ver == 9
 
 
 # ─── no network calls ─────────────────────────────────────────────────────────
