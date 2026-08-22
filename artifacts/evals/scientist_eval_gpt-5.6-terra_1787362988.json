@@ -1,0 +1,124 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v2",
+  "timestamp": 1787362988,
+  "results": [
+    {
+      "case_id": "case-10",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": false,
+      "validation_errors": {
+        "synthetic_clustered_price_paths_required_fields": "required_fields entry 'close' is not registered for data_kind=SYNTHETIC_PARAMETRIC",
+        "synthetic_iid_price_paths_required_fields": "required_fields entry 'close' is not registered for data_kind=SYNTHETIC_PARAMETRIC"
+      },
+      "requirement_count": 5,
+      "hypothesis_statement": "Across synthetic daily price paths with matched unconditional return mean and variance, paths generated with volatility clustering will exhibit a larger reduction in terminal-wealth dispersion from inverse-realized-volatility position sizing relative to fixed-notional sizing than paths with independent identically distributed returns.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "proposes distinct hypothesis when bounded prior-candidate summary context is provided",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "Across synthetic daily price paths with matched unconditional return mean and variance, paths generated with volatility clustering will exhibit a larger reduction in terminal-wealth dispersion from inverse-realized-volatility position sizing relative to fixed-notional sizing than paths with independent identically distributed returns.",
+        "hypothesis_rationale": "Volatility clustering causes recent realized volatility to contain information about near-term conditional variance, so inverse-volatility sizing can reduce exposure before or during persistent high-volatility episodes. Under independent returns with the same unconditional moments, realized volatility is less informative about future variance; therefore the relative dispersion-reduction effect should be smaller. This is distinct from threshold gating because it tests the role of conditional-variance dynamics in sizing efficacy.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_clustered_price_paths",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "1d",
+            "required_fields": [
+              "close"
+            ],
+            "instruments": [
+              "synthetic_volatility_clustered"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": [
+              "garch_alpha",
+              "garch_beta",
+              "garch_omega",
+              "initial_price",
+              "innovation_degrees_of_freedom",
+              "innovation_distribution",
+              "number_of_paths",
+              "random_seed",
+              "return_drift",
+              "time_steps"
+            ],
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "synthetic_iid_price_paths",
+            "data_kind": "SYNTHETIC_PARAMETRIC",
+            "asset_class": "SYNTHETIC",
+            "resolution": "1d",
+            "required_fields": [
+              "close"
+            ],
+            "instruments": [
+              "synthetic_iid_matched_moments"
+            ],
+            "point_in_time_required": false,
+            "required_parameters": [
+              "initial_price",
+              "innovation_degrees_of_freedom",
+              "innovation_distribution",
+              "number_of_paths",
+              "random_seed",
+              "return_drift",
+              "return_volatility",
+              "time_steps"
+            ],
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "generate_matched_synthetic_regimes",
+            "tool_kind": "SYNTHETIC_DATA_GENERATION",
+            "legacy_tool_name": null,
+            "label": "Generate IID and volatility-clustered price-path ensembles with matched unconditional moments."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "run_sizing_comparison",
+            "tool_kind": "BACKTEST_EXECUTION",
+            "legacy_tool_name": null,
+            "label": "Simulate fixed-notional and inverse-realized-volatility sizing over each synthetic path."
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "test_regime_interaction",
+            "tool_kind": "STATISTICAL_ANALYSIS",
+            "legacy_tool_name": null,
+            "label": "Estimate and test the interaction between volatility-clustering regime and sizing method on terminal-wealth dispersion."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v2",
+        "compact_provenance": {
+          "response_id": "resp_066b79b700955fab016a88feacb68487d08b65d810c29fd3cf",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787362988.0,
+          "completed_at": 1787362999.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1564,
+            "output_tokens": 908,
+            "reasoning_tokens": 397
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"Across synthetic daily price paths with matched unconditional return mean and variance, paths generated with volatility clustering will exhibit a larger reduction in terminal-wealth dispersion from inverse-realized-volatility position sizing relative to fixed-notional sizing than paths with independent identically distributed returns.\",\"hypothesis_rationale\":\"Volatility clustering causes recent realized volatility to contain information about near-term conditional variance, so inverse-volatility sizing can reduce exposure before or during persistent high-volatility episodes. Under independent returns with the same unconditional moments, realized volatility is less informative about future variance; therefore the relative dispersion-reduction effect should be smaller. This is distinct from threshold gating because it tests the role of conditional-variance dynamics in sizing efficacy.\",\"data_requirements\":[{\"requirement_id\":\"synthetic_clustered_price_paths\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"1d\",\"required_fields\":[\"close\"],\"instruments\":[\"synthetic_volatility_clustered\"],\"point_in_time_required\":false,\"required_parameters\":[\"return_drift\",\"garch_omega\",\"garch_alpha\",\"garch_beta\",\"innovation_distribution\",\"innovation_degrees_of_freedom\",\"initial_price\",\"time_steps\",\"number_of_paths\",\"random_seed\"]},{\"requirement_id\":\"synthetic_iid_price_paths\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"asset_class\":\"SYNTHETIC\",\"resolution\":\"1d\",\"required_fields\":[\"close\"],\"instruments\":[\"synthetic_iid_matched_moments\"],\"point_in_time_required\":false,\"required_parameters\":[\"return_drift\",\"return_volatility\",\"innovation_distribution\",\"innovation_degrees_of_freedom\",\"initial_price\",\"time_steps\",\"number_of_paths\",\"random_seed\"]}],\"tool_requirements\":[{\"requirement_id\":\"generate_matched_synthetic_regimes\",\"tool_kind\":\"SYNTHETIC_DATA_GENERATION\",\"label\":\"Generate IID and volatility-clustered price-path ensembles with matched unconditional moments.\"},{\"requirement_id\":\"run_sizing_comparison\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"label\":\"Simulate fixed-notional and inverse-realized-volatility sizing over each synthetic path.\"},{\"requirement_id\":\"test_regime_interaction\",\"tool_kind\":\"STATISTICAL_ANALYSIS\",\"label\":\"Estimate and test the interaction between volatility-clustering regime and sizing method on terminal-wealth dispersion.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 0,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

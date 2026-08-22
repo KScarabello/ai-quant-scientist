@@ -115,15 +115,15 @@ CANONICAL_FIELDS_BY_DATA_KIND: dict[DataKind, tuple[str, ...]] = {
         "timestamp", "instrument_id", "feature_value",
     ),
     DataKind.SYNTHETIC_PARAMETRIC: (
-        "timestamp", "signal_value", "synthetic_price", "synthetic_return",
-        "random_seed", "generator_parameters", "train_test_split_label",
-        "regime_label", "volatility_regime_label", "latent_equilibrium_value",
-        "contemporaneous_volatility", "one_step_forward_change",
-        "process_parameters", "simulation_seed", "in_sample_out_of_sample_split",
-        "OU_mean_reversion_speed", "OU_long_run_mean", "OU_diffusion_volatility",
-        "trade_count", "out_of_sample_net_pnl", "out_of_sample_sharpe",
-        "turnover", "transaction_cost_assumption", "parameter_perturbation_magnitude",
-        "half_life", "entry_threshold", "lookback_length",
+        "timestamp",
+        "signal_value",
+        "synthetic_price",
+        "synthetic_return",
+        "regime_label",
+        "volatility_regime_label",
+        "latent_equilibrium_value",
+        "contemporaneous_volatility",
+        "one_step_forward_change",
     ),
 }
 
@@ -167,10 +167,12 @@ def validate_required_parameter_names(parameters: tuple[str, ...] | None) -> Non
 
 @dataclass(frozen=True, slots=True)
 class DataRequirement:
-    """What a research experiment needs from the system.
+    """Prerequisite input data a research experiment needs from the system.
 
     Fields are optional; None means "no constraint on this dimension."
     Only constrained dimensions are evaluated during matching.
+    This model describes inputs required before deterministic tool execution.
+    It does not represent generated backtest outputs or experiment evidence.
     """
     requirement_id: str
     data_kind: DataKind
@@ -186,7 +188,8 @@ class DataRequirement:
     start_date: date | None = None
     end_date: date | None = None
     point_in_time_required: bool = False
-    # For synthetic/parametric research: the spec parameters required
+    # Explicit input parameters the supplying capability must support.
+    # This is not a placeholder for arbitrary future ResearchSpec design.
     required_parameters: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:

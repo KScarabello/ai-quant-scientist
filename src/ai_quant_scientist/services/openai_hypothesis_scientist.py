@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Optional
 
-from ..capabilities.models import AssetClass, DataKind, Resolution, ToolKind
+from ..capabilities.models import AssetClass, CANONICAL_FIELDS_BY_DATA_KIND, DataKind, Resolution, ToolKind
 from ..capabilities.serialization import requirements_to_json
 from ..models.hypothesis_scientist import (
     HypothesisScientistDecision,
@@ -16,6 +16,7 @@ from ..models.hypothesis_scientist import (
 from ..models.research import new_id
 from ..services.hypothesis_prompts import get_scientist_instructions
 from ..services.hypothesis_scientist import brief_to_payload
+from ..services.scientist_requirement_ontology import build_requirement_ontology_snapshot
 
 try:
     from openai import OpenAI
@@ -26,6 +27,11 @@ DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
 DEFAULT_PROMPT_VERSION = "v2"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
+ALL_CANONICAL_FIELD_NAMES = tuple(sorted({
+    field_name
+    for field_names in CANONICAL_FIELDS_BY_DATA_KIND.values()
+    for field_name in field_names
+}))
 
 
 def _extract_compact_provenance(response: Any) -> str:
@@ -88,6 +94,8 @@ class OpenAIHypothesisScientist:
         from pydantic import BaseModel, ConfigDict
         from typing import Literal
 
+        CanonicalFieldName = Literal.__getitem__(ALL_CANONICAL_FIELD_NAMES)
+
         class DataRequirementSchema(BaseModel):
             requirement_id: str
             data_kind: Literal[
@@ -100,7 +108,7 @@ class OpenAIHypothesisScientist:
             resolution: Literal[
                 "TICK", "1s", "1m", "5m", "15m", "30m", "1h", "1d", "1w", "1M", "N/A"
             ] | None = None
-            required_fields: list[str] | None = None
+            required_fields: list[CanonicalFieldName] | None = None
             instruments: list[str] | None = None
             point_in_time_required: bool = False
             required_parameters: list[str] | None = None
@@ -128,6 +136,7 @@ class OpenAIHypothesisScientist:
 
         instructions = get_scientist_instructions(self.prompt_version)
         input_str = json.dumps(brief_to_payload(brief), sort_keys=True)
+        ontology = build_requirement_ontology_snapshot()
 
         try:
             response = self._client.responses.parse(
@@ -214,5 +223,7 @@ class OpenAIHypothesisScientist:
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
+            ontology_version=ontology.version,
+            ontology_fingerprint=ontology.fingerprint,
             raw_response=raw_response_str,
         )

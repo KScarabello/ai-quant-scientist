@@ -25,6 +25,7 @@ from ..models.hypothesis_scientist import (
     ResearchBrief,
 )
 from ..models.research import new_id
+from .scientist_requirement_ontology import build_requirement_ontology_snapshot
 
 
 def utcnow() -> datetime:
@@ -135,6 +136,7 @@ def materialize_research_candidate(
 # ─── Brief serialization ──────────────────────────────────────────────────────
 
 def brief_to_json(brief: ResearchBrief) -> str:
+    ontology = build_requirement_ontology_snapshot()
     return json.dumps({
         "id": brief.id,
         "research_question": brief.research_question,
@@ -151,6 +153,10 @@ def brief_to_json(brief: ResearchBrief) -> str:
             }
             for s in (brief.prior_candidate_summaries or ())
         ] or None,
+        "requirement_ontology": {
+            "version": ontology.version,
+            "fingerprint": ontology.fingerprint,
+        },
         "source": brief.source,
         "created_at": brief.created_at.isoformat(),
     }, sort_keys=True)
@@ -158,6 +164,7 @@ def brief_to_json(brief: ResearchBrief) -> str:
 
 def brief_to_payload(brief: ResearchBrief) -> dict:
     """Compact structured payload for the AI model input."""
+    ontology = build_requirement_ontology_snapshot()
     payload = {"research_question": brief.research_question}
     if brief.asset_class_focus:
         payload["asset_class_focus"] = brief.asset_class_focus
@@ -178,6 +185,7 @@ def brief_to_payload(brief: ResearchBrief) -> dict:
         ]
     elif brief.prior_candidate_fingerprints:
         payload["prior_candidate_fingerprints"] = list(brief.prior_candidate_fingerprints)
+    payload["requirement_ontology"] = ontology.to_payload()
     return payload
 
 
@@ -219,6 +227,8 @@ def generate_candidate(
             "hypothesis_rationale": decision.hypothesis_rationale,
             "requirements_snapshot": decision.requirements_snapshot,
             "no_hypothesis_reason": decision.no_hypothesis_reason,
+            "ontology_version": decision.ontology_version,
+            "ontology_fingerprint": decision.ontology_fingerprint,
         }, sort_keys=True),
         validation_status="VALID" if valid else "INVALID",
         validation_errors_json=json.dumps(errors) if errors else None,
@@ -241,6 +251,7 @@ class FakeHypothesisScientist:
     def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
         from ..capabilities.models import DataKind, AssetClass, Resolution
         question = brief.research_question.lower()
+        ontology = build_requirement_ontology_snapshot()
 
         if "underspecified" in question or "explore" in question or "general" in question:
             return HypothesisScientistDecision(
@@ -251,6 +262,8 @@ class FakeHypothesisScientist:
                 provider=self.provider,
                 model=self.model,
                 prompt_version=self.prompt_version,
+                ontology_version=ontology.version,
+                ontology_fingerprint=ontology.fingerprint,
             )
 
         reqs = [
@@ -275,4 +288,6 @@ class FakeHypothesisScientist:
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
+            ontology_version=ontology.version,
+            ontology_fingerprint=ontology.fingerprint,
         )

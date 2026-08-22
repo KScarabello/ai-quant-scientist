@@ -63,6 +63,11 @@ def run_live_scientist_eval(
         "results": [
             {
                 "case_id": r.case_id,
+                "provider": r.provider,
+                "model": r.model,
+                "prompt_version": r.prompt_version,
+                "ontology_version": r.ontology_version,
+                "ontology_fingerprint": r.ontology_fingerprint,
                 "decision_type": r.decision_type,
                 "contract_passed": r.contract_passed,
                 "validation_errors": r.validation_errors,

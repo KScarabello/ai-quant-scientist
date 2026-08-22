@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -51,10 +52,15 @@ from ai_quant_scientist.services.hypothesis_scientist import (
     HypothesisProposalValidator,
     SCIENTIST_SOURCE,
     brief_to_json,
+    brief_to_payload,
     generate_candidate,
     materialize_research_candidate,
 )
 from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
+from ai_quant_scientist.services.scientist_requirement_ontology import (
+    REQUIREMENT_ONTOLOGY_VERSION,
+    build_requirement_ontology_snapshot,
+)
 from ai_quant_scientist.storage.sqlite_store import SQLiteStore
 
 
@@ -166,6 +172,53 @@ def test_brief_is_immutable():
     b = ResearchBrief.create(research_question="test")
     with pytest.raises((AttributeError, TypeError)):
         b.research_question = "mutated"  # type: ignore
+
+
+# ─── Requirement ontology snapshot ────────────────────────────────────────────
+
+def test_requirement_ontology_snapshot_deterministic():
+    first = build_requirement_ontology_snapshot()
+    second = build_requirement_ontology_snapshot()
+    assert first.version == REQUIREMENT_ONTOLOGY_VERSION
+    assert first.fingerprint == second.fingerprint
+    assert len(first.fingerprint) == 64
+
+
+def test_requirement_ontology_snapshot_has_canonical_vocab():
+    ontology = build_requirement_ontology_snapshot()
+    assert "QUOTES" in ontology.allowed_data_kinds
+    assert "STATISTICAL_ANALYSIS" in ontology.tool_kinds
+    assert "bid_price" in ontology.canonical_fields_by_data_kind["QUOTES"]
+    assert "synthetic_price" in ontology.canonical_fields_by_data_kind["SYNTHETIC_PARAMETRIC"]
+
+
+def test_requirement_ontology_snapshot_has_no_capability_ids_or_availability_claims():
+    payload = json.dumps(build_requirement_ontology_snapshot().to_payload(), sort_keys=True)
+    assert "stub_backtester_v1" not in payload
+    assert "enabled" not in payload
+    assert "registry_fingerprint" not in payload
+    assert "TESTABLE" not in payload
+
+
+def test_requirement_ontology_snapshot_unaffected_by_registry_content():
+    from ai_quant_scientist.capabilities.models import Capability
+    from ai_quant_scientist.capabilities.registry import CapabilityRegistry
+
+    before = build_requirement_ontology_snapshot().fingerprint
+    CapabilityRegistry([
+        Capability(
+            capability_id="totally_new_capability",
+            capability_type="DATA_FEED",
+            data_kind=DataKind.OHLCV,
+            asset_classes=(AssetClass.EQUITY,),
+            resolutions=(Resolution.DAILY,),
+            provider="test",
+            enabled=True,
+            version="1",
+        )
+    ])
+    after = build_requirement_ontology_snapshot().fingerprint
+    assert before == after
 
 
 # ─── Prompt versioning ────────────────────────────────────────────────────────
@@ -381,6 +434,71 @@ def test_required_parameters_round_trip_through_decision():
     assert back[0].required_parameters == ("lookback", "signal_threshold")
 
 
+def test_quotes_case_06_vocabulary_remains_valid():
+    brief = _synth_brief(asset_class_focus="FUTURES")
+    decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="quotes",
+            data_kind=DataKind.QUOTES,
+            asset_class=AssetClass.FUTURES,
+            resolution=Resolution.SECOND_1,
+            required_fields=("bid_price", "ask_price", "bid_size", "ask_size"),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.STATISTICAL_ANALYSIS),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid
+    assert not errors
+
+
+def test_synthetic_scalar_price_path_uses_synthetic_price_not_close():
+    brief = _synth_brief()
+    valid_decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="synthetic_series",
+            data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+            asset_class=AssetClass.SYNTHETIC,
+            resolution=Resolution.DAILY,
+            required_fields=("synthetic_price",),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.SYNTHETIC_DATA_GENERATION),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(valid_decision, brief)
+    assert valid
+    assert not errors
+
+    invalid_decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="synthetic_series",
+            data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+            asset_class=AssetClass.SYNTHETIC,
+            resolution=Resolution.DAILY,
+            required_fields=("close",),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.SYNTHETIC_DATA_GENERATION),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(invalid_decision, brief)
+    assert not valid
+    assert "synthetic_series_required_fields" in errors
+
+
+def test_generated_execution_output_not_treated_as_input_field():
+    brief = _synth_brief()
+    decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="synthetic_events",
+            data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+            asset_class=AssetClass.SYNTHETIC,
+            resolution=Resolution.TICK,
+            required_fields=("timestamp", "signal_value", "execution_price"),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "synthetic_events_required_fields" in errors
+
+
 # ─── Materialization ──────────────────────────────────────────────────────────
 
 def test_materialization_assigns_id_from_software():
@@ -430,6 +548,19 @@ def test_materialization_same_science_same_fingerprint():
     assert c1.id != c2.id
 
 
+def test_materialization_copies_ontology_provenance():
+    brief = _synth_brief()
+    decision = _propose_decision(brief)
+    ontology = build_requirement_ontology_snapshot()
+    decision = replace(
+        decision,
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+    )
+    assert decision.ontology_version == ontology.version
+    assert decision.ontology_fingerprint == ontology.fingerprint
+
+
 # ─── FakeHypothesisScientist ──────────────────────────────────────────────────
 
 def test_fake_scientist_propose_for_clear_brief():
@@ -439,6 +570,8 @@ def test_fake_scientist_propose_for_clear_brief():
     assert decision.decision_type == HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS
     assert decision.hypothesis_statement
     assert decision.requirements_snapshot
+    assert decision.ontology_version == REQUIREMENT_ONTOLOGY_VERSION
+    assert decision.ontology_fingerprint is not None
 
 
 def test_fake_scientist_no_hypothesis_for_underspecified():
@@ -462,6 +595,11 @@ def test_save_and_retrieve_propose_invocation(tmp_path):
     r = retrieved[0]
     assert r.research_brief_id == brief.id
     assert r.resulting_candidate_id == candidate.id
+    snapshot = json.loads(r.research_brief_snapshot)
+    parsed = json.loads(r.parsed_decision_json)
+    assert snapshot["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert parsed["ontology_version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert parsed["ontology_fingerprint"] == snapshot["requirement_ontology"]["fingerprint"]
 
 
 def test_save_and_retrieve_no_hypothesis_invocation(tmp_path):
@@ -707,9 +845,18 @@ def test_eval_artifact_summary_fields_remain():
     assert results[0].decision_type is not None
 
 
+def test_brief_payload_includes_requirement_ontology_without_capability_availability():
+    payload = brief_to_payload(_synth_brief())
+    payload_str = json.dumps(payload, sort_keys=True)
+    assert "requirement_ontology" in payload
+    assert payload["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert "stub_backtester_v1" not in payload_str
+    assert "enabled" not in payload_str
+    assert "registry_fingerprint" not in payload_str
+
+
 def test_eval_metadata_not_in_brief_payload():
     """expected_decision/evaluation_focus must never appear in the model input."""
-    from ai_quant_scientist.services.hypothesis_scientist import brief_to_payload
     cases = load_cases_from_file("evals/scientist_v1.json")
     for case in cases:
         payload = brief_to_payload(case.brief)
@@ -736,12 +883,31 @@ def test_case_10_loads_prior_candidate_summary_context():
     assert "threshold" in summary.hypothesis_statement.lower()
 
 
+def test_case_11_is_multiplicity_test_not_underspecification_test():
+    cases = {case.id: case for case in load_cases_from_file("evals/scientist_v1.json")}
+    case = cases["case-11"]
+    assert case.expected_decision == "PROPOSE_HYPOTHESIS"
+    assert case.brief.asset_class_focus == "SYNTHETIC"
+    assert case.brief.methodological_constraints is not None
+    assert "threshold sensitivity" in case.brief.research_question.lower()
+    assert "lookback sensitivity" in case.brief.research_question.lower()
+    assert "trade frequency" in case.brief.research_question.lower()
+
+
 def test_eval_result_carries_fixture_metadata():
     cases = load_cases_from_file("evals/scientist_v1.json")
     suite = ScientistEvalSuite(cases[:1])
     results = suite.run(FakeHypothesisScientist())
     assert results[0].expected_decision is not None
     assert results[0].evaluation_focus is not None
+
+
+def test_eval_result_carries_ontology_provenance():
+    case = load_cases_from_file("evals/scientist_v1.json")[0]
+    result = ScientistEvalSuite([case]).run(FakeHypothesisScientist())[0]
+    assert result.ontology_version == REQUIREMENT_ONTOLOGY_VERSION
+    assert result.ontology_fingerprint is not None
+    assert result.parsed_decision["ontology_version"] == REQUIREMENT_ONTOLOGY_VERSION
 
 
 # ─── Downstream gate boundary: scientist proposes, gate decides ────────────────
@@ -870,6 +1036,28 @@ def test_openai_adapter_no_hypothesis():
     decision = scientist.generate(_synth_brief())
     assert decision.decision_type == HypothesisScientistDecisionType.NO_HYPOTHESIS
     assert decision.no_hypothesis_reason == "Brief too vague"
+
+
+def test_openai_adapter_input_includes_ontology_but_not_capability_availability():
+    captured: dict = {}
+    parsed = {
+        "decision": "NO_HYPOTHESIS",
+        "hypothesis_statement": None,
+        "hypothesis_rationale": None,
+        "data_requirements": None,
+        "tool_requirements": None,
+        "no_hypothesis_reason": "too vague",
+    }
+    resp = _make_openai_response(parsed)
+    client = MagicMock()
+    client.responses.parse.side_effect = lambda **kw: (captured.update(kw), resp)[1]
+    decision = OpenAIHypothesisScientist(client=client).generate(_synth_brief())
+    payload = json.loads(captured["input"])
+    payload_str = json.dumps(payload, sort_keys=True)
+    assert payload["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert "stub_backtester_v1" not in payload_str
+    assert "enabled" not in payload_str
+    assert decision.ontology_version == REQUIREMENT_ONTOLOGY_VERSION
 
 
 def test_openai_adapter_schema_has_no_governance_fields():

@@ -1,0 +1,79 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v2",
+  "timestamp": 1787362976,
+  "results": [
+    {
+      "case_id": "case-06",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 2,
+      "hypothesis_statement": "For MES futures, a positive level-1 bid-ask displayed-size imbalance measured at the end of a 1-second interval predicts a positive mid-price return over the subsequent 1-second interval, while a negative imbalance predicts a negative return.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "ORDER_BOOK futures MES hypothesis with correct resolution, instrument, and primitive field semantics",
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "For MES futures, a positive level-1 bid-ask displayed-size imbalance measured at the end of a 1-second interval predicts a positive mid-price return over the subsequent 1-second interval, while a negative imbalance predicts a negative return.",
+        "hypothesis_rationale": "Displayed depth imbalance can reflect an asymmetry in immediately available liquidity and short-horizon order-flow pressure: relatively greater bid size may make upward price changes more likely as sell liquidity is absorbed, whereas relatively greater ask size may make downward price changes more likely. The hypothesis is falsified if the signed imbalance has no statistically distinguishable directional association with subsequent mid-price returns, or has the opposite association.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "mes_l1_quotes_1s",
+            "data_kind": "QUOTES",
+            "asset_class": "FUTURES",
+            "resolution": "1s",
+            "required_fields": [
+              "ask_price",
+              "ask_size",
+              "bid_price",
+              "bid_size"
+            ],
+            "instruments": [
+              "MES"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": [
+              "contract_roll_method",
+              "sample_end_timestamp",
+              "sample_start_timestamp",
+              "trading_session_filter"
+            ],
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "directional_association_analysis",
+            "tool_kind": "STATISTICAL_ANALYSIS",
+            "legacy_tool_name": null,
+            "label": "Estimate and test the signed association between end-of-second level-1 order-book imbalance and next-second MES mid-price returns."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v2",
+        "compact_provenance": {
+          "response_id": "resp_019ab4fdedf83a4c016a88fea1a1dc87d087bc66c31aeda29d",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787362977.0,
+          "completed_at": 1787362981.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 1493,
+            "output_tokens": 301,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"For MES futures, a positive level-1 bid-ask displayed-size imbalance measured at the end of a 1-second interval predicts a positive mid-price return over the subsequent 1-second interval, while a negative imbalance predicts a negative return.\",\"hypothesis_rationale\":\"Displayed depth imbalance can reflect an asymmetry in immediately available liquidity and short-horizon order-flow pressure: relatively greater bid size may make upward price changes more likely as sell liquidity is absorbed, whereas relatively greater ask size may make downward price changes more likely. The hypothesis is falsified if the signed imbalance has no statistically distinguishable directional association with subsequent mid-price returns, or has the opposite association.\",\"data_requirements\":[{\"requirement_id\":\"mes_l1_quotes_1s\",\"data_kind\":\"QUOTES\",\"asset_class\":\"FUTURES\",\"resolution\":\"1s\",\"required_fields\":[\"bid_price\",\"ask_price\",\"bid_size\",\"ask_size\"],\"instruments\":[\"MES\"],\"point_in_time_required\":true,\"required_parameters\":[\"sample_start_timestamp\",\"sample_end_timestamp\",\"trading_session_filter\",\"contract_roll_method\"]}],\"tool_requirements\":[{\"requirement_id\":\"directional_association_analysis\",\"tool_kind\":\"STATISTICAL_ANALYSIS\",\"label\":\"Estimate and test the signed association between end-of-second level-1 order-book imbalance and next-second MES mid-price returns.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}

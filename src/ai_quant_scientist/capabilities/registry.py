@@ -181,6 +181,8 @@ class CapabilityRegistry:
                 )
 
         # Filter: required parameters
+        # DataRequirement.required_parameters names explicit input parameters that the
+        # supplying capability must support. It is not a free-form ResearchSpec design field.
         # Capability.supported_parameters=None means NOT DECLARED — fails a constrained requirement.
         if req.required_parameters is not None:
             req_params = set(req.required_parameters)

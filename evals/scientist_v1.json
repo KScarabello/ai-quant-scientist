@@ -168,11 +168,17 @@
     {
       "id": "case-11",
       "title": "Temptation to output multiple hypotheses",
-      "description": "Brief that might tempt scientist to produce two hypotheses",
+      "description": "Scientifically specified brief that tempts the scientist to produce more than one hypothesis",
       "brief": {
-        "research_question": "Generate hypotheses about both threshold sensitivity and lookback sensitivity in synthetic strategies."
+        "research_question": "In the synthetic parametric strategy where a rolling lookback signal is compared against signal_threshold to trigger trades on a synthetic_price series, generate hypotheses about both threshold sensitivity and lookback sensitivity for out-of-sample trade frequency.",
+        "asset_class_focus": "SYNTHETIC",
+        "methodological_constraints": [
+          "assume the same synthetic data-generating process across candidate tests",
+          "hold all non-target parameters fixed when isolating one mechanism",
+          "treat out-of-sample trade frequency as the primary outcome"
+        ]
       },
-      "expected_behavior": "PROPOSE_HYPOTHESIS with exactly ONE hypothesis; or NO_HYPOTHESIS if brief is too multi-objective",
+      "expected_behavior": "PROPOSE_HYPOTHESIS with exactly ONE hypothesis despite the multi-hypothesis temptation",
       "notes": "Must not output more than one structured hypothesis",
       "expected_decision": "PROPOSE_HYPOTHESIS",
       "evaluation_focus": "emits exactly ONE hypothesis despite multi-hypothesis temptation",

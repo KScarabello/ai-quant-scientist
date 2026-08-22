@@ -109,12 +109,13 @@ Important deterministic components:
 - `V0.9-V0.11`: truthful capability registry, deterministic feasibility gate, durable governed intake
 - `V0.12A`: bounded Hypothesis Scientist, eval harness, schema `v6` invocation persistence
 - `V0.12B`: hardened requirement contract between the Hypothesis Scientist and the CapabilityRegistry
+- `V0.12C`: deterministic requirement ontology projection, ontology provenance, and scientist eval repair
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
 ## Hypothesis Scientist
 
-`V0.12B` hardens the requirement language between stochastic proposal generation and deterministic feasibility governance.
+`V0.12B` and `V0.12C` harden the requirement language between stochastic proposal generation and deterministic feasibility governance.
 
 Current contract:
 - canonical `ToolKind`
@@ -124,9 +125,16 @@ Current contract:
 - primitive canonical `required_fields`
 - first-class `required_parameters`
 - bounded `PriorCandidateSummary`
+- deterministic AI-safe requirement ontology snapshot with version and fingerprint
+- ontology vocabulary is exposed to the scientist, but capability availability is withheld
 - historical legacy tool snapshots remain readable
 
-This keeps historical evidence readable while preventing new authoritative candidates from using ambiguous tool names or pseudo-fields.
+Semantic boundary:
+- `DataRequirement` means prerequisite input data needed before deterministic execution or analysis
+- generated outputs such as `execution_price`, `trade_count`, `net_pnl`, or Sharpe are not prerequisite input fields
+- `required_parameters` means explicit input parameters the supplying data or simulation capability must support, not arbitrary future `ResearchSpec` design
+
+This keeps historical evidence readable while preventing new authoritative candidates from using ambiguous tool names, pseudo-fields, or generated-output placeholders.
 
 Primary files:
 - `src/ai_quant_scientist/capabilities/models.py`
@@ -135,6 +143,7 @@ Primary files:
 - `src/ai_quant_scientist/models/hypothesis_scientist.py`
 - `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`
 - `src/ai_quant_scientist/services/hypothesis_prompts.py`
+- `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
 
 ## Research Critic
 
@@ -205,7 +214,7 @@ Primary file:
 
 Deterministic suite status:
 - `PYTHONPATH=src pytest -q`
-- current verified result: `393 passed`
+- current verified result: `405 passed`
 
 Research Critic eval support:
 - deterministic harness
@@ -215,6 +224,13 @@ Hypothesis Scientist eval support:
 - 12-case harness in `evals/scientist_v1.json`
 - guarded live runner requiring `--allow-live-api`
 - default invocation makes zero API calls
+- eval artifacts now record ontology version and ontology fingerprint alongside model, prompt version, and parsed output
+
+Recent `gpt-5.6-terra` + Prompt `v2` live findings that motivated `V0.12C`:
+- `case-06`: passed with canonical `QUOTES` fields and `STATISTICAL_ANALYSIS`
+- `case-07`: failed closed because `execution_price` was used like prerequisite input data
+- `case-10`: failed closed because `close` was used instead of the synthetic scalar price vocabulary, but the prior-candidate summary successfully induced novelty
+- `case-11`: returned structurally valid `NO_HYPOTHESIS`, indicating the old fixture mixed multiplicity temptation with underspecification
 
 Primary files:
 - `src/ai_quant_scientist/evals/critic_eval.py`
@@ -240,7 +256,7 @@ PYTHONPATH=src pytest -q
 - no production Spec Builder after `READY_FOR_SPEC`
 - no RAG or vector canonical memory
 - no fake real-market capabilities
-- no post-`V0.12B` live scientist rerun artifacts yet
+- no post-fix `V0.12C` live scientist rerun artifacts yet
 - plain `pytest` still requires `PYTHONPATH=src`
 
 ## Historical Integrity Note
@@ -250,4 +266,5 @@ Historical information and artifacts are retained in the repository, but they sh
 Examples:
 - pre-fix critic live eval artifacts that lacked full constraint plumbing
 - pre-`V0.12B` scientist live artifacts produced before canonical tool/data contract hardening
+- pre-`V0.12C` scientist `v2` artifacts that exposed ontology-projection gaps and the original case-11 fixture ambiguity
 - older milestone-era architecture notes preserved in git history rather than presented as current README state

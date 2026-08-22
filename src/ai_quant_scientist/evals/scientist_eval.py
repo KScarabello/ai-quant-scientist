@@ -59,6 +59,8 @@ def _serialise_decision_for_eval(decision) -> dict:
         "provider": decision.provider,
         "model": decision.model,
         "prompt_version": decision.prompt_version,
+        "ontology_version": decision.ontology_version,
+        "ontology_fingerprint": decision.ontology_fingerprint,
         "compact_provenance": compact_prov,
     }
 
@@ -85,6 +87,8 @@ class ScientistEvalResult:
     provider: str | None
     model: str | None
     prompt_version: str | None
+    ontology_version: str | None
+    ontology_fingerprint: str | None
     decision_type: str | None
     contract_passed: bool
     validation_errors: dict
@@ -157,6 +161,8 @@ class ScientistEvalSuite:
                     provider=getattr(scientist, "provider", None),
                     model=getattr(scientist, "model", None),
                     prompt_version=effective_prompt_version,
+                    ontology_version=decision.ontology_version,
+                    ontology_fingerprint=decision.ontology_fingerprint,
                     decision_type=decision.decision_type.value if decision.decision_type else None,
                     contract_passed=valid,
                     validation_errors=errors,
@@ -174,6 +180,8 @@ class ScientistEvalSuite:
                     provider=getattr(scientist, "provider", None),
                     model=getattr(scientist, "model", None),
                     prompt_version=effective_prompt_version,
+                    ontology_version=None,
+                    ontology_fingerprint=None,
                     decision_type=None,
                     contract_passed=False,
                     validation_errors={"infrastructure_error": str(exc)},

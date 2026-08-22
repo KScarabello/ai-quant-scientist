@@ -147,6 +147,8 @@ class HypothesisScientistDecision:
     provider: str | None = None
     model: str | None = None
     prompt_version: str | None = None
+    ontology_version: str | None = None
+    ontology_fingerprint: str | None = None
     raw_response: str | None = None
     created_at: datetime = field(default_factory=utcnow)
 
