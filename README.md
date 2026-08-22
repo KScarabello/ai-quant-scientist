@@ -255,7 +255,7 @@ SQLite persists authoritative history for:
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `494 passed`
+- result: `509 passed`
 
 Relevant scientist artifact note:
 

@@ -61,18 +61,24 @@ class _UnusedDesigner:
 def build_supported_supervised_cycle_brief() -> ResearchBrief:
     return ResearchBrief.create(
         research_question=(
-            "In a synthetic parametric trading environment, does making a signal threshold "
+            "For this bounded synthetic smoke test, does making a signal threshold "
             "stricter change trade frequency and risk-adjusted performance for the same "
-            "underlying strategy logic?"
+            "synthetic strategy logic when a synthetic-parametric dataset is treated as the "
+            "prerequisite input?"
         ),
         asset_class_focus="SYNTHETIC",
         methodological_constraints=[
-            "Keep the research bounded to synthetic parametric data and deterministic backtest execution.",
+            "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
+            "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+            "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
+            "Do not require a separate statistical-analysis tool for this bounded fixture.",
+            "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
             "Do not assume real market data or live trading capabilities.",
-            "Focus on a single falsifiable hypothesis that could be expressed as a parameter-sensitivity design.",
+            "Focus on a single falsifiable hypothesis that can be expressed as a parameter-sensitivity design without exact execution values.",
         ],
         exclusions=[
             "Do not propose exact execution parameter values.",
+            "Do not mention capability IDs.",
             "Do not assume autonomous execution approval.",
         ],
         source="live_supervised_cycle_v1",
@@ -458,12 +464,19 @@ def main(argv: List[str] | None = None) -> int:
     with open(out, "r", encoding="utf-8") as handle:
         artifact = json.load(handle)
     print(f"Wrote results to {out}")
-    print(
-        f"Prepared exact proposal_id: {artifact.get('materialization_proposal_id')}"
-    )
-    print(
-        "Stopped at AWAITING_HUMAN_ACCEPTANCE. Inspect that exact proposal before a separate acceptance/execution command."
-    )
+    outcome = artifact.get("preparation_outcome")
+    proposal_id = artifact.get("materialization_proposal_id")
+    message = artifact.get("preparation_message")
+    if outcome == "AWAITING_HUMAN_ACCEPTANCE":
+        print(f"Prepared exact proposal_id: {proposal_id}")
+        print(
+            "Stopped at AWAITING_HUMAN_ACCEPTANCE. Inspect that exact proposal before a separate acceptance/execution command."
+        )
+    else:
+        print(f"Preparation outcome: {outcome}")
+        if message:
+            print(f"Message: {message}")
+        print("No proposal exists to accept or execute.")
     return 0
 
 

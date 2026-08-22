@@ -55,6 +55,7 @@ from ai_quant_scientist.evals.run_live_supervised_cycle import (
     _build_acceptance_execution_artifact,
     _build_preparation_artifact,
     build_supported_supervised_cycle_brief,
+    main as live_cycle_main,
     run_live_supervised_cycle,
 )
 
@@ -480,6 +481,25 @@ def test_live_supervised_cycle_requires_allow_live_api():
         run_live_supervised_cycle(model="test", allow_live_api=False)
 
 
+def test_supported_live_fixture_constrains_v1_prerequisite_path():
+    brief = build_supported_supervised_cycle_brief()
+    text = " ".join(
+        [
+            brief.research_question,
+            *(brief.methodological_constraints or ()),
+            *(brief.exclusions or ()),
+        ]
+    )
+    assert "synthetic-parametric dataset as the prerequisite input" in text
+    assert "BACKTEST_EXECUTION" in text
+    assert "separate synthetic-data-generation tool" in text
+    assert "separate statistical-analysis tool" in text
+    assert "2.0" not in text
+    assert "2.5" not in text
+    assert "20" not in text
+    assert "stub_backtester_v1" not in text
+
+
 def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_path, monkeypatch):
     store = _store(tmp_path)
     scientist = _CountingScientist()
@@ -513,6 +533,17 @@ def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_p
         assert conn.execute("SELECT COUNT(*) FROM initial_experiment_plans").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM initial_experiment_plan_proposals").fetchone()[0] == 1
     assert payload["execution_records"] == []
+
+
+def test_supported_live_fixture_still_reaches_awaiting_human_acceptance_with_fake_path(tmp_path):
+    cycle = SupervisedResearchCycle(
+        store=_store(tmp_path),
+        registry=_registry(),
+        scientist=FakeHypothesisScientist(),
+        designer=FakeResearchDesigner(),
+    )
+    result = cycle.prepare(build_supported_supervised_cycle_brief())
+    assert result.status == SupervisedResearchCyclePreparationStatus.AWAITING_HUMAN_ACCEPTANCE
 
 
 def test_live_runner_acceptance_mode_uses_explicit_existing_proposal_and_zero_ai_calls(tmp_path, monkeypatch):
@@ -574,6 +605,93 @@ def test_live_runner_wrong_proposal_id_fails_closed(tmp_path):
             output_dir=str(tmp_path),
             db_path=str(store.db_path),
         )
+
+
+def test_live_runner_main_reports_blocked_capability_without_fake_proposal(tmp_path, monkeypatch, capsys):
+    artifact_path = tmp_path / "blocked.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "preparation_outcome": "BLOCKED_CAPABILITY",
+                "materialization_proposal_id": None,
+                "preparation_message": "Candidate feasibility gate returned BLOCKED_CAPABILITY.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "ai_quant_scientist.evals.run_live_supervised_cycle.run_live_supervised_cycle",
+        lambda **kwargs: str(artifact_path),
+    )
+
+    rc = live_cycle_main(["--model", "test-model", "--allow-live-api"])
+    output = capsys.readouterr().out
+
+    assert rc == 0
+    assert "Preparation outcome: BLOCKED_CAPABILITY" in output
+    assert "No proposal exists to accept or execute." in output
+    assert "Prepared exact proposal_id" not in output
+    assert "AWAITING_HUMAN_ACCEPTANCE" not in output
+
+
+def test_live_runner_main_reports_exact_awaiting_human_acceptance_proposal(tmp_path, monkeypatch, capsys):
+    artifact_path = tmp_path / "awaiting.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "preparation_outcome": "AWAITING_HUMAN_ACCEPTANCE",
+                "materialization_proposal_id": "proposal-123",
+                "preparation_message": "Preparation completed.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "ai_quant_scientist.evals.run_live_supervised_cycle.run_live_supervised_cycle",
+        lambda **kwargs: str(artifact_path),
+    )
+
+    rc = live_cycle_main(["--model", "test-model", "--allow-live-api"])
+    output = capsys.readouterr().out
+
+    assert rc == 0
+    assert "Prepared exact proposal_id: proposal-123" in output
+    assert "AWAITING_HUMAN_ACCEPTANCE" in output
+    assert "No proposal exists to accept or execute." not in output
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [
+        ("NO_HYPOTHESIS", "Brief is too vague."),
+        ("NO_VALID_DESIGN", "Candidate cannot be expressed as a bounded V1 design."),
+        ("MATERIALIZATION_INFEASIBLE", "Exact materialization feasibility did not pass."),
+    ],
+)
+def test_live_runner_main_reports_other_stop_states(tmp_path, monkeypatch, capsys, outcome, message):
+    artifact_path = tmp_path / f"{outcome}.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "preparation_outcome": outcome,
+                "materialization_proposal_id": None,
+                "preparation_message": message,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "ai_quant_scientist.evals.run_live_supervised_cycle.run_live_supervised_cycle",
+        lambda **kwargs: str(artifact_path),
+    )
+
+    rc = live_cycle_main(["--model", "test-model", "--allow-live-api"])
+    output = capsys.readouterr().out
+
+    assert rc == 0
+    assert f"Preparation outcome: {outcome}" in output
+    assert f"Message: {message}" in output
+    assert "Prepared exact proposal_id" not in output
 
 
 def test_live_runner_accepting_proposal_a_cannot_execute_proposal_b(tmp_path):
@@ -714,3 +832,7 @@ def test_schema_remains_v9(tmp_path):
     store = _store(tmp_path)
     with store.connect() as conn:
         assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 9
+
+
+def test_registry_truth_remains_unchanged():
+    assert build_v1_registry().fingerprint == "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53"

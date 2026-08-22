@@ -6,7 +6,7 @@
 - Working tree status: contains uncommitted `V0.14` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v9`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `494 passed`
+- Verified test count: `509 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -240,6 +240,10 @@ Evidence:
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365801.json`, `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
 - `case-11`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed the repaired multiplicity test by emitting exactly one bounded hypothesis.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365811.json`, `evals/scientist_v1.json`
+- First live `V0.14` preparation did not complete end-to-end: it stopped at `BLOCKED_CAPABILITY` before Research Designer invocation because the Hypothesis Scientist produced a scientifically reasonable threshold-sensitivity hypothesis that also requested separate `SYNTHETIC_DATA_GENERATION` and `STATISTICAL_ANALYSIS` tooling, which truthful production registry `v1` does not provide.
+  Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `src/ai_quant_scientist/capabilities/gate.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
+- That first live `V0.14` stop is governance success, not scientific rejection: no designer invocation occurred, no proposal was created, and the subsequent fixture narrowing was limited to the intentionally supported smoke-test brief without changing prompts, ontology, registry truth, or scientific policy.
+  Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -276,6 +280,8 @@ Status:
 - Connects `ResearchBrief` -> Hypothesis Scientist -> candidate feasibility -> Research Designer -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
 - Leaves `V0.13B` Research Designer V1 frozen and reuses the existing `SpecMaterializer` V2, acceptance semantics, and ordered executor unchanged
 - Live runner approval flow is now genuinely two-step: first prepare and inspect an exact persisted proposal ID, then explicitly accept and execute that same proposal ID in a later separate command with zero AI calls.
+- First real live preparation evidence on Saturday, August 22, 2026 stopped at `BLOCKED_CAPABILITY`; Research Designer was correctly never invoked and no proposal was created.
+- The intentionally supported smoke-test fixture is now narrower: it tells the Hypothesis Scientist to treat synthetic-parametric data as the prerequisite input for the fixture, avoid separate generation/statistical-analysis tool prerequisites, and use deterministic backtest outputs plus downstream deterministic contrast as the measurement path.
 - Persists Research Designer invocations, authoritative `ResearchDesignIntent`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, and deterministic contrast results
 - Requires explicit human acceptance before executing the whole precommitted plan
 - Preserves Hypothesis Scientist Prompt `v1` / `v2` / `v3`, requirement ontology `v1` / `v2`, Critic V3, `RevisionPlanner` V1, `SpecMaterializer` V2 behavior, and truthful sparse production capability reality

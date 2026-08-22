@@ -1,0 +1,66 @@
+{
+  "timestamp": 1787382433,
+  "mode": "prepare",
+  "models": {
+    "hypothesis_scientist": "gpt-5.6-terra",
+    "research_designer": "gpt-5.6-terra"
+  },
+  "prompt_versions": {
+    "hypothesis_scientist": "v3",
+    "research_designer": null
+  },
+  "brief": {
+    "id": "ae74eb18-2a87-4f55-aa6d-34591b1ea715",
+    "research_question": "In a synthetic parametric trading environment, does making a signal threshold stricter change trade frequency and risk-adjusted performance for the same underlying strategy logic?",
+    "asset_class_focus": "SYNTHETIC",
+    "instrument_focus": null,
+    "methodological_constraints": [
+      "Keep the research bounded to synthetic parametric data and deterministic backtest execution.",
+      "Do not assume real market data or live trading capabilities.",
+      "Focus on a single falsifiable hypothesis that could be expressed as a parameter-sensitivity design."
+    ],
+    "exclusions": [
+      "Do not propose exact execution parameter values.",
+      "Do not assume autonomous execution approval."
+    ],
+    "source": "live_supervised_cycle_v1"
+  },
+  "hypothesis_scientist_invocation_id": "afa7942a-ea5d-4d30-9b54-103a992e7430",
+  "hypothesis_decision": {
+    "decision_type": "PROPOSE_HYPOTHESIS",
+    "hypothesis_rationale": "A threshold filters weak signal realizations: tighter filtering should mechanically reduce qualifying entries, while its effect on risk-adjusted performance is ambiguous because selecting stronger signals may improve conditional return quality but reduce the number of independent opportunities and increase outcome concentration. This yields a falsifiable parameter-sensitivity relationship under controlled synthetic regimes.",
+    "hypothesis_statement": "In synthetic parametric price paths with a fixed signal-generation and strategy-logic family, increasing the signal-entry threshold reduces trade frequency and produces a non-monotonic change in risk-adjusted performance because stricter thresholds trade off improved signal selectivity against fewer diversification opportunities.",
+    "no_hypothesis_reason": null,
+    "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "ontology_version": "requirement_ontology_v2",
+    "requirements_snapshot": "[{\"asset_class\":\"SYNTHETIC\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"end_date\":null,\"instruments\":null,\"label\":\"\",\"point_in_time_required\":true,\"required_fields\":[\"regime_label\",\"signal_value\",\"synthetic_price\",\"synthetic_return\",\"timestamp\",\"volatility_regime_label\"],\"required_parameters\":null,\"requirement_id\":\"synthetic_parametric_paths\",\"resolution\":\"N/A\",\"start_date\":null,\"type\":\"DataRequirement\"},{\"label\":\"Generate controlled synthetic parametric paths with signals and regime labels.\",\"requirement_id\":\"synthetic_path_generation\",\"tool_kind\":\"SYNTHETIC_DATA_GENERATION\",\"type\":\"ToolRequirement\"},{\"label\":\"Run deterministic backtests for threshold-sensitivity evaluation under fixed strategy logic.\",\"requirement_id\":\"deterministic_strategy_backtest\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"type\":\"ToolRequirement\"},{\"label\":\"Evaluate the relationship between threshold, trade frequency, and risk-adjusted performance.\",\"requirement_id\":\"threshold_sensitivity_analysis\",\"tool_kind\":\"STATISTICAL_ANALYSIS\",\"type\":\"ToolRequirement\"}]"
+  },
+  "candidate_id": "e6a08355-1af3-40fa-8ac1-a467746e4984",
+  "candidate_feasibility_decision": {
+    "id": "4f5e56b9-71ae-495a-9f99-5494a6a93298",
+    "status": "BLOCKED_CAPABILITY",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53"
+  },
+  "research_designer_invocation_id": null,
+  "designer_decision": {},
+  "ontology_versions": {
+    "hypothesis_scientist": "requirement_ontology_v2",
+    "research_designer": null
+  },
+  "ontology_fingerprints": {
+    "hypothesis_scientist": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "research_designer": null
+  },
+  "research_design_intent_id": null,
+  "initial_experiment_plan_id": null,
+  "materialization_proposal_id": null,
+  "exact_materialized_conditions": [],
+  "preparation_outcome": "BLOCKED_CAPABILITY",
+  "preparation_message": "Candidate feasibility gate returned BLOCKED_CAPABILITY.",
+  "human_acceptance_occurred": false,
+  "execution_outcome": null,
+  "execution_message": null,
+  "execution_records": [],
+  "contrast_result": null
+}
