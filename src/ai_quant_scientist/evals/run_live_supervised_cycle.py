@@ -70,6 +70,9 @@ def build_supported_supervised_cycle_brief() -> ResearchBrief:
         methodological_constraints=[
             "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
             "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+            "Do not require particular primitive synthetic data fields at candidate-feasibility time.",
+            "Leave required_fields unset unless a primitive input field is strictly unavoidable for broad feasibility.",
+            "Do not assert required_parameters for this smoke test.",
             "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
             "Do not require a separate statistical-analysis tool for this bounded fixture.",
             "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
@@ -242,12 +245,7 @@ def _build_preparation_artifact(
         "hypothesis_decision": _parsed_json_object(hypothesis_invocation.parsed_decision_json),
         "candidate_id": None if candidate is None else candidate.id,
         "candidate_feasibility_decision": _json_safe(
-            {
-                "id": None if feasibility is None else feasibility.id,
-                "status": None if feasibility is None else feasibility.gate_decision.value,
-                "registry_version": None if feasibility is None else feasibility.registry_version,
-                "registry_fingerprint": None if feasibility is None else feasibility.registry_fingerprint,
-            }
+            _feasibility_summary(feasibility)
         ),
         "research_designer_invocation_id": None if designer_invocation is None else designer_invocation.id,
         "designer_decision": (
@@ -323,12 +321,7 @@ def _build_acceptance_execution_artifact(
         "research_designer_invocation_id": None if designer_invocation is None else designer_invocation.id,
         "candidate_id": candidate.id,
         "candidate_feasibility_decision": _json_safe(
-            {
-                "id": feasibility.id,
-                "status": feasibility.gate_decision.value,
-                "registry_version": feasibility.registry_version,
-                "registry_fingerprint": feasibility.registry_fingerprint,
-            }
+            _feasibility_summary(feasibility)
         ),
         "research_design_intent_id": design_intent.id,
         "initial_experiment_plan_id": plan.id,
@@ -421,6 +414,28 @@ def _require_present(value, message: str):
     if value is None:
         raise KeyError(message)
     return value
+
+
+def _feasibility_summary(feasibility) -> dict[str, Any]:
+    if feasibility is None:
+        return {
+            "id": None,
+            "status": None,
+            "registry_version": None,
+            "registry_fingerprint": None,
+            "satisfied_ids": [],
+            "unsatisfied_ids": [],
+            "reason_codes": [],
+        }
+    return {
+        "id": feasibility.id,
+        "status": feasibility.gate_decision.value,
+        "registry_version": feasibility.registry_version,
+        "registry_fingerprint": feasibility.registry_fingerprint,
+        "satisfied_ids": list(feasibility.satisfied_ids),
+        "unsatisfied_ids": list(feasibility.unsatisfied_ids),
+        "reason_codes": [code.value for code in feasibility.reason_codes],
+    }
 
 
 def main(argv: List[str] | None = None) -> int:

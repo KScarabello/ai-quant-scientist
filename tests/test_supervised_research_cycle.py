@@ -23,6 +23,7 @@ from ai_quant_scientist.capabilities.models import (
     AssetClass,
     DataKind,
     DataRequirement,
+    FeasibilityReasonCode,
     Resolution,
     ToolKind,
     ToolRequirement,
@@ -132,6 +133,48 @@ class _BlockedCapabilityScientist(FakeHypothesisScientist):
             research_brief_id=brief.id,
             hypothesis_statement="MES order-book imbalance predicts one-second futures returns.",
             hypothesis_rationale="Requires futures order-book data plus execution support.",
+            requirements_snapshot=requirements_to_json(requirements),
+            provider=self.provider,
+            model=self.model,
+            prompt_version=self.prompt_version,
+            ontology_version=ontology.version,
+            ontology_fingerprint=ontology.fingerprint,
+        )
+
+
+class _SyntheticFieldConstrainedScientist(FakeHypothesisScientist):
+    def __init__(self) -> None:
+        self.called = 0
+
+    def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
+        self.called += 1
+        ontology = build_requirement_ontology_snapshot()
+        requirements = (
+            DataRequirement(
+                requirement_id="synthetic_parametric_input",
+                data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+                asset_class=AssetClass.SYNTHETIC,
+                resolution=Resolution.NOT_APPLICABLE,
+                required_fields=("signal_value", "synthetic_price", "timestamp"),
+            ),
+            ToolRequirement(
+                requirement_id="deterministic_parameter_sensitivity_backtest",
+                tool_kind=ToolKind.BACKTEST_EXECUTION,
+            ),
+        )
+        return HypothesisScientistDecision(
+            id=new_id(),
+            decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+            research_brief_id=brief.id,
+            hypothesis_statement=(
+                "For identical synthetic strategy logic, a stricter signal threshold reduces "
+                "trade frequency and can improve risk-adjusted performance."
+            ),
+            hypothesis_rationale=(
+                "The bounded smoke test should stay at broad candidate feasibility, but this "
+                "fixture intentionally over-asserts primitive field prerequisites to verify "
+                "truthful fail-closed behavior."
+            ),
             requirements_snapshot=requirements_to_json(requirements),
             provider=self.provider,
             model=self.model,
@@ -494,10 +537,36 @@ def test_supported_live_fixture_constrains_v1_prerequisite_path():
     assert "BACKTEST_EXECUTION" in text
     assert "separate synthetic-data-generation tool" in text
     assert "separate statistical-analysis tool" in text
+    assert "Do not require particular primitive synthetic data fields" in text
+    assert "Leave required_fields unset" in text
+    assert "Do not assert required_parameters" in text
     assert "2.0" not in text
     assert "2.5" not in text
     assert "20" not in text
     assert "stub_backtester_v1" not in text
+
+
+def test_supported_fake_candidate_keeps_candidate_feasibility_broad(tmp_path):
+    store = _store(tmp_path)
+    cycle = SupervisedResearchCycle(
+        store=store,
+        registry=_registry(),
+        scientist=FakeHypothesisScientist(),
+        designer=FakeResearchDesigner(),
+    )
+
+    preparation = cycle.prepare(build_supported_supervised_cycle_brief())
+    candidate = store.get_research_candidate(preparation.candidate_id)
+
+    assert candidate is not None
+    data_requirements = [req for req in candidate.requirements if isinstance(req, DataRequirement)]
+    tool_requirements = [req for req in candidate.requirements if isinstance(req, ToolRequirement)]
+
+    assert len(data_requirements) == 1
+    assert data_requirements[0].data_kind == DataKind.SYNTHETIC_PARAMETRIC
+    assert data_requirements[0].required_fields is None
+    assert data_requirements[0].required_parameters is None
+    assert [req.tool_kind for req in tool_requirements] == [ToolKind.BACKTEST_EXECUTION]
 
 
 def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_path, monkeypatch):
@@ -544,6 +613,51 @@ def test_supported_live_fixture_still_reaches_awaiting_human_acceptance_with_fak
     )
     result = cycle.prepare(build_supported_supervised_cycle_brief())
     assert result.status == SupervisedResearchCyclePreparationStatus.AWAITING_HUMAN_ACCEPTANCE
+
+
+def test_explicit_synthetic_fields_still_fail_closed_and_artifact_reports_diagnostics(tmp_path):
+    store = _store(tmp_path)
+    cycle = SupervisedResearchCycle(
+        store=store,
+        registry=_registry(),
+        scientist=_SyntheticFieldConstrainedScientist(),
+        designer=FakeResearchDesigner(),
+    )
+
+    brief = build_supported_supervised_cycle_brief()
+    preparation = cycle.prepare(brief)
+    feasibility = store.get_feasibility_decision(preparation.candidate_feasibility_decision_id)
+    artifact = _build_preparation_artifact(
+        store=store,
+        model="test-model",
+        brief=brief,
+        preparation=preparation,
+    )
+
+    assert preparation.status == SupervisedResearchCyclePreparationStatus.BLOCKED_CAPABILITY
+    assert preparation.research_designer_invocation_id is None
+    assert feasibility is not None
+    assert feasibility.satisfied_ids == ("deterministic_parameter_sensitivity_backtest",)
+    assert feasibility.unsatisfied_ids == ("synthetic_parametric_input",)
+    assert feasibility.reason_codes == (FeasibilityReasonCode.REQUIRED_FIELD_MISSING,)
+    assert artifact["candidate_feasibility_decision"]["satisfied_ids"] == [
+        "deterministic_parameter_sensitivity_backtest"
+    ]
+    assert artifact["candidate_feasibility_decision"]["unsatisfied_ids"] == [
+        "synthetic_parametric_input"
+    ]
+    assert artifact["candidate_feasibility_decision"]["reason_codes"] == [
+        FeasibilityReasonCode.REQUIRED_FIELD_MISSING.value
+    ]
+
+
+def test_stub_registry_fields_remain_unbroadened_for_smoke_test():
+    stub = build_v1_registry().list_capabilities()[0]
+
+    assert "signal_value" not in stub.available_fields
+    assert "synthetic_price" not in stub.available_fields
+    assert "timestamp" not in stub.available_fields
+    assert set(stub.supported_parameters) == {"signal_threshold", "lookback"}
 
 
 def test_live_runner_acceptance_mode_uses_explicit_existing_proposal_and_zero_ai_calls(tmp_path, monkeypatch):

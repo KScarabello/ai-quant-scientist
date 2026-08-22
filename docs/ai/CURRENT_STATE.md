@@ -6,7 +6,7 @@
 - Working tree status: contains uncommitted `V0.14` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v9`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `509 passed`
+- Verified test count: `512 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -77,6 +77,8 @@ Governance keeps the scientist honest.
 - The prepare phase stops at `AWAITING_HUMAN_ACCEPTANCE`; acceptance and execution require a separate explicit action.
   Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/services/spec_materialization.py`
 - The guarded live runner now preserves the human-approval provenance boundary across commands: preparation prints and persists an exact proposal ID, and later acceptance/execution must supply that same exact proposal ID without making new AI calls.
+  Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
+- Live supervised-cycle artifacts now also record candidate-feasibility diagnostics (`satisfied_ids`, `unsatisfied_ids`, `reason_codes`) so blocked preparation runs remain auditably truthful without inferring nonexistent proposals or silently hiding the exact failure boundary.
   Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
 - No autonomous loop exists today.
   Evidence: `README.md`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
@@ -244,6 +246,10 @@ Evidence:
   Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `src/ai_quant_scientist/capabilities/gate.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
 - That first live `V0.14` stop is governance success, not scientific rejection: no designer invocation occurred, no proposal was created, and the subsequent fixture narrowing was limited to the intentionally supported smoke-test brief without changing prompts, ontology, registry truth, or scientific policy.
   Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
+- Second live `V0.14` preparation also stopped truthfully at `BLOCKED_CAPABILITY`, but the failure boundary moved: the Hypothesis Scientist now requested only broad `BACKTEST_EXECUTION` tooling while still asserting primitive synthetic `required_fields` (`signal_value`, `synthetic_price`, `timestamp`) that truthful production registry `v1` does not declare, so the deterministic gate recorded `satisfied_ids=['deterministic_parameter_sensitivity_backtest']`, `unsatisfied_ids=['synthetic_parametric_input']`, and `reason_codes=['REQUIRED_FIELD_MISSING']`.
+  Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787382814.json`, `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
+- The supported smoke-test fixture is now narrowed one step further at the candidate-feasibility boundary: it explicitly treats the synthetic-parametric dataset as the prerequisite input, forbids separate synthetic/statistical tools, forbids field-level `required_fields` assertions unless strictly unavoidable, and forbids `required_parameters`, while still requiring broad `BACKTEST_EXECUTION` and leaving exact field/spec compatibility for later deterministic stages.
+  Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `tests/test_supervised_research_cycle.py`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 

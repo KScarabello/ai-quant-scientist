@@ -1,0 +1,71 @@
+{
+  "timestamp": 1787382814,
+  "mode": "prepare",
+  "models": {
+    "hypothesis_scientist": "gpt-5.6-terra",
+    "research_designer": "gpt-5.6-terra"
+  },
+  "prompt_versions": {
+    "hypothesis_scientist": "v3",
+    "research_designer": null
+  },
+  "brief": {
+    "id": "c1b27ce3-17dd-46e7-a911-085f3a3a8905",
+    "research_question": "For this bounded synthetic smoke test, does making a signal threshold stricter change trade frequency and risk-adjusted performance for the same synthetic strategy logic when a synthetic-parametric dataset is treated as the prerequisite input?",
+    "asset_class_focus": "SYNTHETIC",
+    "instrument_focus": null,
+    "methodological_constraints": [
+      "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
+      "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+      "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
+      "Do not require a separate statistical-analysis tool for this bounded fixture.",
+      "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
+      "Do not assume real market data or live trading capabilities.",
+      "Focus on a single falsifiable hypothesis that can be expressed as a parameter-sensitivity design without exact execution values."
+    ],
+    "exclusions": [
+      "Do not propose exact execution parameter values.",
+      "Do not mention capability IDs.",
+      "Do not assume autonomous execution approval."
+    ],
+    "source": "live_supervised_cycle_v1"
+  },
+  "hypothesis_scientist_invocation_id": "79d21dbc-dd35-4906-808f-8bcfe7f8fff9",
+  "hypothesis_decision": {
+    "decision_type": "PROPOSE_HYPOTHESIS",
+    "hypothesis_rationale": "A threshold governs which signal observations trigger trades. Raising its strictness should admit fewer observations; if low-magnitude signals contain less information relative to noise, excluding them should improve the return variability trade-off. Deterministic backtest outputs and their deterministic contrast across threshold settings can falsify either predicted direction.",
+    "hypothesis_statement": "For identical synthetic strategy logic on a synthetic-parametric dataset, a stricter signal threshold will reduce trade frequency and increase risk-adjusted performance by filtering weaker, noisier signal realizations.",
+    "no_hypothesis_reason": null,
+    "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "ontology_version": "requirement_ontology_v2",
+    "requirements_snapshot": "[{\"asset_class\":\"SYNTHETIC\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"end_date\":null,\"instruments\":null,\"label\":\"\",\"point_in_time_required\":true,\"required_fields\":[\"signal_value\",\"synthetic_price\",\"timestamp\"],\"required_parameters\":null,\"requirement_id\":\"synthetic_parametric_input\",\"resolution\":\"N/A\",\"start_date\":null,\"type\":\"DataRequirement\"},{\"label\":\"Deterministic backtest execution and downstream deterministic contrast calculation\",\"requirement_id\":\"deterministic_parameter_sensitivity_backtest\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"type\":\"ToolRequirement\"}]"
+  },
+  "candidate_id": "2b32c24d-3364-41c8-9f2f-eed677bbd62d",
+  "candidate_feasibility_decision": {
+    "id": "4ab03759-894c-4083-b371-be6b751eef58",
+    "status": "BLOCKED_CAPABILITY",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53"
+  },
+  "research_designer_invocation_id": null,
+  "designer_decision": {},
+  "ontology_versions": {
+    "hypothesis_scientist": "requirement_ontology_v2",
+    "research_designer": null
+  },
+  "ontology_fingerprints": {
+    "hypothesis_scientist": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "research_designer": null
+  },
+  "research_design_intent_id": null,
+  "initial_experiment_plan_id": null,
+  "materialization_proposal_id": null,
+  "exact_materialized_conditions": [],
+  "preparation_outcome": "BLOCKED_CAPABILITY",
+  "preparation_message": "Candidate feasibility gate returned BLOCKED_CAPABILITY.",
+  "human_acceptance_occurred": false,
+  "execution_outcome": null,
+  "execution_message": null,
+  "execution_records": [],
+  "contrast_result": null
+}
