@@ -2462,6 +2462,54 @@ class SQLiteStore:
                 ),
             )
 
+    def get_research_designer_invocation(self, invocation_id: str) -> ResearchDesignerInvocation | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_designer_invocations WHERE id = ?",
+                (invocation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchDesignerInvocation(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            candidate_snapshot_json=row["candidate_snapshot_json"],
+            candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+            prompt_version=row["prompt_version"],
+            ontology_version=row["ontology_version"],
+            ontology_fingerprint=row["ontology_fingerprint"],
+            intent_contract_version=row["intent_contract_version"],
+            provider=row["provider"],
+            model=row["model"],
+            raw_response=row["raw_response"],
+            parsed_decision_json=row["parsed_decision_json"],
+            validation_status=row["validation_status"],
+            validation_errors_json=row["validation_errors_json"],
+            resulting_design_intent_id=row["resulting_design_intent_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def find_research_designer_invocation_by_resulting_design_intent_id(
+        self,
+        design_intent_id: str,
+    ) -> ResearchDesignerInvocation | None:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id FROM research_designer_invocations
+                WHERE resulting_design_intent_id = ?
+                ORDER BY created_at, rowid
+                """,
+                (design_intent_id,),
+            ).fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise RuntimeError(
+                f"Expected exactly one ResearchDesignerInvocation for design_intent_id={design_intent_id!r}"
+            )
+        return self.get_research_designer_invocation(rows[0]["id"])
+
     def get_research_designer_invocations(self, candidate_id: str) -> list[ResearchDesignerInvocation]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -2509,6 +2557,49 @@ class SQLiteStore:
                     inv.created_at.isoformat(),
                 ),
             )
+
+    def get_hypothesis_scientist_invocation(self, invocation_id: str):
+        from ..models.hypothesis_scientist import HypothesisScientistInvocation
+
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM hypothesis_scientist_invocations WHERE id = ?",
+                (invocation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return HypothesisScientistInvocation(
+            id=row["id"],
+            research_brief_id=row["research_brief_id"],
+            research_brief_snapshot=row["research_brief_snapshot"],
+            prompt_version=row["prompt_version"],
+            provider=row["provider"],
+            model=row["model"],
+            raw_response=row["raw_response"],
+            parsed_decision_json=row["parsed_decision_json"],
+            validation_status=row["validation_status"],
+            validation_errors_json=row["validation_errors_json"],
+            resulting_candidate_id=row["resulting_candidate_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def find_hypothesis_scientist_invocation_by_resulting_candidate_id(self, candidate_id: str):
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id FROM hypothesis_scientist_invocations
+                WHERE resulting_candidate_id = ?
+                ORDER BY created_at, rowid
+                """,
+                (candidate_id,),
+            ).fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise RuntimeError(
+                f"Expected exactly one HypothesisScientistInvocation for candidate_id={candidate_id!r}"
+            )
+        return self.get_hypothesis_scientist_invocation(rows[0]["id"])
 
     def get_hypothesis_scientist_invocations(self, brief_id: str) -> list:
         """Return all scientist invocations for a brief, oldest first."""

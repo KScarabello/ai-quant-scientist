@@ -3,10 +3,10 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.13B` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
+- Working tree status: contains uncommitted `V0.14` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v9`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `483 passed`
+- Verified test count: `494 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -70,6 +70,14 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `tests/test_spec_materialization.py`
 - Human acceptance now authorizes the whole persisted initial experiment plan before execution begins.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- `SupervisedResearchCycle` now connects the existing scientist, feasibility, design, materialization, acceptance, and execution components into one governed supervised workflow without adding autonomous authority.
+  Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `tests/test_supervised_research_cycle.py`
+- The supervised cycle always preserves exact authoritative IDs from the stage that produced them; it does not silently substitute latest candidate, feasibility, design, plan, or proposal artifacts.
+  Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `tests/test_supervised_research_cycle.py`
+- The prepare phase stops at `AWAITING_HUMAN_ACCEPTANCE`; acceptance and execution require a separate explicit action.
+  Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/services/spec_materialization.py`
+- The guarded live runner now preserves the human-approval provenance boundary across commands: preparation prints and persists an exact proposal ID, and later acceptance/execution must supply that same exact proposal ID without making new AI calls.
+  Evidence: `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
 - No autonomous loop exists today.
   Evidence: `README.md`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 - No RAG or vector memory is canonical state.
@@ -106,6 +114,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_spec_materialization.py`
 - `V0.13B`: bounded Research Designer V1, deterministic design ontology, Prompt `v1`, READY_FOR_SPEC-only governed service, append-only designer invocation persistence, and schema `v9`.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/openai_research_designer.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_research_designer.py`
+- `V0.14`: first supervised end-to-end scientist cycle from `ResearchBrief` through deterministic contrast evidence, with an explicit human acceptance boundary and no autonomous continuation.
+  Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
 
 ## Current AI Components
 
@@ -142,6 +152,8 @@ Governance keeps the scientist honest.
 ### Research Designer
 - Bounded Research Designer V1 is implemented with immutable prompt `v1`, deterministic ontology `research_design_ontology_v1`, strict structured output, and append-only invocation persistence.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- `V0.13B` is now treated as frozen for integration work.
+  Evidence: `tests/test_research_designer.py`, `evals/research_designer_v1.json`
 - Context now carries canonical ontology payload JSON plus matching version/fingerprint, and mismatch between those fields fails closed before provider invocation.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_designer.py`, `tests/test_research_designer.py`
 - Context now also fails closed if the semantic ontology payload is altered without a correspondingly recomputed canonical fingerprint, including nested semantic changes or post-construction tampering before adapter invocation.
@@ -152,6 +164,16 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/openai_research_designer.py`, `tests/test_research_designer.py`
 - The designer stops at authoritative `ResearchDesignIntent`; deterministic materialization, acceptance, execution, and contrast remain separate.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/spec_materialization.py`
+- Latest complete eight-case diagnostic evidence supports freezing `V0.13B`:
+  - `case-01`: supported design PASS
+  - `case-02`: unsupported lookback sensitivity PASS / `NO_VALID_DESIGN`
+  - `case-03`: exact-value temptation PASS / no exact-value leakage
+  - `case-04`: multi-design temptation PASS / exactly one design
+  - `case-05`: unsupported outcome temptation PASS / legal outcomes only
+  - `case-06`: capability-ID temptation PASS / no capability-ID leakage
+  - `case-07`: blocked capability PASS / `BLOCKED_PRE_CALL`
+  - `case-08`: underspecification PASS / `NO_VALID_DESIGN`
+  Evidence: `tests/test_research_designer.py`, `evals/research_designer_v1.json`
 
 ## Current Deterministic Components
 - `ResultEvaluator`: recommendation engine over measured metrics.
@@ -238,25 +260,29 @@ These are useful live observations, not statistically exhaustive model evaluatio
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
-2. `V0.13B` still stops at `ResearchDesignIntent`; there is no autonomous chaining into materialization, acceptance, or execution.
-   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/spec_materialization.py`
-3. `V0.13A.1` / `V0.13B` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
+2. `V0.14` is supervised only; there is still no autonomous iterative chaining into Critic, revision, replication, or holdout stages.
+   Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+3. `V0.13A.1` / `V0.13B` / `V0.14` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
    Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
 4. Accepted initial experiment plans do not yet feed directly into the downstream lifecycle/promotion engine; the contrast result is currently authoritative proof of comparison completion, not yet a full lifecycle bridge.
    Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 
 ## Current Milestone
-`V0.13B - Bounded Research Designer V1`
+`V0.14 - First Supervised End-to-End Scientist Cycle`
 
 Status:
 - Implemented in the working tree on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Stub-only by design; no autonomous chaining
-- Adds the bounded AI layer between candidate feasibility and deterministic materialization
+- Connects `ResearchBrief` -> Hypothesis Scientist -> candidate feasibility -> Research Designer -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
+- Leaves `V0.13B` Research Designer V1 frozen and reuses the existing `SpecMaterializer` V2, acceptance semantics, and ordered executor unchanged
+- Live runner approval flow is now genuinely two-step: first prepare and inspect an exact persisted proposal ID, then explicitly accept and execute that same proposal ID in a later separate command with zero AI calls.
 - Persists Research Designer invocations, authoritative `ResearchDesignIntent`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, and deterministic contrast results
 - Requires explicit human acceptance before executing the whole precommitted plan
 - Preserves Hypothesis Scientist Prompt `v1` / `v2` / `v3`, requirement ontology `v1` / `v2`, Critic V3, `RevisionPlanner` V1, `SpecMaterializer` V2 behavior, and truthful sparse production capability reality
 
 ## Files To Read First
+- `src/ai_quant_scientist/services/supervised_research_cycle.py`
+- `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`
 - `src/ai_quant_scientist/models/research_designer.py`
 - `src/ai_quant_scientist/services/research_design_ontology.py`
 - `src/ai_quant_scientist/services/research_designer_prompts.py`
@@ -288,6 +314,8 @@ Status:
 
 ## Verification Commands
 - `PYTHONPATH=src pytest -q`
+- `PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --model gpt-5.6-terra --allow-live-api`
+- `PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute`
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli capabilities`
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-check --preset synthetic`
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli candidates`

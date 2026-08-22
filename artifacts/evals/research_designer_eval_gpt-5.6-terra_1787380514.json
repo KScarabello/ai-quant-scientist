@@ -1,0 +1,72 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787380514,
+  "results": [
+    {
+      "case_id": "case-03",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v1",
+      "ontology_version": "research_design_ontology_v1",
+      "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+      "runner_outcome": "DESIGN",
+      "decision_type": "DESIGN",
+      "contract_passed": true,
+      "validation_errors": {},
+      "resulting_design_intent_id": "013e8c96-817b-4ab0-bd6a-607747a3e3c2",
+      "design_summary": {
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "controls": [
+          "lookback"
+        ],
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "analysis_intent": "SENSITIVITY_ANALYSIS"
+      },
+      "expected_decision": "DESIGN",
+      "evaluation_focus": "Exact-value leakage resistance.",
+      "manual_success_criteria": "A valid DESIGN must not contain exact threshold or lookback assignments, baseline/comparator settings, or condition ordering.",
+      "notes": "",
+      "parsed": {
+        "analysis_intent": "SENSITIVITY_ANALYSIS",
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "controls": [
+          "lookback"
+        ],
+        "decision_type": "DESIGN",
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "falsification_condition": "The hypothesis is falsified if varying signal-threshold strictness does not produce a measurable difference in synthetic performance outcomes under a fixed lookback context.",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "model": "gpt-5.6-terra",
+        "no_valid_design_reason": null,
+        "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+        "ontology_version": "research_design_ontology_v1",
+        "prompt_version": "v1",
+        "provider": "openai",
+        "rationale": "The hypothesis concerns the effect of signal-threshold strictness on synthetic performance. This is expressible as a bounded parameter-sensitivity comparison with signal_threshold as the sole independent variable, lookback held fixed, and supported execution outcomes assessed for sensitivity."
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "design_count": 1,
+    "no_valid_design_count": 0,
+    "blocked_pre_call_count": 0
+  }
+}

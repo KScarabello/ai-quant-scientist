@@ -44,6 +44,21 @@ Research Designer path after explicit `READY_FOR_SPEC` authorization:
 -> authoritative `ResearchDesignIntent`
 -> stop
 
+Supervised end-to-end cycle:
+
+`ResearchBrief`
+-> `HypothesisScientist`
+-> `ResearchCandidate`
+-> `GovernedResearchIntake`
+-> explicit candidate-feasibility authorization
+-> `ResearchDesigner`
+-> authoritative `ResearchDesignIntent`
+-> deterministic `SpecMaterializer` V2
+-> `InitialExperimentPlan`
+-> explicit human acceptance of the whole plan
+-> deterministic ordered execution of `BASELINE` then `COMPARATOR`
+-> deterministic parameter-sensitivity contrast result
+
 Deterministic contrast-plan path after `ResearchDesignIntent`:
 
 `ResearchDesignIntent`
@@ -113,7 +128,7 @@ Current boundary:
 - runs only after an explicit `READY_FOR_SPEC` authorization
 - receives a deterministic AI-safe design ontology snapshot with version and fingerprint
 - persists every invocation
-- stops at `ResearchDesignIntent`
+- stops at `ResearchDesignIntent`; only the separate supervised cycle may pass that exact intent into deterministic materialization
 
 ### Research Critic
 
@@ -142,6 +157,7 @@ Core invariants:
 - Exact reproducibility-critical values come from deterministic policy, not AI-authored intent.
 - Planned comparison conditions are precommitted before execution.
 - Human acceptance authorizes the whole precommitted plan.
+- The supervised cycle stops at plan preparation unless a separate explicit acceptance action executes the exact persisted proposal.
 - Lifecycle promotion remains downstream and separate from condition sequencing.
 - `falsification_condition` is retained as non-authoritative scientific prose and is not parsed into governance thresholds.
 
@@ -158,6 +174,7 @@ Core invariants:
 - `V0.13A`: supervised `ResearchDesignIntent`, deterministic stub-only exact feasibility, durable materialization proposals, and explicit human acceptance
 - `V0.13A.1`: deterministic contrast plan, precommitted baseline/comparator execution, append-only acceptance-time revalidation, restart-safe condition execution records, deterministic contrast result, and semantic closure for `PARAMETER_SENSITIVITY`
 - `V0.13B`: bounded Research Designer V1, deterministic design ontology, prompt V1, governed READY_FOR_SPEC-only design service, append-only invocation persistence, and schema `v9`
+- `V0.14`: first supervised end-to-end scientist cycle connecting brief -> hypothesis -> candidate feasibility -> design -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -208,6 +225,11 @@ There are now three relevant deterministic layers:
 - condition feasibility: exact stub payload support for each precommitted condition
 - plan execution: deterministic ordered execution and comparison of all required conditions
 
+There is now one supervised orchestration layer:
+
+- `SupervisedResearchCycle.prepare(...)`: bounded AI generation and deterministic plan preparation, stopping at `AWAITING_HUMAN_ACCEPTANCE`
+- `SupervisedResearchCycle.accept_and_execute(...)`: separate explicit human-governed acceptance plus deterministic execution of the exact previously prepared persisted plan
+
 ## Persistence
 
 Current schema version: `v9`
@@ -233,7 +255,7 @@ SQLite persists authoritative history for:
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `469 passed`
+- result: `494 passed`
 
 Relevant scientist artifact note:
 
@@ -248,15 +270,23 @@ PYTHONPATH=src python3 -m ai_quant_scientist.cli capabilities
 PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-check --preset synthetic
 PYTHONPATH=src python3 -m ai_quant_scientist.cli candidates
 PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_id>
+PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --model gpt-5.6-terra --allow-live-api
+PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated Research Designer CLI yet. The governed service API and eval harness are the supported V0.13B interfaces.
+There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.14 interfaces.
+
+Live supervised cycle workflow:
+
+1. Run preparation once and note the printed `proposal_id`.
+2. Inspect that exact persisted proposal and plan.
+3. Execute only with `--proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute`.
 
 ## Current Limitations / Future Work
 
 - no autonomous loop
-- no autonomous chaining from Research Designer into materialization, acceptance, or execution
+- no autonomous iterative chaining from contrast results into Critic, revision, replication, or holdout
 - no generalized multi-capability exact materializer
 - no generalized multi-condition experiment DSL
 - no RAG or vector canonical memory

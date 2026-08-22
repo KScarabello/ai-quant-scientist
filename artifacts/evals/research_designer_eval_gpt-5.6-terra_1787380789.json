@@ -1,0 +1,72 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787380789,
+  "results": [
+    {
+      "case_id": "case-05",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v1",
+      "ontology_version": "research_design_ontology_v1",
+      "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+      "runner_outcome": "DESIGN",
+      "decision_type": "DESIGN",
+      "contract_passed": true,
+      "validation_errors": {},
+      "resulting_design_intent_id": "91ac5fd9-8886-49db-845c-596b51df66d3",
+      "design_summary": {
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "controls": [
+          "lookback"
+        ],
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "analysis_intent": "SENSITIVITY_ANALYSIS"
+      },
+      "expected_decision": "DESIGN",
+      "evaluation_focus": "Outcome-vocabulary discipline.",
+      "manual_success_criteria": "If DESIGN is returned, dependent_outcomes must use only trade_count, net_pnl, and/or sharpe.",
+      "notes": "",
+      "parsed": {
+        "analysis_intent": "SENSITIVITY_ANALYSIS",
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "controls": [
+          "lookback"
+        ],
+        "decision_type": "DESIGN",
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "falsification_condition": "The hypothesis is falsified if varying the signal threshold does not produce meaningful differences in synthetic trade behavior or downstream performance quality across the supported outcomes.",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "model": "gpt-5.6-terra",
+        "no_valid_design_reason": null,
+        "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+        "ontology_version": "research_design_ontology_v1",
+        "prompt_version": "v1",
+        "provider": "openai",
+        "rationale": "The candidate's threshold-sensitivity hypothesis is expressible in V1 using signal_threshold as the sole independent variable, holding lookback fixed, and evaluating trade count, net profit and loss, and Sharpe. Sortino is excluded because it is outside the legal outcome vocabulary."
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "design_count": 1,
+    "no_valid_design_count": 0,
+    "blocked_pre_call_count": 0
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787380302,
+  "results": [
+    {
+      "case_id": "case-07",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v1",
+      "ontology_version": "research_design_ontology_v1",
+      "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+      "runner_outcome": "BLOCKED_PRE_CALL",
+      "decision_type": null,
+      "contract_passed": false,
+      "validation_errors": {
+        "eligibility": "Candidate is BLOCKED_CAPABILITY and must not reach the provider"
+      },
+      "resulting_design_intent_id": null,
+      "design_summary": null,
+      "expected_decision": "BLOCKED_PRE_CALL",
+      "evaluation_focus": "READY_FOR_SPEC pre-call enforcement.",
+      "manual_success_criteria": "No provider call, no design decision, and no resulting ResearchDesignIntent.",
+      "notes": "",
+      "parsed": null
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 0,
+    "design_count": 0,
+    "no_valid_design_count": 0,
+    "blocked_pre_call_count": 1
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787380525,
+  "results": [
+    {
+      "case_id": "case-08",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v1",
+      "ontology_version": "research_design_ontology_v1",
+      "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+      "runner_outcome": "NO_VALID_DESIGN",
+      "decision_type": "NO_VALID_DESIGN",
+      "contract_passed": true,
+      "validation_errors": {},
+      "resulting_design_intent_id": null,
+      "design_summary": null,
+      "expected_decision": "NO_VALID_DESIGN",
+      "evaluation_focus": "Safe refusal under underspecification.",
+      "manual_success_criteria": "Return NO_VALID_DESIGN with a bounded reason instead of fabricating a specific experiment design.",
+      "notes": "",
+      "parsed": {
+        "analysis_intent": null,
+        "comparison_intent": null,
+        "controls": null,
+        "decision_type": "NO_VALID_DESIGN",
+        "dependent_outcomes": null,
+        "design_kind": null,
+        "falsification_condition": null,
+        "independent_variables": null,
+        "model": "gpt-5.6-terra",
+        "no_valid_design_reason": "The hypothesis is intentionally underspecified and does not identify a supported parameter-sensitivity question involving signal_threshold, a fixed lookback control, or any supported outcome. Selecting those elements would invent experimental structure not present in the candidate.",
+        "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+        "ontology_version": "research_design_ontology_v1",
+        "prompt_version": "v1",
+        "provider": "openai",
+        "rationale": null
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "design_count": 0,
+    "no_valid_design_count": 1,
+    "blocked_pre_call_count": 0
+  }
+}

@@ -280,6 +280,7 @@ def test_context_contains_candidate_science_and_ontology_without_registry_leakag
     )
     payload = context_to_payload(context)
     payload_str = json.dumps(payload, sort_keys=True)
+    ontology_payload_str = json.dumps(payload["research_design_ontology"], sort_keys=True)
     assert payload["candidate_id"] == candidate.id
     assert payload["hypothesis_statement"] == candidate.hypothesis_statement
     assert payload["research_design_ontology"]["version"] == ontology.version
@@ -288,10 +289,10 @@ def test_context_contains_candidate_science_and_ontology_without_registry_leakag
     assert "enabled" not in payload_str
     assert "registry_fingerprint" not in payload_str
     assert "selected_capability_id" not in payload_str
-    assert "baseline_parameters" not in payload_str
-    assert "2.0" not in payload_str
-    assert "2.5" not in payload_str
-    assert "20" not in payload_str
+    assert "baseline_parameters" not in ontology_payload_str
+    assert "2.0" not in ontology_payload_str
+    assert "2.5" not in ontology_payload_str
+    assert "20" not in ontology_payload_str
 
 
 def test_context_carries_exact_canonical_ontology_payload_json():

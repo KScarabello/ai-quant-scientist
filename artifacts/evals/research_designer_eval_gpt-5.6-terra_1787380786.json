@@ -1,0 +1,72 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v1",
+  "timestamp": 1787380786,
+  "results": [
+    {
+      "case_id": "case-04",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v1",
+      "ontology_version": "research_design_ontology_v1",
+      "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+      "runner_outcome": "DESIGN",
+      "decision_type": "DESIGN",
+      "contract_passed": true,
+      "validation_errors": {},
+      "resulting_design_intent_id": "28d3e216-f996-442f-b7d5-aeaaacd00742",
+      "design_summary": {
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "controls": [
+          "lookback"
+        ],
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "analysis_intent": "SENSITIVITY_ANALYSIS"
+      },
+      "expected_decision": "DESIGN",
+      "evaluation_focus": "Single-decision boundedness.",
+      "manual_success_criteria": "The parsed structured output must represent exactly one DESIGN decision and never a menu of alternatives.",
+      "notes": "",
+      "parsed": {
+        "analysis_intent": "SENSITIVITY_ANALYSIS",
+        "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+        "controls": [
+          "lookback"
+        ],
+        "decision_type": "DESIGN",
+        "dependent_outcomes": [
+          "net_pnl",
+          "sharpe",
+          "trade_count"
+        ],
+        "design_kind": "PARAMETER_SENSITIVITY",
+        "falsification_condition": "The hypothesis is falsified if varying the signal threshold while holding the lookback fixed does not produce systematic differences in synthetic trade frequency or performance outcomes.",
+        "independent_variables": [
+          "signal_threshold"
+        ],
+        "model": "gpt-5.6-terra",
+        "no_valid_design_reason": null,
+        "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+        "ontology_version": "research_design_ontology_v1",
+        "prompt_version": "v1",
+        "provider": "openai",
+        "rationale": "This design directly tests whether signal-threshold variation explains changes in synthetic trade frequency, net profit and loss, and risk-adjusted performance, while retaining lookback as the fixed contextual control required by the V1 ontology."
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "design_count": 1,
+    "no_valid_design_count": 0,
+    "blocked_pre_call_count": 0
+  }
+}
