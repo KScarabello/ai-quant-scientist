@@ -3,10 +3,10 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.12D` implementation changes plus a canonical-field validator precedence fix verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
-- Schema version: `v6`
+- Working tree status: contains uncommitted `V0.13A.1` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
+- Schema version: `v8`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `419 passed`
+- Verified test count: `441 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -20,8 +20,8 @@ Software measures reality.
 Governance keeps the scientist honest.
 
 ## Architectural Invariants
-- Frozen `ResearchSpec`s are immutable and must be frozen before execution.
-  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+- Frozen `ResearchSpec`s must be frozen before execution; new `V0.13A.1` experiment-plan artifacts are deeply frozen in memory.
+  Evidence: `src/ai_quant_scientist/models/research.py`, `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 - SQLite is canonical scientific history.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Lifecycle transitions are governed by explicit policy.
@@ -44,12 +44,20 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `src/ai_quant_scientist/capabilities/intake.py`
 - `ResearchCandidate`s and feasibility histories are durable and append-only in practice.
   Evidence: `src/ai_quant_scientist/capabilities/intake.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- `ResearchDesignIntent`s, initial experiment plans, exact condition-feasibility decisions, plan proposals, condition execution records, and contrast results are durable and append-only in practice.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
 - Hypothesis Scientist may originate exactly one bounded hypothesis or return `NO_HYPOTHESIS`.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - Hypothesis Scientist cannot declare feasibility, construct a `ResearchSpec`, or start research.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - `READY_FOR_SPEC` means broad prerequisites are satisfied so deterministic design may begin; it does not authorize execution.
   Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `src/ai_quant_scientist/capabilities/intake.py`
+- Exact reproducibility-critical condition values and comparison sequencing come from deterministic policy, not AI-authored intent.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
+- Planned comparison conditions are precommitted before execution and are not revisions.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `tests/test_spec_materialization.py`
+- Human acceptance now authorizes the whole persisted initial experiment plan before execution begins.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
 - No autonomous loop exists today.
   Evidence: `README.md`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 - No RAG or vector memory is canonical state.
@@ -80,6 +88,10 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/scientist_requirement_ontology.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `evals/scientist_v1.json`
 - `V0.12D`: candidate-feasibility / future spec-feasibility boundary and AI candidate contract cleanup.
   Evidence: `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `evals/scientist_v1.json`
+- `V0.13A`: supervised `ResearchDesignIntent`, deterministic stub-only `SpecMaterializer`, exact stub-only spec feasibility, durable materialization proposals, and explicit human acceptance before the first executable spec.
+  Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_spec_materialization.py`
+- `V0.13A.1`: deterministic contrast-plan semantic closure for `PARAMETER_SENSITIVITY`, append-only fresh acceptance revalidation, ordered condition execution, deterministic contrast result persistence, and schema `v8`.
+  Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_spec_materialization.py`
 
 ## Current AI Components
 
@@ -106,12 +118,18 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/capabilities/gate.py`
 - `DataRequirement.required_parameters` remains readable and matchable for historical/manual paths but is no longer part of the new AI-authored candidate contract.
   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/registry.py`
-- Invocation persistence remains schema `v6`.
+- Invocation persistence now lives inside overall schema `v8`.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Eval harness remains `12` cases in `evals/scientist_v1.json`.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `evals/scientist_v1.json`
 - Observability now includes exact requirement objects, canonical `tool_kind`, ontology provenance, prompt provenance, and human-only eval metadata separation; historical/manual `required_parameters` remain observable when present.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `tests/test_hypothesis_scientist.py`
+
+### Research Designer
+- No Research Designer AI is implemented yet.
+  Evidence: no `openai_research_designer.py`, prompt, eval harness, or live runner exists in `src/ai_quant_scientist/services/` or `src/ai_quant_scientist/evals/`
+- `V0.13A.1` closes the deterministic semantic gap for the future bounded Research Designer, but `ResearchDesignIntent` is currently manual/supervised only.
+  Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`
 
 ## Current Deterministic Components
 - `ResultEvaluator`: recommendation engine over measured metrics.
@@ -126,7 +144,15 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/gate.py`
 - `GovernedResearchIntake`: durable candidate persistence plus append-only feasibility history.
   Evidence: `src/ai_quant_scientist/capabilities/intake.py`, `tests/test_research_intake.py`
-- SQLite schema/persistence: runs, specs, evaluations, critic invocations, candidates, feasibility decisions, scientist invocations.
+- `SpecMaterializer` V2: deterministic stub-only mapping from bounded design intent to a complete precommitted contrast plan.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
+- `SpecFeasibility` V1: deterministic exact stub-only per-condition compatibility validation at materialization and again at acceptance.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
+- `InitialExperimentExecutor`: deterministic ordered execution of accepted baseline/comparator conditions plus restart-safe completion semantics.
+  Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
+- Deterministic contrast result: persisted baseline/comparator outcome deltas proving that the declared comparison actually occurred.
+  Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- SQLite schema/persistence: runs, specs, evaluations, critic invocations, candidates, feasibility decisions, scientist invocations, design intents, historical single-spec materialization records, initial experiment plans, ordered conditions, condition executions, and deterministic contrast results.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 
 ## Current Production Capabilities
@@ -158,6 +184,8 @@ Evidence:
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364150.json`, `evals/scientist_v1.json`
 - `case-06`: latest available post-`V0.12D` Terra Prompt `v3` artifact produced an otherwise appropriate ORDER_BOOK requirement, but exposed a deterministic validator precedence bug because canonical `exchange_or_venue` was rejected by the generic `_or_` heuristic before canonical membership was honored.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`, `src/ai_quant_scientist/capabilities/models.py`
+- `case-06`: the clean post-validator-fix Terra Prompt `v3` / ontology `v2` rerun exists and structurally passed with `contract_passed=true` and `validation_errors={}`.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787366543.json`
 - `case-07`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed requirement completeness, including broad `BACKTEST_EXECUTION`.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365790.json`, `evals/scientist_v1.json`
 - `case-10`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed for ontology projection plus novelty behavior, with the same derived-field caveat around `one_step_forward_change`.
@@ -184,39 +212,27 @@ These are useful live observations, not statistically exhaustive model evaluatio
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
-2. `READY_FOR_SPEC` still stops before a production Spec Builder.
-   Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
-3. Exact frozen-spec feasibility and implementation validation still do not exist.
-   Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
-4. One narrow deterministic validator bug remained after the first Prompt `v3` rerun: canonical-field membership did not take precedence over the generic pseudo-field heuristic.
-   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`
-5. Post-fix validation rerun for `case-06` has not yet been produced after the canonical-field precedence fix.
-   Evidence: `src/ai_quant_scientist/evals/run_live_scientist_eval.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`
+2. No Research Designer AI exists yet; `ResearchDesignIntent` is still manual/supervised only.
+   Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/spec_materialization.py`
+3. `V0.13A.1` remains synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
+   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
+4. Accepted initial experiment plans do not yet feed directly into the downstream lifecycle/promotion engine; the contrast result is currently authoritative proof of comparison completion, not yet a full lifecycle bridge.
+   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 
 ## Current Milestone
-`V0.12D - Candidate Feasibility / Spec Feasibility Boundary`
+`V0.13A.1 - Deterministic Contrast Plan + Semantic Closure`
 
 Status:
 - Implemented in the working tree on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
-- Not prompt-science tuning
-- Cleans the AI-authored candidate contract so it stays broad and pre-spec
-- Preserves historical/manual `required_parameters` behavior without reinterpreting old evidence
-- Not yet complete from a live-evidence standpoint until post-fix diagnostics are rerun
-
-## Exact V0.12D Goals
-- Distinguish broad candidate feasibility from future exact spec feasibility
-- Remove `required_parameters` from the new AI-authored scientist contract
-- Preserve historical/manual `required_parameters` behavior and persisted evidence exactly
-- Keep candidate-stage `ToolRequirement` coarse
-- Clarify that `READY_FOR_SPEC` means permission to proceed to deterministic design, not execution
-- Repair `case-11` with a fully specified multiplicity-only synthetic brief
-- Record `case-07` manual completeness expectations without leaking eval metadata into model input
-- Preserve live-tested ontology/prompt history without silent rewrites
-- Production registry remains truthful
-- Preserve Prompt `v1` and Prompt `v2` exactly
-- No live API calls during implementation
+- Stub-only by design; no Research Designer AI
+- Adds a deterministic and persistent path after `READY_FOR_SPEC`
+- Persists `ResearchDesignIntent`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, and deterministic contrast results
+- Requires explicit human acceptance before executing the whole precommitted plan
+- Preserves Prompt `v1` / `v2` / `v3`, ontology `v1` / `v2`, Critic V3, `RevisionPlanner` V1, and truthful sparse production capability reality
 
 ## Files To Read First
+- `src/ai_quant_scientist/models/design.py`
+- `src/ai_quant_scientist/services/spec_materialization.py`
 - `src/ai_quant_scientist/capabilities/models.py`
 - `src/ai_quant_scientist/capabilities/registry.py`
 - `src/ai_quant_scientist/capabilities/serialization.py`
@@ -233,6 +249,7 @@ Status:
 - `tests/test_hypothesis_scientist.py`
 - `tests/test_capabilities.py`
 - `tests/test_research_intake.py`
+- `tests/test_spec_materialization.py`
 
 ## Verification Commands
 - `PYTHONPATH=src pytest -q`
@@ -240,9 +257,10 @@ Status:
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-check --preset synthetic`
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli candidates`
 - `PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_id>`
+- `PYTHONPATH=src pytest -q tests/test_spec_materialization.py`
 
 ## Exact Next Task
-Run a small post-fix live scientist eval rerun under prompt `v3`, starting with `case-07`, `case-10`, and `case-11`, plus `case-06` as a regression check, then compare those artifacts against the pre-`V0.12D` Prompt `v2` diagnostics.
+Design the smallest safe bounded Research Designer V1 that emits `ResearchDesignIntent` without gaining authority over exact reproducibility-critical values, then validate that interface against the `V0.13A.1` deterministic contrast-plan path before any live API work.
 
 ## Stop Conditions / Do Not Do
 - No live API calls

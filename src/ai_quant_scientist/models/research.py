@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +19,24 @@ def utcnow() -> datetime:
 
 def new_id() -> str:
     return str(uuid4())
+
+
+def freeze_json_value(value: Any) -> Any:
+    """Recursively freeze JSON-like structures for authoritative records."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): freeze_json_value(item) for key, item in value.items()})
+    if isinstance(value, list | tuple):
+        return tuple(freeze_json_value(item) for item in value)
+    return value
+
+
+def thaw_json_value(value: Any) -> Any:
+    """Recursively thaw immutable JSON-like structures for persistence."""
+    if isinstance(value, Mapping):
+        return {str(key): thaw_json_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [thaw_json_value(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +57,10 @@ class ResearchSpec:
     parameters: dict[str, Any]
     parent_spec_id: str | None = None
     revision_proposal_id: str | None = None
+    design_intent_id: str | None = None
+    spec_materialization_proposal_id: str | None = None
+    selected_capability_id: str | None = None
+    materializer_version: str | None = None
     created_at: datetime = field(default_factory=utcnow)
     frozen_at: datetime | None = field(default_factory=utcnow)
     is_frozen: bool = True
@@ -122,7 +146,7 @@ def record_to_state(record: Any) -> dict[str, Any]:
             return value.value
         if isinstance(value, datetime):
             return value.isoformat()
-        if isinstance(value, dict):
+        if isinstance(value, Mapping):
             return {key: convert(item) for key, item in value.items()}
         if isinstance(value, (list, tuple)):
             return [convert(item) for item in value]

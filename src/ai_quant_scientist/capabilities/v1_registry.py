@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from .models import AssetClass, Capability, DataKind, Resolution, ToolKind
 from .registry import CapabilityRegistry
+from ..tools.stub_execution_contract import supported_parameter_names
 
 _CAPABILITIES: list[Capability] = [
     Capability(
@@ -31,7 +32,7 @@ _CAPABILITIES: list[Capability] = [
         coverage_end=None,
         point_in_time=False,
         # The two parameters this tool's research specs must have
-        supported_parameters=("signal_threshold", "lookback"),
+        supported_parameters=supported_parameter_names(),
         supported_tool_kinds=(ToolKind.BACKTEST_EXECUTION,),
         provider="StubBacktester",
         enabled=True,

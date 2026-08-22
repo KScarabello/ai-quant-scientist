@@ -19,13 +19,41 @@ from ..models.research import (
     ResearchRun,
     ResearchSpec,
     SpecRevisionProposal,
+    freeze_json_value,
+    record_to_state,
+    thaw_json_value,
 )
 from ..models.research import new_id
 from ..models.enums import ResearchAction, SpecRevisionProposalStatus
 from ..models.critic import CriticInvocation, CriticDecision
+from ..models.design import (
+    AnalysisIntent,
+    ComparisonIntent,
+    DesignOutcome,
+    DesignVariable,
+    ConditionExecutionRecord,
+    ConditionExecutionStatus,
+    ExperimentCondition,
+    ExperimentConditionRole,
+    InitialExperimentCompletionRule,
+    InitialExperimentPlan,
+    InitialExperimentPlanProposal,
+    InitialExperimentPlanProposalStatus,
+    OutcomeContrast,
+    ParameterSensitivityContrastResult,
+    ResearchDesignIntent,
+    ResearchDesignKind,
+    SpecFeasibilityDecision,
+    SpecFeasibilityPhase,
+    SpecFeasibilityReasonCode,
+    SpecFeasibilityStatus,
+    SpecMaterializationProposal,
+    SpecMaterializationProposalStatus,
+    thaw_mapping,
+)
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 8
 
 
 class SQLiteStore:
@@ -86,6 +114,10 @@ class SQLiteStore:
                     hypothesis_id TEXT NOT NULL,
                     parent_spec_id TEXT,
                     revision_proposal_id TEXT,
+                    design_intent_id TEXT,
+                    spec_materialization_proposal_id TEXT,
+                    selected_capability_id TEXT,
+                    materializer_version TEXT,
                     parameters_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     frozen_at TEXT,
@@ -212,6 +244,147 @@ class SQLiteStore:
                     validation_errors_json TEXT,
                     resulting_candidate_id TEXT,
                     created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS research_design_intents (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    design_kind TEXT NOT NULL,
+                    independent_variables_json TEXT NOT NULL,
+                    dependent_outcomes_json TEXT NOT NULL,
+                    controls_json TEXT NOT NULL,
+                    comparison_intent TEXT NOT NULL,
+                    analysis_intent TEXT NOT NULL,
+                    falsification_condition TEXT NOT NULL,
+                    rationale TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    provider TEXT,
+                    model TEXT,
+                    prompt_version TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                );
+                CREATE TABLE IF NOT EXISTS spec_feasibility_decisions (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL,
+                    selected_capability_id TEXT NOT NULL,
+                    plan_id TEXT,
+                    condition_id TEXT,
+                    phase TEXT NOT NULL DEFAULT 'MATERIALIZATION',
+                    status TEXT NOT NULL,
+                    reason_codes_json TEXT NOT NULL,
+                    proposed_parameters_json TEXT NOT NULL,
+                    validation_notes TEXT NOT NULL,
+                    spec_feasibility_version TEXT NOT NULL,
+                    registry_version TEXT NOT NULL,
+                    registry_fingerprint TEXT NOT NULL,
+                    materializer_version TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id)
+                );
+                CREATE TABLE IF NOT EXISTS spec_materialization_proposals (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL,
+                    candidate_feasibility_decision_id TEXT NOT NULL,
+                    selected_capability_id TEXT NOT NULL,
+                    proposed_parameters_json TEXT NOT NULL,
+                    materializer_version TEXT NOT NULL,
+                    materialization_policy_version TEXT NOT NULL,
+                    materialization_policy_fingerprint TEXT NOT NULL,
+                    materialization_trace_json TEXT NOT NULL,
+                    spec_feasibility_decision_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    accepted_spec_id TEXT,
+                    resulting_research_run_id TEXT,
+                    created_at TEXT NOT NULL,
+                    decided_at TEXT,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                    FOREIGN KEY (spec_feasibility_decision_id) REFERENCES spec_feasibility_decisions(id)
+                );
+                CREATE TABLE IF NOT EXISTS initial_experiment_plans (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL,
+                    candidate_feasibility_decision_id TEXT NOT NULL,
+                    selected_capability_id TEXT NOT NULL,
+                    design_kind TEXT NOT NULL,
+                    independent_variable TEXT NOT NULL,
+                    control_variables_json TEXT NOT NULL,
+                    dependent_outcomes_json TEXT NOT NULL,
+                    ordered_condition_ids_json TEXT NOT NULL,
+                    completion_rule TEXT NOT NULL,
+                    materializer_version TEXT NOT NULL,
+                    materialization_policy_version TEXT NOT NULL,
+                    materialization_policy_fingerprint TEXT NOT NULL,
+                    registry_version TEXT NOT NULL,
+                    registry_fingerprint TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id)
+                );
+                CREATE TABLE IF NOT EXISTS initial_experiment_conditions (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    exact_parameters_json TEXT NOT NULL,
+                    selected_capability_id TEXT NOT NULL,
+                    expected_tool_kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(plan_id, ordinal),
+                    FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id)
+                );
+                CREATE TABLE IF NOT EXISTS initial_experiment_plan_proposals (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL UNIQUE,
+                    candidate_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL,
+                    candidate_feasibility_decision_id TEXT NOT NULL,
+                    materialization_feasibility_decision_ids_json TEXT NOT NULL,
+                    materialization_trace_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    contrast_result_id TEXT,
+                    created_at TEXT NOT NULL,
+                    decided_at TEXT,
+                    accepted_at TEXT,
+                    completed_at TEXT,
+                    FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id)
+                );
+                CREATE TABLE IF NOT EXISTS condition_execution_records (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    condition_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    selected_capability_id TEXT NOT NULL,
+                    exact_parameters_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    experiment_result_id TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    metrics_json TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    passed INTEGER NOT NULL,
+                    executed_at TEXT NOT NULL,
+                    UNIQUE(plan_id, condition_id),
+                    FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
+                    FOREIGN KEY (condition_id) REFERENCES initial_experiment_conditions(id)
+                );
+                CREATE TABLE IF NOT EXISTS parameter_sensitivity_contrast_results (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL UNIQUE,
+                    independent_variable TEXT NOT NULL,
+                    baseline_condition_id TEXT NOT NULL,
+                    comparator_condition_id TEXT NOT NULL,
+                    baseline_parameter_value REAL NOT NULL,
+                    comparator_parameter_value REAL NOT NULL,
+                    outcomes_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
+                    FOREIGN KEY (baseline_condition_id) REFERENCES initial_experiment_conditions(id),
+                    FOREIGN KEY (comparator_condition_id) REFERENCES initial_experiment_conditions(id)
                 );
                 """
             )
@@ -340,12 +513,181 @@ class SQLiteStore:
                         );
                         """
                     )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (6,))
+                elif v == 6:
+                    # migrate v6 -> v7: add supervised design/materialization persistence
+                    for column_name in (
+                        "design_intent_id",
+                        "spec_materialization_proposal_id",
+                        "selected_capability_id",
+                        "materializer_version",
+                    ):
+                        if not column_exists(connection, "research_specs", column_name):
+                            connection.execute(
+                                f"ALTER TABLE research_specs ADD COLUMN {column_name} TEXT"
+                            )
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_design_intents (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            design_kind TEXT NOT NULL,
+                            independent_variables_json TEXT NOT NULL,
+                            dependent_outcomes_json TEXT NOT NULL,
+                            controls_json TEXT NOT NULL,
+                            comparison_intent TEXT NOT NULL,
+                            analysis_intent TEXT NOT NULL,
+                            falsification_condition TEXT NOT NULL,
+                            rationale TEXT NOT NULL,
+                            source TEXT NOT NULL,
+                            provider TEXT,
+                            model TEXT,
+                            prompt_version TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS spec_feasibility_decisions (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL,
+                            selected_capability_id TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            reason_codes_json TEXT NOT NULL,
+                            proposed_parameters_json TEXT NOT NULL,
+                            validation_notes TEXT NOT NULL,
+                            spec_feasibility_version TEXT NOT NULL,
+                            registry_version TEXT NOT NULL,
+                            registry_fingerprint TEXT NOT NULL,
+                            materializer_version TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS spec_materialization_proposals (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL,
+                            candidate_feasibility_decision_id TEXT NOT NULL,
+                            selected_capability_id TEXT NOT NULL,
+                            proposed_parameters_json TEXT NOT NULL,
+                            materializer_version TEXT NOT NULL,
+                            materialization_policy_version TEXT NOT NULL,
+                            materialization_policy_fingerprint TEXT NOT NULL,
+                            materialization_trace_json TEXT NOT NULL,
+                            spec_feasibility_decision_id TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            accepted_spec_id TEXT,
+                            resulting_research_run_id TEXT,
+                            created_at TEXT NOT NULL,
+                            decided_at TEXT,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                            FOREIGN KEY (spec_feasibility_decision_id) REFERENCES spec_feasibility_decisions(id)
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (7,))
+                elif v == 7:
+                    if not column_exists(connection, "spec_feasibility_decisions", "plan_id"):
+                        connection.execute("ALTER TABLE spec_feasibility_decisions ADD COLUMN plan_id TEXT")
+                    if not column_exists(connection, "spec_feasibility_decisions", "condition_id"):
+                        connection.execute("ALTER TABLE spec_feasibility_decisions ADD COLUMN condition_id TEXT")
+                    if not column_exists(connection, "spec_feasibility_decisions", "phase"):
+                        connection.execute(
+                            "ALTER TABLE spec_feasibility_decisions ADD COLUMN phase TEXT NOT NULL DEFAULT 'MATERIALIZATION'"
+                        )
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS initial_experiment_plans (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL,
+                            candidate_feasibility_decision_id TEXT NOT NULL,
+                            selected_capability_id TEXT NOT NULL,
+                            design_kind TEXT NOT NULL,
+                            independent_variable TEXT NOT NULL,
+                            control_variables_json TEXT NOT NULL,
+                            dependent_outcomes_json TEXT NOT NULL,
+                            ordered_condition_ids_json TEXT NOT NULL,
+                            completion_rule TEXT NOT NULL,
+                            materializer_version TEXT NOT NULL,
+                            materialization_policy_version TEXT NOT NULL,
+                            materialization_policy_fingerprint TEXT NOT NULL,
+                            registry_version TEXT NOT NULL,
+                            registry_fingerprint TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS initial_experiment_conditions (
+                            id TEXT PRIMARY KEY,
+                            plan_id TEXT NOT NULL,
+                            ordinal INTEGER NOT NULL,
+                            role TEXT NOT NULL,
+                            exact_parameters_json TEXT NOT NULL,
+                            selected_capability_id TEXT NOT NULL,
+                            expected_tool_kind TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            UNIQUE(plan_id, ordinal),
+                            FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS initial_experiment_plan_proposals (
+                            id TEXT PRIMARY KEY,
+                            plan_id TEXT NOT NULL UNIQUE,
+                            candidate_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL,
+                            candidate_feasibility_decision_id TEXT NOT NULL,
+                            materialization_feasibility_decision_ids_json TEXT NOT NULL,
+                            materialization_trace_json TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            contrast_result_id TEXT,
+                            created_at TEXT NOT NULL,
+                            decided_at TEXT,
+                            accepted_at TEXT,
+                            completed_at TEXT,
+                            FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS condition_execution_records (
+                            id TEXT PRIMARY KEY,
+                            plan_id TEXT NOT NULL,
+                            condition_id TEXT NOT NULL,
+                            ordinal INTEGER NOT NULL,
+                            role TEXT NOT NULL,
+                            selected_capability_id TEXT NOT NULL,
+                            exact_parameters_json TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            experiment_result_id TEXT NOT NULL,
+                            tool_name TEXT NOT NULL,
+                            metrics_json TEXT NOT NULL,
+                            summary TEXT NOT NULL,
+                            passed INTEGER NOT NULL,
+                            executed_at TEXT NOT NULL,
+                            UNIQUE(plan_id, condition_id),
+                            FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
+                            FOREIGN KEY (condition_id) REFERENCES initial_experiment_conditions(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS parameter_sensitivity_contrast_results (
+                            id TEXT PRIMARY KEY,
+                            plan_id TEXT NOT NULL UNIQUE,
+                            independent_variable TEXT NOT NULL,
+                            baseline_condition_id TEXT NOT NULL,
+                            comparator_condition_id TEXT NOT NULL,
+                            baseline_parameter_value REAL NOT NULL,
+                            comparator_parameter_value REAL NOT NULL,
+                            outcomes_json TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
+                            FOREIGN KEY (baseline_condition_id) REFERENCES initial_experiment_conditions(id),
+                            FOREIGN KEY (comparator_condition_id) REFERENCES initial_experiment_conditions(id)
+                        );
+                        """
+                    )
                     connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
                 else:
                     raise RuntimeError(f"Unsupported schema version {v}")
 
     def _dumps(self, value: Any) -> str:
-        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+        return json.dumps(thaw_json_value(value), sort_keys=True, separators=(",", ":"))
 
     def _loads(self, value: str | None) -> Any:
         return None if value is None else json.loads(value)
@@ -369,9 +711,10 @@ class SQLiteStore:
         connection.execute(
             """
             INSERT INTO research_specs (
-                id, research_run_id, version, hypothesis_id, parent_spec_id, revision_proposal_id, parameters_json,
-                created_at, frozen_at, is_frozen
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, research_run_id, version, hypothesis_id, parent_spec_id, revision_proposal_id,
+                design_intent_id, spec_materialization_proposal_id, selected_capability_id, materializer_version,
+                parameters_json, created_at, frozen_at, is_frozen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 spec.id,
@@ -380,6 +723,10 @@ class SQLiteStore:
                 spec.hypothesis_id,
                 spec.parent_spec_id,
                 spec.revision_proposal_id,
+                spec.design_intent_id,
+                spec.spec_materialization_proposal_id,
+                spec.selected_capability_id,
+                spec.materializer_version,
                 self._dumps(spec.parameters),
                 spec.created_at.isoformat(),
                 None if spec.frozen_at is None else spec.frozen_at.isoformat(),
@@ -747,6 +1094,7 @@ class SQLiteStore:
             row = connection.execute("SELECT * FROM research_specs WHERE id = ?", (spec_id,)).fetchone()
         if row is None:
             return None
+        row_keys = set(row.keys())
         return ResearchSpec(
             id=row["id"],
             research_run_id=row["research_run_id"],
@@ -754,6 +1102,18 @@ class SQLiteStore:
             hypothesis_id=row["hypothesis_id"],
             parent_spec_id=row["parent_spec_id"],
             revision_proposal_id=row["revision_proposal_id"],
+            design_intent_id=row["design_intent_id"] if "design_intent_id" in row_keys else None,
+            spec_materialization_proposal_id=(
+                row["spec_materialization_proposal_id"]
+                if "spec_materialization_proposal_id" in row_keys
+                else None
+            ),
+            selected_capability_id=(
+                row["selected_capability_id"] if "selected_capability_id" in row_keys else None
+            ),
+            materializer_version=(
+                row["materializer_version"] if "materializer_version" in row_keys else None
+            ),
             parameters=self._loads(row["parameters_json"]),
             created_at=datetime.fromisoformat(row["created_at"]),
             frozen_at=None if row["frozen_at"] is None else datetime.fromisoformat(row["frozen_at"]),
@@ -837,9 +1197,10 @@ class SQLiteStore:
             connection.execute(
                 """
                 INSERT INTO research_specs (
-                    id, research_run_id, version, hypothesis_id, parent_spec_id, revision_proposal_id, parameters_json,
-                    created_at, frozen_at, is_frozen
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, research_run_id, version, hypothesis_id, parent_spec_id, revision_proposal_id,
+                    design_intent_id, spec_materialization_proposal_id, selected_capability_id, materializer_version,
+                    parameters_json, created_at, frozen_at, is_frozen
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     new_spec_id,
@@ -848,6 +1209,10 @@ class SQLiteStore:
                     parent["hypothesis_id"],
                     proposal.parent_spec_id,
                     proposal.id,
+                    parent["design_intent_id"] if "design_intent_id" in parent.keys() else None,
+                    parent["spec_materialization_proposal_id"] if "spec_materialization_proposal_id" in parent.keys() else None,
+                    parent["selected_capability_id"] if "selected_capability_id" in parent.keys() else None,
+                    parent["materializer_version"] if "materializer_version" in parent.keys() else None,
                     self._dumps(proposal.proposed_parameters),
                     proposal.created_at.isoformat(),
                     proposal.created_at.isoformat(),
@@ -1121,6 +1486,862 @@ class SQLiteStore:
                 evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
             ))
         return result
+
+    def get_feasibility_decision_by_id(self, decision_id: str):
+        from ..capabilities.gate import GateDecision
+        from ..capabilities.models import FeasibilityReasonCode
+        from ..capabilities.intake import StoredFeasibilityDecision
+        import json as _json
+
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM feasibility_decisions WHERE id = ?",
+                (decision_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return StoredFeasibilityDecision(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            gate_decision=GateDecision[row["gate_decision"]],
+            gate_version=row["gate_version"],
+            registry_version=row["registry_version"],
+            registry_fingerprint=row["registry_fingerprint"],
+            satisfied_ids=tuple(_json.loads(row["satisfied_ids_json"])),
+            unsatisfied_ids=tuple(_json.loads(row["unsatisfied_ids_json"])),
+            reason_codes=tuple(
+                FeasibilityReasonCode[item] for item in _json.loads(row["reason_codes_json"])
+            ),
+            feasibility_snapshot=_json.loads(row["feasibility_result_json"]),
+            evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
+        )
+
+    def get_latest_feasibility_decision(self, candidate_id: str):
+        decisions = self.get_feasibility_decisions(candidate_id)
+        return decisions[-1] if decisions else None
+
+    # ─── Research design intents ──────────────────────────────────────────────
+
+    def save_research_design_intent(self, design_intent: ResearchDesignIntent) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO research_design_intents
+                   (id, candidate_id, design_kind, independent_variables_json,
+                    dependent_outcomes_json, controls_json, comparison_intent,
+                    analysis_intent, falsification_condition, rationale, source,
+                    provider, model, prompt_version, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    design_intent.id,
+                    design_intent.candidate_id,
+                    design_intent.design_kind.value,
+                    self._dumps([item.value for item in design_intent.independent_variables]),
+                    self._dumps([item.value for item in design_intent.dependent_outcomes]),
+                    self._dumps([item.value for item in design_intent.controls]),
+                    design_intent.comparison_intent.value,
+                    design_intent.analysis_intent.value,
+                    design_intent.falsification_condition,
+                    design_intent.rationale,
+                    design_intent.source,
+                    design_intent.provider,
+                    design_intent.model,
+                    design_intent.prompt_version,
+                    design_intent.created_at.isoformat(),
+                ),
+            )
+
+    def get_research_design_intent(self, design_intent_id: str) -> ResearchDesignIntent | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_design_intents WHERE id = ?",
+                (design_intent_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchDesignIntent(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            design_kind=ResearchDesignKind(row["design_kind"]),
+            independent_variables=tuple(
+                DesignVariable(item) for item in self._loads(row["independent_variables_json"])
+            ),
+            dependent_outcomes=tuple(
+                DesignOutcome(item) for item in self._loads(row["dependent_outcomes_json"])
+            ),
+            controls=tuple(DesignVariable(item) for item in self._loads(row["controls_json"])),
+            comparison_intent=ComparisonIntent(row["comparison_intent"]),
+            analysis_intent=AnalysisIntent(row["analysis_intent"]),
+            falsification_condition=row["falsification_condition"],
+            rationale=row["rationale"],
+            source=row["source"],
+            provider=row["provider"],
+            model=row["model"],
+            prompt_version=row["prompt_version"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def list_research_design_intents(self, candidate_id: str | None = None) -> list[ResearchDesignIntent]:
+        with self.connect() as conn:
+            if candidate_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM research_design_intents ORDER BY created_at, rowid"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM research_design_intents WHERE candidate_id = ? ORDER BY created_at, rowid",
+                    (candidate_id,),
+                ).fetchall()
+        return [
+            ResearchDesignIntent(
+                id=row["id"],
+                candidate_id=row["candidate_id"],
+                design_kind=ResearchDesignKind(row["design_kind"]),
+                independent_variables=tuple(
+                    DesignVariable(item) for item in self._loads(row["independent_variables_json"])
+                ),
+                dependent_outcomes=tuple(
+                    DesignOutcome(item) for item in self._loads(row["dependent_outcomes_json"])
+                ),
+                controls=tuple(DesignVariable(item) for item in self._loads(row["controls_json"])),
+                comparison_intent=ComparisonIntent(row["comparison_intent"]),
+                analysis_intent=AnalysisIntent(row["analysis_intent"]),
+                falsification_condition=row["falsification_condition"],
+                rationale=row["rationale"],
+                source=row["source"],
+                provider=row["provider"],
+                model=row["model"],
+                prompt_version=row["prompt_version"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in rows
+        ]
+
+    # ─── Exact spec feasibility ───────────────────────────────────────────────
+
+    def save_spec_feasibility_decision(self, decision: SpecFeasibilityDecision) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO spec_feasibility_decisions
+                   (id, candidate_id, design_intent_id, selected_capability_id,
+                    plan_id, condition_id, phase,
+                    status, reason_codes_json, proposed_parameters_json,
+                    validation_notes, spec_feasibility_version, registry_version,
+                    registry_fingerprint, materializer_version, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    decision.id,
+                    decision.candidate_id,
+                    decision.design_intent_id,
+                    decision.selected_capability_id,
+                    decision.plan_id,
+                    decision.condition_id,
+                    decision.phase.value,
+                    decision.status.value,
+                    self._dumps([item.value for item in decision.reason_codes]),
+                    self._dumps(decision.proposed_parameters),
+                    decision.validation_notes,
+                    decision.spec_feasibility_version,
+                    decision.registry_version,
+                    decision.registry_fingerprint,
+                    decision.materializer_version,
+                    decision.created_at.isoformat(),
+                ),
+            )
+
+    def get_spec_feasibility_decision(self, decision_id: str) -> SpecFeasibilityDecision | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM spec_feasibility_decisions WHERE id = ?",
+                (decision_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return SpecFeasibilityDecision(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            design_intent_id=row["design_intent_id"],
+            selected_capability_id=row["selected_capability_id"],
+            status=SpecFeasibilityStatus(row["status"]),
+            reason_codes=tuple(
+                SpecFeasibilityReasonCode(item)
+                for item in self._loads(row["reason_codes_json"])
+            ),
+            proposed_parameters=self._loads(row["proposed_parameters_json"]),
+            validation_notes=row["validation_notes"],
+            spec_feasibility_version=row["spec_feasibility_version"],
+            registry_version=row["registry_version"],
+            registry_fingerprint=row["registry_fingerprint"],
+            materializer_version=row["materializer_version"],
+            plan_id=row["plan_id"] if "plan_id" in row.keys() else None,
+            condition_id=row["condition_id"] if "condition_id" in row.keys() else None,
+            phase=SpecFeasibilityPhase(
+                row["phase"] if "phase" in row.keys() and row["phase"] is not None else "MATERIALIZATION"
+            ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def list_spec_feasibility_decisions(self, candidate_id: str | None = None) -> list[SpecFeasibilityDecision]:
+        with self.connect() as conn:
+            if candidate_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM spec_feasibility_decisions ORDER BY created_at, rowid"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM spec_feasibility_decisions WHERE candidate_id = ? ORDER BY created_at, rowid",
+                    (candidate_id,),
+                ).fetchall()
+        return [
+            SpecFeasibilityDecision(
+                id=row["id"],
+                candidate_id=row["candidate_id"],
+                design_intent_id=row["design_intent_id"],
+                selected_capability_id=row["selected_capability_id"],
+                status=SpecFeasibilityStatus(row["status"]),
+                reason_codes=tuple(
+                    SpecFeasibilityReasonCode(item)
+                    for item in self._loads(row["reason_codes_json"])
+                ),
+                proposed_parameters=self._loads(row["proposed_parameters_json"]),
+                validation_notes=row["validation_notes"],
+                spec_feasibility_version=row["spec_feasibility_version"],
+                registry_version=row["registry_version"],
+                registry_fingerprint=row["registry_fingerprint"],
+                materializer_version=row["materializer_version"],
+                plan_id=row["plan_id"] if "plan_id" in row.keys() else None,
+                condition_id=row["condition_id"] if "condition_id" in row.keys() else None,
+                phase=SpecFeasibilityPhase(
+                    row["phase"] if "phase" in row.keys() and row["phase"] is not None else "MATERIALIZATION"
+                ),
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in rows
+        ]
+
+    # ─── Initial spec materialization proposals ───────────────────────────────
+
+    def save_spec_materialization_proposal(self, proposal: SpecMaterializationProposal) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO spec_materialization_proposals
+                   (id, candidate_id, design_intent_id, candidate_feasibility_decision_id,
+                    selected_capability_id, proposed_parameters_json, materializer_version,
+                    materialization_policy_version, materialization_policy_fingerprint,
+                    materialization_trace_json, spec_feasibility_decision_id, status,
+                    accepted_spec_id, resulting_research_run_id, created_at, decided_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    proposal.id,
+                    proposal.candidate_id,
+                    proposal.design_intent_id,
+                    proposal.candidate_feasibility_decision_id,
+                    proposal.selected_capability_id,
+                    self._dumps(proposal.proposed_parameters),
+                    proposal.materializer_version,
+                    proposal.materialization_policy_version,
+                    proposal.materialization_policy_fingerprint,
+                    self._dumps(proposal.materialization_trace),
+                    proposal.spec_feasibility_decision_id,
+                    proposal.status.value,
+                    proposal.accepted_spec_id,
+                    proposal.resulting_research_run_id,
+                    proposal.created_at.isoformat(),
+                    None if proposal.decided_at is None else proposal.decided_at.isoformat(),
+                ),
+            )
+
+    def get_spec_materialization_proposal(self, proposal_id: str) -> SpecMaterializationProposal | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM spec_materialization_proposals WHERE id = ?",
+                (proposal_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return SpecMaterializationProposal(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            design_intent_id=row["design_intent_id"],
+            candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+            selected_capability_id=row["selected_capability_id"],
+            proposed_parameters=self._loads(row["proposed_parameters_json"]),
+            materializer_version=row["materializer_version"],
+            materialization_policy_version=row["materialization_policy_version"],
+            materialization_policy_fingerprint=row["materialization_policy_fingerprint"],
+            materialization_trace=self._loads(row["materialization_trace_json"]),
+            spec_feasibility_decision_id=row["spec_feasibility_decision_id"],
+            status=SpecMaterializationProposalStatus(row["status"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            decided_at=None if row["decided_at"] is None else datetime.fromisoformat(row["decided_at"]),
+            accepted_spec_id=row["accepted_spec_id"],
+            resulting_research_run_id=row["resulting_research_run_id"],
+        )
+
+    def list_spec_materialization_proposals(self, candidate_id: str | None = None) -> list[SpecMaterializationProposal]:
+        with self.connect() as conn:
+            if candidate_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM spec_materialization_proposals ORDER BY created_at, rowid"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM spec_materialization_proposals WHERE candidate_id = ? ORDER BY created_at, rowid",
+                    (candidate_id,),
+                ).fetchall()
+        return [
+            SpecMaterializationProposal(
+                id=row["id"],
+                candidate_id=row["candidate_id"],
+                design_intent_id=row["design_intent_id"],
+                candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+                selected_capability_id=row["selected_capability_id"],
+                proposed_parameters=self._loads(row["proposed_parameters_json"]),
+                materializer_version=row["materializer_version"],
+                materialization_policy_version=row["materialization_policy_version"],
+                materialization_policy_fingerprint=row["materialization_policy_fingerprint"],
+                materialization_trace=self._loads(row["materialization_trace_json"]),
+                spec_feasibility_decision_id=row["spec_feasibility_decision_id"],
+                status=SpecMaterializationProposalStatus(row["status"]),
+                created_at=datetime.fromisoformat(row["created_at"]),
+                decided_at=None if row["decided_at"] is None else datetime.fromisoformat(row["decided_at"]),
+                accepted_spec_id=row["accepted_spec_id"],
+                resulting_research_run_id=row["resulting_research_run_id"],
+            )
+            for row in rows
+        ]
+
+    def accept_spec_materialization_proposal(
+        self,
+        proposal_id: str,
+        *,
+        max_iterations: int,
+    ) -> SpecMaterializationProposal:
+        from ..capabilities.gate import GateDecision
+        from ..capabilities.serialization import requirements_to_json
+
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM spec_materialization_proposals WHERE id = ?",
+                (proposal_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown proposal: {proposal_id}")
+
+            proposal = self.get_spec_materialization_proposal(proposal_id)
+            if proposal.status != SpecMaterializationProposalStatus.PROPOSED:
+                raise ValueError("Spec materialization proposal is not awaiting acceptance")
+
+            candidate = self.get_research_candidate(proposal.candidate_id)
+            if candidate is None:
+                raise KeyError(f"Unknown candidate: {proposal.candidate_id}")
+            design_intent = self.get_research_design_intent(proposal.design_intent_id)
+            if design_intent is None:
+                raise KeyError(f"Unknown design intent: {proposal.design_intent_id}")
+            feasibility = self.get_spec_feasibility_decision(proposal.spec_feasibility_decision_id)
+            if feasibility is None:
+                raise KeyError(
+                    f"Unknown spec feasibility decision: {proposal.spec_feasibility_decision_id}"
+                )
+            if not feasibility.is_pass:
+                raise ValueError("Cannot accept a proposal whose exact spec feasibility failed")
+
+            candidate_feasibility = self.get_feasibility_decision_by_id(
+                proposal.candidate_feasibility_decision_id
+            )
+            if candidate_feasibility is None:
+                raise KeyError("Candidate feasibility decision not found")
+            if candidate_feasibility.gate_decision != GateDecision.READY_FOR_SPEC:
+                raise ValueError("Candidate is not authorized READY_FOR_SPEC")
+
+            run_id = new_id()
+            hypothesis = Hypothesis(
+                id=new_id(),
+                research_run_id=run_id,
+                statement=candidate.hypothesis_statement,
+                rationale=candidate.hypothesis_rationale,
+            )
+            spec = ResearchSpec(
+                id=new_id(),
+                research_run_id=run_id,
+                version=1,
+                hypothesis_id=hypothesis.id,
+                parameters=dict(proposal.proposed_parameters),
+                design_intent_id=design_intent.id,
+                spec_materialization_proposal_id=proposal.id,
+                selected_capability_id=proposal.selected_capability_id,
+                materializer_version=proposal.materializer_version,
+            )
+            run = ResearchRun(
+                id=run_id,
+                stage=ResearchStage.IDEA,
+                status=RunStatus.ACTIVE,
+                next_required_action=ResearchAction.NONE,
+                hypothesis_id=hypothesis.id,
+                active_spec_id=spec.id,
+                iteration_count=0,
+                max_iterations=max_iterations,
+                created_at=spec.created_at,
+                updated_at=spec.created_at,
+            )
+            audit_event = AuditEvent(
+                id=new_id(),
+                research_run_id=run.id,
+                event_type="INITIAL_SPEC_ACCEPTED",
+                action="accept_spec_materialization_proposal",
+                reason="Accepted deterministic initial spec proposal and created executable research run",
+                state_before={},
+                state_after=record_to_state(run),
+                metadata={
+                    "candidate": {
+                        **record_to_state(candidate),
+                        "requirements": self._loads(requirements_to_json(candidate.requirements)),
+                    },
+                    "design_intent": record_to_state(design_intent),
+                    "proposal": record_to_state(proposal),
+                    "spec_feasibility_decision": record_to_state(feasibility),
+                    "hypothesis": record_to_state(hypothesis),
+                    "spec": record_to_state(spec),
+                },
+            )
+
+            self._insert_run(connection, run)
+            self._insert_hypothesis(connection, hypothesis)
+            self._insert_spec(connection, spec)
+            self._insert_audit_event(connection, audit_event)
+            connection.execute(
+                """
+                UPDATE spec_materialization_proposals
+                SET status = ?, accepted_spec_id = ?, resulting_research_run_id = ?, decided_at = ?
+                WHERE id = ?
+                """,
+                (
+                    SpecMaterializationProposalStatus.ACCEPTED.value,
+                    spec.id,
+                    run.id,
+                    spec.created_at.isoformat(),
+                    proposal.id,
+                ),
+            )
+
+        accepted = self.get_spec_materialization_proposal(proposal_id)
+        assert accepted is not None
+        return accepted
+
+    # ─── Initial experiment plans (V0.13A.1) ──────────────────────────────────
+
+    def save_initial_experiment_plan(self, plan: InitialExperimentPlan) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO initial_experiment_plans
+                   (id, candidate_id, design_intent_id, candidate_feasibility_decision_id,
+                    selected_capability_id, design_kind, independent_variable,
+                    control_variables_json, dependent_outcomes_json, ordered_condition_ids_json,
+                    completion_rule, materializer_version, materialization_policy_version,
+                    materialization_policy_fingerprint, registry_version, registry_fingerprint,
+                    created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    plan.id,
+                    plan.candidate_id,
+                    plan.design_intent_id,
+                    plan.candidate_feasibility_decision_id,
+                    plan.selected_capability_id,
+                    plan.design_kind.value,
+                    plan.independent_variable.value,
+                    self._dumps([item.value for item in plan.control_variables]),
+                    self._dumps([item.value for item in plan.dependent_outcomes]),
+                    self._dumps([item.id for item in plan.ordered_conditions]),
+                    plan.completion_rule.value,
+                    plan.materializer_version,
+                    plan.materialization_policy_version,
+                    plan.materialization_policy_fingerprint,
+                    plan.registry_version,
+                    plan.registry_fingerprint,
+                    plan.created_at.isoformat(),
+                ),
+            )
+            for condition in plan.ordered_conditions:
+                conn.execute(
+                    """INSERT OR IGNORE INTO initial_experiment_conditions
+                       (id, plan_id, ordinal, role, exact_parameters_json,
+                        selected_capability_id, expected_tool_kind, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        condition.id,
+                        plan.id,
+                        condition.ordinal,
+                        condition.role.value,
+                        self._dumps(condition.exact_parameters),
+                        condition.selected_capability_id,
+                        condition.expected_tool_kind,
+                        condition.created_at.isoformat(),
+                    ),
+                )
+
+    def get_initial_experiment_plan(self, plan_id: str) -> InitialExperimentPlan | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM initial_experiment_plans WHERE id = ?",
+                (plan_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            condition_rows = conn.execute(
+                "SELECT * FROM initial_experiment_conditions WHERE plan_id = ? ORDER BY ordinal",
+                (plan_id,),
+            ).fetchall()
+        conditions = tuple(
+            ExperimentCondition(
+                id=condition_row["id"],
+                ordinal=condition_row["ordinal"],
+                role=ExperimentConditionRole(condition_row["role"]),
+                exact_parameters=self._loads(condition_row["exact_parameters_json"]),
+                selected_capability_id=condition_row["selected_capability_id"],
+                expected_tool_kind=condition_row["expected_tool_kind"],
+                created_at=datetime.fromisoformat(condition_row["created_at"]),
+            )
+            for condition_row in condition_rows
+        )
+        return InitialExperimentPlan(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            design_intent_id=row["design_intent_id"],
+            candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+            selected_capability_id=row["selected_capability_id"],
+            design_kind=ResearchDesignKind(row["design_kind"]),
+            independent_variable=DesignVariable(row["independent_variable"]),
+            control_variables=tuple(
+                DesignVariable(item) for item in self._loads(row["control_variables_json"])
+            ),
+            dependent_outcomes=tuple(
+                DesignOutcome(item) for item in self._loads(row["dependent_outcomes_json"])
+            ),
+            ordered_conditions=conditions,
+            completion_rule=InitialExperimentCompletionRule(row["completion_rule"]),
+            materializer_version=row["materializer_version"],
+            materialization_policy_version=row["materialization_policy_version"],
+            materialization_policy_fingerprint=row["materialization_policy_fingerprint"],
+            registry_version=row["registry_version"],
+            registry_fingerprint=row["registry_fingerprint"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def save_initial_experiment_plan_proposal(self, proposal: InitialExperimentPlanProposal) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO initial_experiment_plan_proposals
+                   (id, plan_id, candidate_id, design_intent_id,
+                    candidate_feasibility_decision_id, materialization_feasibility_decision_ids_json,
+                    materialization_trace_json, status, contrast_result_id,
+                    created_at, decided_at, accepted_at, completed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    proposal.id,
+                    proposal.plan_id,
+                    proposal.candidate_id,
+                    proposal.design_intent_id,
+                    proposal.candidate_feasibility_decision_id,
+                    self._dumps(list(proposal.materialization_feasibility_decision_ids)),
+                    self._dumps(proposal.materialization_trace),
+                    proposal.status.value,
+                    proposal.contrast_result_id,
+                    proposal.created_at.isoformat(),
+                    None if proposal.decided_at is None else proposal.decided_at.isoformat(),
+                    None if proposal.accepted_at is None else proposal.accepted_at.isoformat(),
+                    None if proposal.completed_at is None else proposal.completed_at.isoformat(),
+                ),
+            )
+
+    def get_initial_experiment_plan_proposal(self, proposal_id: str) -> InitialExperimentPlanProposal | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM initial_experiment_plan_proposals WHERE id = ?",
+                (proposal_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return InitialExperimentPlanProposal(
+            id=row["id"],
+            plan_id=row["plan_id"],
+            candidate_id=row["candidate_id"],
+            design_intent_id=row["design_intent_id"],
+            candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
+            materialization_feasibility_decision_ids=tuple(
+                self._loads(row["materialization_feasibility_decision_ids_json"])
+            ),
+            materialization_trace=self._loads(row["materialization_trace_json"]),
+            status=InitialExperimentPlanProposalStatus(row["status"]),
+            contrast_result_id=row["contrast_result_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            decided_at=None if row["decided_at"] is None else datetime.fromisoformat(row["decided_at"]),
+            accepted_at=None if row["accepted_at"] is None else datetime.fromisoformat(row["accepted_at"]),
+            completed_at=None if row["completed_at"] is None else datetime.fromisoformat(row["completed_at"]),
+        )
+
+    def get_initial_experiment_plan_proposal_by_plan_id(
+        self,
+        plan_id: str,
+    ) -> InitialExperimentPlanProposal | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM initial_experiment_plan_proposals WHERE plan_id = ?",
+                (plan_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_initial_experiment_plan_proposal(row["id"])
+
+    def update_initial_experiment_plan_proposal_status(
+        self,
+        proposal_id: str,
+        status: InitialExperimentPlanProposalStatus,
+        *,
+        decided_at: datetime | None = None,
+        accepted_at: datetime | None = None,
+        completed_at: datetime | None = None,
+        contrast_result_id: str | None = None,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE initial_experiment_plan_proposals
+                SET status = ?, decided_at = COALESCE(?, decided_at),
+                    accepted_at = COALESCE(?, accepted_at),
+                    completed_at = COALESCE(?, completed_at),
+                    contrast_result_id = COALESCE(?, contrast_result_id)
+                WHERE id = ?
+                """,
+                (
+                    status.value,
+                    None if decided_at is None else decided_at.isoformat(),
+                    None if accepted_at is None else accepted_at.isoformat(),
+                    None if completed_at is None else completed_at.isoformat(),
+                    contrast_result_id,
+                    proposal_id,
+                ),
+            )
+
+    def accept_initial_experiment_plan_proposal(
+        self,
+        proposal_id: str,
+        *,
+        registry,
+        feasibility_validator,
+        materializer_version: str,
+        current_policy_version: str,
+        current_policy_fingerprint: str,
+    ) -> InitialExperimentPlanProposal:
+        from ..capabilities.gate import GateDecision
+
+        fresh_decisions: list[SpecFeasibilityDecision] = []
+        failure: str | None = None
+        accepted_at: datetime | None = None
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM initial_experiment_plan_proposals WHERE id = ?",
+                (proposal_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown proposal: {proposal_id}")
+            proposal = self.get_initial_experiment_plan_proposal(proposal_id)
+            assert proposal is not None
+            if proposal.status != InitialExperimentPlanProposalStatus.PROPOSED:
+                raise ValueError("Initial experiment plan proposal is not awaiting acceptance")
+            plan = self.get_initial_experiment_plan(proposal.plan_id)
+            if plan is None:
+                raise KeyError(f"Unknown plan: {proposal.plan_id}")
+            if current_policy_version != plan.materialization_policy_version:
+                raise ValueError("Materialization policy version drift requires rematerialization")
+            if current_policy_fingerprint != plan.materialization_policy_fingerprint:
+                raise ValueError("Materialization policy fingerprint drift requires rematerialization")
+            candidate_feasibility = self.get_feasibility_decision_by_id(plan.candidate_feasibility_decision_id)
+            if candidate_feasibility is None:
+                raise KeyError("Candidate feasibility decision not found")
+            if candidate_feasibility.candidate_id != plan.candidate_id:
+                raise ValueError("Candidate feasibility decision does not belong to plan candidate")
+            if candidate_feasibility.gate_decision != GateDecision.READY_FOR_SPEC:
+                raise ValueError("Candidate is not authorized READY_FOR_SPEC")
+            for condition in plan.ordered_conditions:
+                decision = feasibility_validator.validate(
+                    candidate_id=plan.candidate_id,
+                    design_intent_id=plan.design_intent_id,
+                    selected_capability_id=condition.selected_capability_id,
+                    proposed_parameters=condition.exact_parameters,
+                    registry=registry,
+                    materializer_version=materializer_version,
+                    plan_id=plan.id,
+                    condition_id=condition.id,
+                    phase=SpecFeasibilityPhase.ACCEPTANCE,
+                )
+                fresh_decisions.append(decision)
+                conn.execute(
+                    """INSERT OR IGNORE INTO spec_feasibility_decisions
+                       (id, candidate_id, design_intent_id, selected_capability_id,
+                        plan_id, condition_id, phase, status, reason_codes_json, proposed_parameters_json,
+                        validation_notes, spec_feasibility_version, registry_version,
+                        registry_fingerprint, materializer_version, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        decision.id,
+                        decision.candidate_id,
+                        decision.design_intent_id,
+                        decision.selected_capability_id,
+                        decision.plan_id,
+                        decision.condition_id,
+                        decision.phase.value,
+                        decision.status.value,
+                        self._dumps([item.value for item in decision.reason_codes]),
+                        self._dumps(decision.proposed_parameters),
+                        decision.validation_notes,
+                        decision.spec_feasibility_version,
+                        decision.registry_version,
+                        decision.registry_fingerprint,
+                        decision.materializer_version,
+                        decision.created_at.isoformat(),
+                    ),
+                )
+            if not all(decision.is_pass for decision in fresh_decisions):
+                failure = "Current exact feasibility no longer passes for every required condition"
+            else:
+                accepted_at = fresh_decisions[-1].created_at
+                conn.execute(
+                    """
+                    UPDATE initial_experiment_plan_proposals
+                    SET status = ?, decided_at = ?, accepted_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        InitialExperimentPlanProposalStatus.ACCEPTED.value,
+                        accepted_at.isoformat(),
+                        accepted_at.isoformat(),
+                        proposal.id,
+                    ),
+                )
+        if failure is not None:
+            raise ValueError(failure)
+        accepted = self.get_initial_experiment_plan_proposal(proposal_id)
+        assert accepted is not None
+        return accepted
+
+    def save_condition_execution_record(self, record: ConditionExecutionRecord) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO condition_execution_records
+                   (id, plan_id, condition_id, ordinal, role, selected_capability_id,
+                    exact_parameters_json, status, experiment_result_id, tool_name, metrics_json,
+                    summary, passed, executed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    record.id,
+                    record.plan_id,
+                    record.condition_id,
+                    record.ordinal,
+                    record.role.value,
+                    record.selected_capability_id,
+                    self._dumps(record.exact_parameters),
+                    record.status.value,
+                    record.experiment_result_id,
+                    record.tool_name,
+                    self._dumps(record.metrics),
+                    record.summary,
+                    1 if record.passed else 0,
+                    record.executed_at.isoformat(),
+                ),
+            )
+
+    def list_condition_execution_records(self, plan_id: str) -> list[ConditionExecutionRecord]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM condition_execution_records WHERE plan_id = ? ORDER BY ordinal",
+                (plan_id,),
+            ).fetchall()
+        return [
+            ConditionExecutionRecord(
+                id=row["id"],
+                plan_id=row["plan_id"],
+                condition_id=row["condition_id"],
+                ordinal=row["ordinal"],
+                role=ExperimentConditionRole(row["role"]),
+                selected_capability_id=row["selected_capability_id"],
+                exact_parameters=self._loads(row["exact_parameters_json"]),
+                status=ConditionExecutionStatus(row["status"]),
+                experiment_result_id=row["experiment_result_id"],
+                tool_name=row["tool_name"],
+                metrics=self._loads(row["metrics_json"]),
+                summary=row["summary"],
+                passed=bool(row["passed"]),
+                executed_at=datetime.fromisoformat(row["executed_at"]),
+            )
+            for row in rows
+        ]
+
+    def save_parameter_sensitivity_contrast_result(
+        self,
+        result: ParameterSensitivityContrastResult,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO parameter_sensitivity_contrast_results
+                   (id, plan_id, independent_variable, baseline_condition_id, comparator_condition_id,
+                    baseline_parameter_value, comparator_parameter_value, outcomes_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    result.id,
+                    result.plan_id,
+                    result.independent_variable.value,
+                    result.baseline_condition_id,
+                    result.comparator_condition_id,
+                    result.baseline_parameter_value,
+                    result.comparator_parameter_value,
+                    self._dumps(
+                        [
+                            {
+                                "outcome": outcome.outcome.value,
+                                "baseline_value": outcome.baseline_value,
+                                "comparator_value": outcome.comparator_value,
+                                "delta": outcome.delta,
+                                "baseline_condition_id": outcome.baseline_condition_id,
+                                "comparator_condition_id": outcome.comparator_condition_id,
+                            }
+                            for outcome in result.outcomes
+                        ]
+                    ),
+                    result.created_at.isoformat(),
+                ),
+            )
+
+    def get_parameter_sensitivity_contrast_result(
+        self,
+        plan_id: str,
+    ) -> ParameterSensitivityContrastResult | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM parameter_sensitivity_contrast_results WHERE plan_id = ?",
+                (plan_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ParameterSensitivityContrastResult(
+            id=row["id"],
+            plan_id=row["plan_id"],
+            independent_variable=DesignVariable(row["independent_variable"]),
+            baseline_condition_id=row["baseline_condition_id"],
+            comparator_condition_id=row["comparator_condition_id"],
+            baseline_parameter_value=row["baseline_parameter_value"],
+            comparator_parameter_value=row["comparator_parameter_value"],
+            outcomes=tuple(
+                OutcomeContrast(
+                    outcome=DesignOutcome(item["outcome"]),
+                    baseline_value=item["baseline_value"],
+                    comparator_value=item["comparator_value"],
+                    delta=item["delta"],
+                    baseline_condition_id=item["baseline_condition_id"],
+                    comparator_condition_id=item["comparator_condition_id"],
+                )
+                for item in self._loads(row["outcomes_json"])
+            ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
 
     # ─── Hypothesis scientist invocations ─────────────────────────────────────
 
