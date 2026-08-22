@@ -3,10 +3,10 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.12D` implementation changes verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
+- Working tree status: contains uncommitted `V0.12D` implementation changes plus a canonical-field validator precedence fix verified on `2026-08-22` Arizona project-local time (`2026-08-22` UTC)
 - Schema version: `v6`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `411 passed`
+- Verified test count: `419 passed`
 - Date: `2026-08-22` (Arizona project-local verification date; `2026-08-22` UTC)
 
 Primary evidence:
@@ -156,6 +156,14 @@ Evidence:
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364141.json`, `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
 - `case-11`: latest available post-`V0.12C` Terra Prompt `v2` artifact returned valid `NO_HYPOTHESIS`, attributing refusal to underspecification; the fixture is now repaired with a fully specified OU/process/strategy brief so it tests multiplicity only.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364150.json`, `evals/scientist_v1.json`
+- `case-06`: latest available post-`V0.12D` Terra Prompt `v3` artifact produced an otherwise appropriate ORDER_BOOK requirement, but exposed a deterministic validator precedence bug because canonical `exchange_or_venue` was rejected by the generic `_or_` heuristic before canonical membership was honored.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`, `src/ai_quant_scientist/capabilities/models.py`
+- `case-07`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed requirement completeness, including broad `BACKTEST_EXECUTION`.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365790.json`, `evals/scientist_v1.json`
+- `case-10`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed for ontology projection plus novelty behavior, with the same derived-field caveat around `one_step_forward_change`.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365801.json`, `src/ai_quant_scientist/services/scientist_requirement_ontology.py`
+- `case-11`: latest available post-`V0.12D` Terra Prompt `v3` artifact structurally passed and manually passed the repaired multiplicity test by emitting exactly one bounded hypothesis.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365811.json`, `evals/scientist_v1.json`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -170,6 +178,8 @@ These are useful live observations, not statistically exhaustive model evaluatio
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787362976.json`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787363000.json`
 - Pre-`V0.12D` Terra Prompt `v2` artifacts still reflect the older AI-facing `required_parameters` contract and should not be treated as validation of the new candidate/spec boundary.
   Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364131.json`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364150.json`
+- Immediate post-`V0.12D` Prompt `v3` case-06 artifact is not scientific-policy failure evidence; it is validator-precedence bug evidence and should not be treated as model inadequacy.
+  Evidence: `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`, `src/ai_quant_scientist/capabilities/models.py`
 
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
@@ -178,8 +188,10 @@ These are useful live observations, not statistically exhaustive model evaluatio
    Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
 3. Exact frozen-spec feasibility and implementation validation still do not exist.
    Evidence: `src/ai_quant_scientist/capabilities/gate.py`, `README.md`
-4. Post-fix `V0.12D` live scientist evals have not yet been rerun; the latest available Terra artifacts are still Prompt `v2` / pre-`V0.12D` contract evidence.
-   Evidence: `src/ai_quant_scientist/evals/run_live_scientist_eval.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787364131.json`
+4. One narrow deterministic validator bug remained after the first Prompt `v3` rerun: canonical-field membership did not take precedence over the generic pseudo-field heuristic.
+   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`
+5. Post-fix validation rerun for `case-06` has not yet been produced after the canonical-field precedence fix.
+   Evidence: `src/ai_quant_scientist/evals/run_live_scientist_eval.py`, `artifacts/evals/scientist_eval_gpt-5.6-terra_1787365783.json`
 
 ## Current Milestone
 `V0.12D - Candidate Feasibility / Spec Feasibility Boundary`

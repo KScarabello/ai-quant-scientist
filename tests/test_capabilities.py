@@ -30,6 +30,7 @@ from ai_quant_scientist.capabilities import (
     ToolRequirement,
     build_v1_registry,
     compute_registry_fingerprint,
+    validate_required_field_names,
 )
 from ai_quant_scientist.capabilities.v1_registry import DEFAULT_REGISTRY, _CAPABILITIES
 
@@ -96,6 +97,10 @@ def test_registry_version():
 
 def test_registry_fingerprint_is_non_empty():
     assert len(DEFAULT_REGISTRY.fingerprint) == 64  # SHA-256 hex
+
+
+def test_registry_fingerprint_matches_v1_truth_snapshot():
+    assert DEFAULT_REGISTRY.fingerprint == "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53"
 
 
 def test_registry_ordering_does_not_affect_fingerprint():
@@ -547,6 +552,34 @@ def test_canonical_field_catalog_contains_order_book_primitives():
     assert "best_bid_price" in fields
     assert "best_ask_price" in fields
     assert "contract_expiry" in fields
+
+
+def test_canonical_exchange_or_venue_accepted_for_order_book():
+    validate_required_field_names(
+        DataKind.ORDER_BOOK,
+        ("timestamp", "instrument_id", "exchange_or_venue"),
+    )
+
+
+def test_every_canonical_field_survives_generic_pseudo_field_validation():
+    for data_kind, fields in CANONICAL_FIELDS_BY_DATA_KIND.items():
+        validate_required_field_names(data_kind, fields)
+
+
+def test_unknown_a_or_b_style_pseudo_field_still_rejected():
+    with pytest.raises(ValueError, match="encodes logical alternatives"):
+        validate_required_field_names(
+            DataKind.ORDER_BOOK,
+            ("timestamp", "instrument_id", "best_bid_price_or_best_ask_price"),
+        )
+
+
+def test_canonical_membership_remains_data_kind_specific():
+    with pytest.raises(ValueError, match="not registered for data_kind=QUOTES"):
+        validate_required_field_names(
+            DataKind.QUOTES,
+            ("best_bid_price",),
+        )
 
 
 # ─── V0.9 hardening regressions ──────────────────────────────────────────────

@@ -4,6 +4,7 @@ Zero live API calls. Zero network calls.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from dataclasses import replace
@@ -190,6 +191,12 @@ def test_requirement_ontology_v1_fingerprint_preserved_for_historical_replay():
     assert ontology.fingerprint == "e490b82b80b2a64f72d76b63a36f6ba6780309c1449612eb18695f91456c2395"
 
 
+def test_requirement_ontology_v2_fingerprint_preserved():
+    ontology = build_requirement_ontology_snapshot()
+    assert ontology.version == REQUIREMENT_ONTOLOGY_VERSION
+    assert ontology.fingerprint == "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917"
+
+
 def test_requirement_ontology_snapshot_has_canonical_vocab():
     ontology = build_requirement_ontology_snapshot()
     assert "QUOTES" in ontology.allowed_data_kinds
@@ -275,6 +282,18 @@ def test_prompt_v3_preserves_policy_but_removes_pre_spec_parameter_contract():
     assert "required_parameters" not in p
     assert "READY_FOR_SPEC" in p
     assert "future ResearchSpec design details" in p
+
+
+def test_prompt_versions_exact_hashes_unchanged():
+    assert hashlib.sha256(get_scientist_instructions("v1").encode("utf-8")).hexdigest() == (
+        "34693e305202cae2ee96f84d328bdbd53e8cee8f65765afb9a3c0f35614ec37e"
+    )
+    assert hashlib.sha256(get_scientist_instructions("v2").encode("utf-8")).hexdigest() == (
+        "09c4284f3b24d016812c51c0415abd3bae7b9fed189cbfcf2d4ee46fe17d1551"
+    )
+    assert hashlib.sha256(get_scientist_instructions("v3").encode("utf-8")).hexdigest() == (
+        "aa89aa587b8b26332562b2055eeb2813dff148201d96bec8bf79eed34b93661a"
+    )
 
 
 # ─── Validator ────────────────────────────────────────────────────────────────
@@ -474,6 +493,32 @@ def test_quotes_case_06_vocabulary_remains_valid():
             asset_class=AssetClass.FUTURES,
             resolution=Resolution.SECOND_1,
             required_fields=("bid_price", "ask_price", "bid_size", "ask_size"),
+        ),
+        ToolRequirement(requirement_id="t", tool_kind=ToolKind.STATISTICAL_ANALYSIS),
+    ))
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid
+    assert not errors
+
+
+def test_order_book_exchange_or_venue_is_accepted_when_canonical():
+    brief = _synth_brief(asset_class_focus="FUTURES")
+    decision = _propose_decision(brief, reqs=(
+        DataRequirement(
+            requirement_id="order_book",
+            data_kind=DataKind.ORDER_BOOK,
+            asset_class=AssetClass.FUTURES,
+            resolution=Resolution.SECOND_1,
+            required_fields=(
+                "timestamp",
+                "instrument_id",
+                "best_bid_price",
+                "best_ask_price",
+                "best_bid_size",
+                "best_ask_size",
+                "exchange_or_venue",
+                "contract_expiry",
+            ),
         ),
         ToolRequirement(requirement_id="t", tool_kind=ToolKind.STATISTICAL_ANALYSIS),
     ))

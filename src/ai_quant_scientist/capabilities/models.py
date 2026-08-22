@@ -136,11 +136,13 @@ def validate_required_field_names(data_kind: DataKind, fields: tuple[str, ...] |
     for field_name in fields:
         if not field_name or not field_name.strip():
             raise ValueError("required_fields entries must be non-empty")
-        if not _FIELD_IDENTIFIER_RE.match(field_name):
-            raise ValueError(f"required_fields entry is not a primitive identifier: {field_name!r}")
-        if "_or_" in field_name.lower():
-            raise ValueError(f"required_fields entry encodes logical alternatives: {field_name!r}")
         if field_name not in allowed:
+            # Exact canonical membership is the authoritative legality check.
+            # Heuristics only improve diagnostics for unknown identifiers.
+            if not _FIELD_IDENTIFIER_RE.match(field_name):
+                raise ValueError(f"required_fields entry is not a primitive identifier: {field_name!r}")
+            if "_or_" in field_name.lower():
+                raise ValueError(f"required_fields entry encodes logical alternatives: {field_name!r}")
             raise ValueError(
                 f"required_fields entry {field_name!r} is not registered for data_kind={data_kind.value}"
             )

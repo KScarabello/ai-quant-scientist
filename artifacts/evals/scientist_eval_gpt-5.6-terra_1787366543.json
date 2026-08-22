@@ -1,0 +1,106 @@
+{
+  "model": "gpt-5.6-terra",
+  "prompt_version": "v3",
+  "timestamp": 1787366543,
+  "results": [
+    {
+      "case_id": "case-06",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "prompt_version": "v3",
+      "ontology_version": "requirement_ontology_v2",
+      "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+      "decision_type": "PROPOSE_HYPOTHESIS",
+      "contract_passed": true,
+      "validation_errors": {},
+      "requirement_count": 3,
+      "hypothesis_statement": "In MES futures, a positive best-level bid-ask size imbalance at a 1-second timestamp predicts a positive subsequent short-horizon price change, while a negative imbalance predicts a negative subsequent price change.",
+      "expected_decision": "PROPOSE_HYPOTHESIS",
+      "evaluation_focus": "ORDER_BOOK futures MES hypothesis with correct resolution, instrument, and primitive field semantics",
+      "manual_success_criteria": "Requires DataRequirement(ORDER_BOOK, FUTURES, MES, 1s or similar) using primitive fields such as timestamp, instrument_id, best_bid_price, best_ask_price, best_bid_size, best_ask_size, exchange_or_venue, and contract_expiry; includes a ToolRequirement with canonical tool_kind",
+      "expected_tool_kinds": null,
+      "notes": "",
+      "parsed": {
+        "hypothesis_statement": "In MES futures, a positive best-level bid-ask size imbalance at a 1-second timestamp predicts a positive subsequent short-horizon price change, while a negative imbalance predicts a negative subsequent price change.",
+        "hypothesis_rationale": "An imbalance in displayed depth at the best bid and ask can reflect asymmetric immediate liquidity and directional order-flow pressure: relatively greater bid size may make upward price movement more likely as sell-side liquidity is depleted, with the converse for greater ask size. The hypothesis is falsified if the conditional subsequent price change is not directionally associated with the signed imbalance.",
+        "requirements": [
+          {
+            "type": "DataRequirement",
+            "requirement_id": "mes_best_level_order_book",
+            "data_kind": "ORDER_BOOK",
+            "asset_class": "FUTURES",
+            "resolution": "1s",
+            "required_fields": [
+              "best_ask_price",
+              "best_ask_size",
+              "best_bid_price",
+              "best_bid_size",
+              "contract_expiry",
+              "exchange_or_venue",
+              "instrument_id",
+              "timestamp"
+            ],
+            "instruments": [
+              "MES"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "DataRequirement",
+            "requirement_id": "mes_trade_prices",
+            "data_kind": "TRADES",
+            "asset_class": "FUTURES",
+            "resolution": "1s",
+            "required_fields": [
+              "exchange_or_venue",
+              "instrument_id",
+              "timestamp",
+              "trade_price"
+            ],
+            "instruments": [
+              "MES"
+            ],
+            "point_in_time_required": true,
+            "required_parameters": null,
+            "label": ""
+          },
+          {
+            "type": "ToolRequirement",
+            "requirement_id": "predictive_association_analysis",
+            "tool_kind": "STATISTICAL_ANALYSIS",
+            "legacy_tool_name": null,
+            "label": "Test the directional association between best-level order-book imbalance and subsequent MES price changes."
+          }
+        ],
+        "no_hypothesis_reason": null,
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "v3",
+        "ontology_version": "requirement_ontology_v2",
+        "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+        "compact_provenance": {
+          "response_id": "resp_01e1ead0c6a62fb6016a890c905e0487d0b8215902474c2c10",
+          "model": "gpt-5.6-terra",
+          "status": "completed",
+          "created_at": 1787366544.0,
+          "completed_at": 1787366548.0,
+          "store": false,
+          "usage": {
+            "input_tokens": 2440,
+            "output_tokens": 329,
+            "reasoning_tokens": 0
+          },
+          "output_text": "{\"decision\":\"PROPOSE_HYPOTHESIS\",\"hypothesis_statement\":\"In MES futures, a positive best-level bid-ask size imbalance at a 1-second timestamp predicts a positive subsequent short-horizon price change, while a negative imbalance predicts a negative subsequent price change.\",\"hypothesis_rationale\":\"An imbalance in displayed depth at the best bid and ask can reflect asymmetric immediate liquidity and directional order-flow pressure: relatively greater bid size may make upward price movement more likely as sell-side liquidity is depleted, with the converse for greater ask size. The hypothesis is falsified if the conditional subsequent price change is not directionally associated with the signed imbalance.\",\"data_requirements\":[{\"requirement_id\":\"mes_best_level_order_book\",\"data_kind\":\"ORDER_BOOK\",\"asset_class\":\"FUTURES\",\"resolution\":\"1s\",\"required_fields\":[\"timestamp\",\"instrument_id\",\"best_bid_price\",\"best_ask_price\",\"best_bid_size\",\"best_ask_size\",\"exchange_or_venue\",\"contract_expiry\"],\"instruments\":[\"MES\"],\"point_in_time_required\":true},{\"requirement_id\":\"mes_trade_prices\",\"data_kind\":\"TRADES\",\"asset_class\":\"FUTURES\",\"resolution\":\"1s\",\"required_fields\":[\"timestamp\",\"instrument_id\",\"trade_price\",\"exchange_or_venue\"],\"instruments\":[\"MES\"],\"point_in_time_required\":true}],\"tool_requirements\":[{\"requirement_id\":\"predictive_association_analysis\",\"tool_kind\":\"STATISTICAL_ANALYSIS\",\"label\":\"Test the directional association between best-level order-book imbalance and subsequent MES price changes.\"}],\"no_hypothesis_reason\":null}"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_cases": 1,
+    "contract_passed": 1,
+    "propose_count": 1,
+    "no_hypothesis_count": 0
+  }
+}
