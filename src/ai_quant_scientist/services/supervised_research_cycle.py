@@ -18,6 +18,7 @@ from ..models.hypothesis_scientist import (
 )
 from .hypothesis_scientist import HypothesisScientist, generate_candidate
 from .research_designer import GovernedResearchDesigner, ResearchDesigner
+from .scientific_verdict import ScientificVerdictEvaluator
 from .spec_materialization import (
     GovernedSpecMaterialization,
     InitialExperimentExecutor,
@@ -49,6 +50,7 @@ class SupervisedResearchCyclePreparationResult:
     candidate_feasibility_decision_id: str | None = None
     research_designer_invocation_id: str | None = None
     research_design_intent_id: str | None = None
+    research_prediction_plan_id: str | None = None
     initial_experiment_plan_id: str | None = None
     materialization_proposal_id: str | None = None
     message: str | None = None
@@ -60,6 +62,7 @@ class SupervisedResearchCycleExecutionResult:
     materialization_proposal_id: str
     initial_experiment_plan_id: str
     contrast_result_id: str | None = None
+    scientific_verdict_id: str | None = None
     message: str | None = None
 
 
@@ -77,6 +80,7 @@ class SupervisedResearchCycle:
         governed_designer: GovernedResearchDesigner | None = None,
         governed_materialization: GovernedSpecMaterialization | None = None,
         executor: InitialExperimentExecutor | None = None,
+        verdict_evaluator: ScientificVerdictEvaluator | None = None,
     ) -> None:
         self._store = store
         self._registry = registry
@@ -93,6 +97,7 @@ class SupervisedResearchCycle:
             registry=registry,
         )
         self._executor = executor or InitialExperimentExecutor(store=store)
+        self._verdict_evaluator = verdict_evaluator or ScientificVerdictEvaluator(store=store)
 
     def prepare(self, brief: ResearchBrief) -> SupervisedResearchCyclePreparationResult:
         invocation, candidate = generate_candidate(self._scientist, brief, self._store)
@@ -137,6 +142,7 @@ class SupervisedResearchCycle:
             materialized = self._governed_materialization.materialize(
                 candidate,
                 design_result.design_intent,
+                prediction_plan=design_result.prediction_plan,
                 candidate_feasibility_decision_id=feasibility_decision.id,
             )
         except MaterializationBlockedError as exc:
@@ -148,6 +154,9 @@ class SupervisedResearchCycle:
                 candidate_feasibility_decision_id=feasibility_decision.id,
                 research_designer_invocation_id=design_result.invocation.id,
                 research_design_intent_id=design_result.design_intent.id,
+                research_prediction_plan_id=(
+                    None if design_result.prediction_plan is None else design_result.prediction_plan.id
+                ),
                 message=str(exc),
             )
 
@@ -160,6 +169,9 @@ class SupervisedResearchCycle:
                 candidate_feasibility_decision_id=feasibility_decision.id,
                 research_designer_invocation_id=design_result.invocation.id,
                 research_design_intent_id=design_result.design_intent.id,
+                research_prediction_plan_id=(
+                    None if design_result.prediction_plan is None else design_result.prediction_plan.id
+                ),
                 initial_experiment_plan_id=materialized.plan.id,
                 materialization_proposal_id=materialized.proposal.id,
                 message="Exact materialization feasibility did not pass for every required condition.",
@@ -173,6 +185,9 @@ class SupervisedResearchCycle:
             candidate_feasibility_decision_id=feasibility_decision.id,
             research_designer_invocation_id=design_result.invocation.id,
             research_design_intent_id=design_result.design_intent.id,
+            research_prediction_plan_id=(
+                None if design_result.prediction_plan is None else design_result.prediction_plan.id
+            ),
             initial_experiment_plan_id=materialized.plan.id,
             materialization_proposal_id=materialized.proposal.id,
             message="Preparation completed. Explicit human acceptance is required before execution.",
@@ -215,12 +230,31 @@ class SupervisedResearchCycle:
                 message=str(exc),
             )
 
+        scientific_verdict_id = None
+        verdict_message = "Deterministic execution completed and persisted a contrast result."
+        if plan.research_prediction_plan_id is not None:
+            try:
+                verdict = self._verdict_evaluator.evaluate_plan(plan.id)
+            except Exception as exc:
+                return SupervisedResearchCycleExecutionResult(
+                    status=SupervisedResearchCycleExecutionStatus.EXECUTION_FAILED,
+                    materialization_proposal_id=proposal.id,
+                    initial_experiment_plan_id=plan.id,
+                    contrast_result_id=contrast_result.id,
+                    message=str(exc),
+                )
+            scientific_verdict_id = verdict.id
+            verdict_message = (
+                "Deterministic execution completed and persisted both a contrast result and a scientific verdict."
+            )
+
         return SupervisedResearchCycleExecutionResult(
             status=SupervisedResearchCycleExecutionStatus.COMPLETED,
             materialization_proposal_id=proposal.id,
             initial_experiment_plan_id=plan.id,
             contrast_result_id=contrast_result.id,
-            message="Deterministic execution completed and persisted a contrast result.",
+            scientific_verdict_id=scientific_verdict_id,
+            message=verdict_message,
         )
 
     def _prepare_no_candidate_result(

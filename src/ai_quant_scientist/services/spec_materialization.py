@@ -29,6 +29,7 @@ from ..models.design import (
     ParameterSensitivityContrastResult,
     ResearchDesignIntent,
     ResearchDesignKind,
+    ResearchPredictionPlan,
     SpecFeasibilityDecision,
     SpecFeasibilityPhase,
     SpecFeasibilityReasonCode,
@@ -224,6 +225,7 @@ class SpecMaterializer:
         *,
         candidate: ResearchCandidate,
         design_intent: ResearchDesignIntent,
+        prediction_plan: ResearchPredictionPlan | None = None,
         candidate_feasibility_decision,
         registry: CapabilityRegistry,
     ) -> InitialExperimentPlanMaterializationResult:
@@ -238,6 +240,20 @@ class SpecMaterializer:
             raise MaterializationBlockedError("Candidate feasibility decision does not belong to candidate")
         if design_intent.candidate_id != candidate.id:
             raise MaterializationBlockedError("ResearchDesignIntent does not belong to candidate")
+        if prediction_plan is not None:
+            if prediction_plan.candidate_id != candidate.id:
+                raise MaterializationBlockedError("ResearchPredictionPlan does not belong to candidate")
+            if prediction_plan.design_intent_id != design_intent.id:
+                raise MaterializationBlockedError("ResearchPredictionPlan does not belong to design intent")
+            if prediction_plan.independent_variable != self.policy.supported_independent_variable:
+                raise MaterializationBlockedError(
+                    "ResearchPredictionPlan independent variable is unsupported by the deterministic policy"
+                )
+            prediction_outcomes = {item.outcome for item in prediction_plan.predictions}
+            if prediction_outcomes != set(design_intent.dependent_outcomes):
+                raise MaterializationBlockedError(
+                    "ResearchPredictionPlan predictions must match the authoritative design dependent outcomes exactly"
+                )
         if design_intent.design_kind != self.policy.supported_design_kind:
             raise MaterializationBlockedError(
                 f"Unsupported design_kind for V0.13A.1 materializer: {design_intent.design_kind.value}"
@@ -282,6 +298,7 @@ class SpecMaterializer:
             id=plan_id,
             candidate_id=candidate.id,
             design_intent_id=design_intent.id,
+            research_prediction_plan_id=None if prediction_plan is None else prediction_plan.id,
             candidate_feasibility_decision_id=candidate_feasibility_decision.id,
             selected_capability_id=self.policy.selected_capability_id,
             design_kind=design_intent.design_kind,
@@ -367,6 +384,7 @@ class GovernedSpecMaterialization:
         candidate: ResearchCandidate,
         design_intent: ResearchDesignIntent,
         *,
+        prediction_plan: ResearchPredictionPlan | None = None,
         candidate_feasibility_decision_id: str,
     ) -> InitialExperimentPlanMaterializationResult:
         self._store.save_research_design_intent(design_intent)
@@ -379,6 +397,7 @@ class GovernedSpecMaterialization:
         result = self._materializer.materialize(
             candidate=stored_candidate,
             design_intent=design_intent,
+            prediction_plan=prediction_plan,
             candidate_feasibility_decision=candidate_feasibility_decision,
             registry=self._registry,
         )
@@ -392,6 +411,7 @@ class GovernedSpecMaterialization:
         self,
         design_intent_id: str,
         *,
+        prediction_plan: ResearchPredictionPlan | None = None,
         candidate_feasibility_decision_id: str,
     ) -> InitialExperimentPlanMaterializationResult:
         design_intent = self._store.get_research_design_intent(design_intent_id)
@@ -403,6 +423,7 @@ class GovernedSpecMaterialization:
         return self.materialize(
             candidate,
             design_intent,
+            prediction_plan=prediction_plan,
             candidate_feasibility_decision_id=candidate_feasibility_decision_id,
         )
 
@@ -429,6 +450,7 @@ class InitialExperimentExecutor:
         plan = self._store.get_initial_experiment_plan(plan_id)
         if plan is None:
             raise KeyError(f"InitialExperimentPlan not found: {plan_id!r}")
+        self._store.validate_research_prediction_plan_linkage(plan)
         proposal = self._store.get_initial_experiment_plan_proposal_by_plan_id(plan.id)
         if proposal is None:
             raise KeyError(f"InitialExperimentPlanProposal not found for plan: {plan.id!r}")

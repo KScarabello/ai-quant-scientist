@@ -24,16 +24,25 @@ from ai_quant_scientist.models.design import (
     ConditionExecutionStatus,
     DesignOutcome,
     DesignVariable,
+    ExpectedDirection,
     ExperimentCondition,
     ExperimentConditionRole,
     InitialExperimentCompletionRule,
     InitialExperimentPlan,
     InitialExperimentPlanProposalStatus,
+    OutcomePrediction,
     ResearchDesignIntent,
     ResearchDesignKind,
+    ResearchPredictionPlan,
     SpecFeasibilityPhase,
     SpecFeasibilityReasonCode,
     SpecFeasibilityStatus,
+)
+from ai_quant_scientist.models.research import new_id
+from ai_quant_scientist.models.research_designer import ResearchDesignerInvocation
+from ai_quant_scientist.services.research_design_ontology import (
+    RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
+    build_current_research_design_ontology_snapshot,
 )
 from ai_quant_scientist.services.spec_materialization import (
     GovernedSpecMaterialization,
@@ -129,6 +138,48 @@ def _disabled_stub_registry() -> CapabilityRegistry:
     stub = next(c for c in build_v1_registry().list_capabilities() if c.capability_id == "stub_backtester_v1")
     disabled = replace(stub, enabled=False)
     return CapabilityRegistry([disabled])
+
+
+def _prediction_plan(candidate_id: str, design_intent_id: str) -> tuple[ResearchDesignerInvocation, ResearchPredictionPlan]:
+    ontology = build_current_research_design_ontology_snapshot()
+    invocation = ResearchDesignerInvocation(
+        id=new_id(),
+        candidate_id=candidate_id,
+        candidate_snapshot_json="{}",
+        candidate_feasibility_decision_id="ready-1",
+        prompt_version="v2",
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+        intent_contract_version="research_design_intent_v1",
+        provider="fake",
+        model="fake-v1",
+        raw_response=None,
+        parsed_decision_json='{"decision_type":"DESIGN"}',
+        validation_status="VALID",
+        validation_errors_json=None,
+        resulting_design_intent_id=design_intent_id,
+    )
+    prediction_plan = ResearchPredictionPlan(
+        id=new_id(),
+        candidate_id=candidate_id,
+        design_intent_id=design_intent_id,
+        research_designer_invocation_id=invocation.id,
+        prediction_contract_version=RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        predictions=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+    )
+    return invocation, prediction_plan
 
 
 def test_research_design_intent_is_immutable():
@@ -237,6 +288,64 @@ def test_design_intent_wrong_candidate_fails_closed(tmp_path):
             candidate=candidate_b,
             design_intent=intent,
             candidate_feasibility_decision=latest,
+            registry=registry,
+        )
+
+
+def test_prediction_plan_wrong_design_intent_fails_closed(tmp_path):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate = _synthetic_candidate()
+    _, latest = _submit_candidate(store, registry, candidate)
+    stored_candidate = store.get_research_candidate(candidate.id)
+    assert stored_candidate is not None
+    design_intent = _design_intent(
+        candidate.id,
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+    )
+    other_design_intent = _design_intent(
+        candidate.id,
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+    )
+    invocation, prediction_plan = _prediction_plan(candidate.id, other_design_intent.id)
+    store.save_research_design_intent(other_design_intent)
+    store.save_research_designer_invocation(invocation)
+    store.save_research_prediction_plan(prediction_plan)
+
+    with pytest.raises(MaterializationBlockedError, match="does not belong to design intent"):
+        SpecMaterializer().materialize(
+            candidate=stored_candidate,
+            design_intent=design_intent,
+            prediction_plan=prediction_plan,
+            candidate_feasibility_decision=latest,
+            registry=registry,
+        )
+
+
+def test_prediction_plan_wrong_candidate_fails_closed(tmp_path):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate_a = _synthetic_candidate()
+    _, latest_a = _submit_candidate(store, registry, candidate_a)
+    candidate_b = ResearchCandidate.create(
+        hypothesis_statement="Different candidate.",
+        hypothesis_rationale="Different provenance.",
+        requirements=list(candidate_a.requirements),
+    )
+    store.save_research_candidate(candidate_b)
+    design_intent_a = _design_intent(
+        candidate_a.id,
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+    )
+    invocation, prediction_plan_b = _prediction_plan(candidate_b.id, design_intent_a.id)
+    store.save_research_designer_invocation(invocation)
+
+    with pytest.raises(MaterializationBlockedError, match="does not belong to candidate"):
+        SpecMaterializer().materialize(
+            candidate=candidate_a,
+            design_intent=design_intent_a,
+            prediction_plan=prediction_plan_b,
+            candidate_feasibility_decision=latest_a,
             registry=registry,
         )
 
@@ -513,6 +622,57 @@ def test_execution_cannot_start_before_acceptance(tmp_path):
         executor.execute_plan(materialized.plan.id)
 
 
+def test_save_initial_experiment_plan_rejects_missing_prediction_plan_reference(tmp_path):
+    store = _store(tmp_path)
+    candidate = _synthetic_candidate()
+    store.save_research_candidate(candidate)
+    design_intent = _design_intent(
+        candidate.id,
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+    )
+    store.save_research_design_intent(design_intent)
+
+    plan = InitialExperimentPlan(
+        id=new_id(),
+        candidate_id=candidate.id,
+        design_intent_id=design_intent.id,
+        candidate_feasibility_decision_id="ready-1",
+        selected_capability_id="stub_backtester_v1",
+        design_kind=ResearchDesignKind.PARAMETER_SENSITIVITY,
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        control_variables=(DesignVariable.LOOKBACK,),
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+        ordered_conditions=(
+            ExperimentCondition(
+                id=new_id(),
+                ordinal=1,
+                role=ExperimentConditionRole.BASELINE,
+                exact_parameters={"signal_threshold": 2.0, "lookback": 20},
+                selected_capability_id="stub_backtester_v1",
+                expected_tool_kind="BACKTEST_EXECUTION",
+            ),
+            ExperimentCondition(
+                id=new_id(),
+                ordinal=2,
+                role=ExperimentConditionRole.COMPARATOR,
+                exact_parameters={"signal_threshold": 2.5, "lookback": 20},
+                selected_capability_id="stub_backtester_v1",
+                expected_tool_kind="BACKTEST_EXECUTION",
+            ),
+        ),
+        completion_rule=InitialExperimentCompletionRule.ALL_CONDITIONS_REQUIRED,
+        materializer_version="spec_materializer_v2",
+        materialization_policy_version="stub_spec_materialization_policy_v2",
+        materialization_policy_fingerprint="policy-fingerprint",
+        registry_version="capability_registry_v1",
+        registry_fingerprint="registry-fingerprint",
+        research_prediction_plan_id="missing-prediction-plan",
+    )
+
+    with pytest.raises(ValueError, match="references a missing ResearchPredictionPlan"):
+        store.save_initial_experiment_plan(plan)
+
+
 def test_accepted_plan_cannot_be_accepted_twice(tmp_path):
     store = _store(tmp_path)
     registry = _registry()
@@ -640,7 +800,7 @@ def test_semantic_closure_end_to_end_executes_true_parameter_sensitivity_contras
         assert conn.execute("SELECT COUNT(*) FROM spec_revision_proposals").fetchone()[0] == 0
 
 
-def test_v7_to_v9_migration_adds_plan_tables_and_designer_audit_columns(tmp_path):
+def test_v7_to_v10_migration_adds_plan_prediction_and_verdict_tables(tmp_path):
     db = tmp_path / "v7.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -732,7 +892,7 @@ def test_v7_to_v9_migration_adds_plan_tables_and_designer_audit_columns(tmp_path
     store = SQLiteStore(db)
     with store.connect() as c:
         version = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert version == 9
+        assert version == 10
         spec_feasibility_columns = [row[1] for row in c.execute("PRAGMA table_info(spec_feasibility_decisions)").fetchall()]
         assert "plan_id" in spec_feasibility_columns
         assert "condition_id" in spec_feasibility_columns
@@ -740,6 +900,8 @@ def test_v7_to_v9_migration_adds_plan_tables_and_designer_audit_columns(tmp_path
         design_intent_columns = [row[1] for row in c.execute("PRAGMA table_info(research_design_intents)").fetchall()]
         assert "ontology_version" in design_intent_columns
         assert "ontology_fingerprint" in design_intent_columns
+        plan_columns = [row[1] for row in c.execute("PRAGMA table_info(initial_experiment_plans)").fetchall()]
+        assert "research_prediction_plan_id" in plan_columns
         tables = [row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         assert "initial_experiment_plans" in tables
         assert "initial_experiment_conditions" in tables
@@ -747,18 +909,23 @@ def test_v7_to_v9_migration_adds_plan_tables_and_designer_audit_columns(tmp_path
         assert "condition_execution_records" in tables
         assert "parameter_sensitivity_contrast_results" in tables
         assert "research_designer_invocations" in tables
+        assert "research_prediction_plans" in tables
+        assert "scientific_verdicts" in tables
 
 
-def test_fresh_v9_db_has_plan_tables(tmp_path):
+def test_fresh_v10_db_has_plan_prediction_and_verdict_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as c:
         version = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
         tables = [row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         design_intent_columns = [row[1] for row in c.execute("PRAGMA table_info(research_design_intents)").fetchall()]
-    assert version == 9
+        plan_columns = [row[1] for row in c.execute("PRAGMA table_info(initial_experiment_plans)").fetchall()]
+    assert version == 10
     for table in (
         "research_design_intents",
         "research_designer_invocations",
+        "research_prediction_plans",
+        "scientific_verdicts",
         "spec_feasibility_decisions",
         "spec_materialization_proposals",
         "initial_experiment_plans",
@@ -770,3 +937,4 @@ def test_fresh_v9_db_has_plan_tables(tmp_path):
         assert table in tables
     assert "ontology_version" in design_intent_columns
     assert "ontology_fingerprint" in design_intent_columns
+    assert "research_prediction_plan_id" in plan_columns

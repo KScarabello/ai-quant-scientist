@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
 from types import SimpleNamespace
@@ -32,6 +33,9 @@ from ai_quant_scientist.models.design import (
     ComparisonIntent,
     DesignOutcome,
     DesignVariable,
+    ExpectedDirection,
+    OutcomePrediction,
+    ResearchPredictionPlan,
     ResearchDesignIntent,
     ResearchDesignKind,
 )
@@ -44,6 +48,9 @@ from ai_quant_scientist.models.research_designer import (
 from ai_quant_scientist.services.openai_research_designer import OpenAIResearchDesigner
 from ai_quant_scientist.services.research_design_ontology import (
     RESEARCH_DESIGN_ONTOLOGY_VERSION,
+    RESEARCH_DESIGN_ONTOLOGY_V2_VERSION,
+    RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
+    build_current_research_design_ontology_snapshot,
     build_research_design_ontology_snapshot,
     compute_research_design_ontology_fingerprint,
 )
@@ -55,6 +62,7 @@ from ai_quant_scientist.services.research_designer import (
     context_to_payload,
 )
 from ai_quant_scientist.services.research_designer_prompts import (
+    CURRENT_RESEARCH_DESIGNER_VERSION,
     RESEARCH_DESIGNER_VERSION,
     available_versions,
     get_research_designer_instructions,
@@ -121,6 +129,45 @@ def _submit_candidate(store: SQLiteStore, registry: CapabilityRegistry, candidat
     return result, latest
 
 
+def _ready_directional_candidate() -> ResearchCandidate:
+    return _ready_candidate(
+        statement=(
+            "A stricter signal threshold should lower trade frequency and higher "
+            "risk-adjusted performance."
+        ),
+        rationale=(
+            "Filtering weaker signal realizations should reduce trade frequency while improving "
+            "risk-adjusted performance under fixed lookback."
+        ),
+    )
+
+
+def _ontology_v1():
+    return build_research_design_ontology_snapshot(version="v1")
+
+
+def _ontology_v2():
+    return build_current_research_design_ontology_snapshot()
+
+
+def _governed_v1(store: SQLiteStore, registry: CapabilityRegistry, designer) -> GovernedResearchDesigner:
+    return GovernedResearchDesigner(
+        store=store,
+        registry=registry,
+        designer=designer,
+        ontology=_ontology_v1(),
+    )
+
+
+def _governed_v2(store: SQLiteStore, registry: CapabilityRegistry, designer) -> GovernedResearchDesigner:
+    return GovernedResearchDesigner(
+        store=store,
+        registry=registry,
+        designer=designer,
+        ontology=_ontology_v2(),
+    )
+
+
 def _make_openai_response(parsed: dict):
     text = json.dumps(parsed)
     item = SimpleNamespace(type="output_text", parsed=parsed, text=text)
@@ -163,7 +210,49 @@ def _design_decision(candidate_id: str, **overrides) -> ResearchDesignerDecision
         "model": "fake-v1",
         "prompt_version": "v1",
         "ontology_version": RESEARCH_DESIGN_ONTOLOGY_VERSION,
-        "ontology_fingerprint": build_research_design_ontology_snapshot().fingerprint,
+        "ontology_fingerprint": _ontology_v1().fingerprint,
+    }
+    payload.update(overrides)
+    return ResearchDesignerDecision(**payload)
+
+
+def _design_decision_v2(candidate_id: str, **overrides) -> ResearchDesignerDecision:
+    payload = {
+        "id": "decision-v2",
+        "candidate_id": candidate_id,
+        "decision_type": ResearchDesignerDecisionType.DESIGN,
+        "design_kind": ResearchDesignKind.PARAMETER_SENSITIVITY,
+        "independent_variables": (DesignVariable.SIGNAL_THRESHOLD,),
+        "dependent_outcomes": (
+            DesignOutcome.SHARPE,
+            DesignOutcome.TRADE_COUNT,
+        ),
+        "controls": (DesignVariable.LOOKBACK,),
+        "comparison_intent": ComparisonIntent.CONTRAST_PARAMETER_LEVELS,
+        "analysis_intent": AnalysisIntent.SENSITIVITY_ANALYSIS,
+        "predictions": (
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        "falsification_condition": (
+            "The hypothesis is falsified if a stricter signal threshold does not yield lower trade "
+            "frequency and higher risk-adjusted performance under fixed controls."
+        ),
+        "rationale": (
+            "Use a bounded parameter-sensitivity design and precommit directional predictions for "
+            "trade_count and sharpe."
+        ),
+        "provider": "fake",
+        "model": "fake-v2",
+        "prompt_version": "v2",
+        "ontology_version": RESEARCH_DESIGN_ONTOLOGY_V2_VERSION,
+        "ontology_fingerprint": _ontology_v2().fingerprint,
     }
     payload.update(overrides)
     return ResearchDesignerDecision(**payload)
@@ -236,22 +325,22 @@ def _context_with_payload(candidate: ResearchCandidate, payload: dict) -> Resear
 
 
 def test_research_design_ontology_snapshot_is_deterministic():
-    first = build_research_design_ontology_snapshot()
-    second = build_research_design_ontology_snapshot()
+    first = _ontology_v1()
+    second = _ontology_v1()
     assert first.version == RESEARCH_DESIGN_ONTOLOGY_VERSION
     assert first.fingerprint == second.fingerprint
     assert len(first.fingerprint) == 64
 
 
 def test_research_design_ontology_v1_fingerprint_preserved():
-    ontology = build_research_design_ontology_snapshot()
+    ontology = _ontology_v1()
     assert ontology.version == RESEARCH_DESIGN_ONTOLOGY_VERSION
     assert ontology.fingerprint == "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e"
     assert compute_research_design_ontology_fingerprint(ontology.to_payload()) == ontology.fingerprint
 
 
 def test_research_design_ontology_payload_omits_exact_materialization_values():
-    payload_str = json.dumps(build_research_design_ontology_snapshot().to_payload(), sort_keys=True)
+    payload_str = json.dumps(_ontology_v1().to_payload(), sort_keys=True)
     assert "2.0" not in payload_str
     assert "2.5" not in payload_str
     assert "20" not in payload_str
@@ -260,13 +349,23 @@ def test_research_design_ontology_payload_omits_exact_materialization_values():
 
 
 def test_research_designer_prompt_v1_available_and_hash_locked():
-    assert available_versions() == ("v1",)
+    assert available_versions() == ("v1", "v2")
     prompt = get_research_designer_instructions("v1")
     assert RESEARCH_DESIGNER_VERSION == "research_designer_v1"
+    assert CURRENT_RESEARCH_DESIGNER_VERSION == "research_designer_v2"
     assert "NO_VALID_DESIGN" in prompt
     assert "signal_threshold is the only supported independent variable" in prompt
     assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == (
         "8744692f166fdb6058a4597abb6bcbad17489817efc1879c3506643e1d922fac"
+    )
+
+
+def test_research_designer_prompt_v2_available_and_hash_locked():
+    prompt = get_research_designer_instructions("v2")
+    assert "exactly one directional prediction" in prompt
+    assert "must not contain exact numeric targets" in prompt
+    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == (
+        "721392d5160f82c8de83eaef67f4c3fc96fc13872bd1823f43b7c681737187cb"
     )
 
 
@@ -399,6 +498,145 @@ def test_validator_accepts_valid_design():
     assert errors == {}
 
 
+def test_research_design_ontology_v2_exposes_prediction_contract():
+    ontology = _ontology_v2()
+    assert ontology.version == RESEARCH_DESIGN_ONTOLOGY_V2_VERSION
+    assert ontology.fingerprint == "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d"
+    assert ontology.prediction_contract_version == RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+    assert ontology.supported_expected_directions == ("DECREASE", "INCREASE", "NO_CHANGE")
+    assert "directional prediction" in ontology.prediction_semantics.lower()
+    assert compute_research_design_ontology_fingerprint(ontology.to_payload()) == ontology.fingerprint
+
+
+def test_context_built_from_ontology_v2_passes_semantic_fingerprint_validation():
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=_ready_candidate(),
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    assert context.design_ontology_payload["fingerprint"] == ontology.fingerprint
+    assert context.design_ontology_payload["prediction_contract_version"] == RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+
+
+def test_validator_accepts_valid_v2_design_with_predictions():
+    candidate = _ready_candidate()
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    valid, errors = ResearchDesignProposalValidator(
+        capability_id_tokens=("stub_backtester_v1",)
+    ).validate(_design_decision_v2(candidate.id), context, ontology)
+    assert valid
+    assert errors == {}
+
+
+def test_validator_rejects_missing_prediction_for_selected_outcome():
+    candidate = _ready_candidate()
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision_v2(
+        candidate.id,
+        predictions=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+        ),
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert "predictions_missing" in errors
+
+
+def test_validator_rejects_duplicate_prediction_for_selected_outcome():
+    candidate = _ready_candidate()
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision_v2(
+        candidate.id,
+        predictions=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.NO_CHANGE,
+            ),
+        ),
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert "predictions_duplicate" in errors
+
+
+def test_validator_rejects_prediction_for_unselected_outcome():
+    candidate = _ready_candidate()
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision_v2(
+        candidate.id,
+        dependent_outcomes=(DesignOutcome.TRADE_COUNT,),
+        predictions=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert "predictions_extra" in errors
+
+
+def test_validator_rejects_unsupported_direction_like_value():
+    from types import SimpleNamespace
+
+    candidate = _ready_candidate()
+    ontology = _ontology_v2()
+    context = build_research_designer_context(
+        candidate=candidate,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision_v2(
+        candidate.id,
+        predictions=(
+            SimpleNamespace(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=SimpleNamespace(value="SIDEWAYS"),
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert "predictions_directions" in errors or "predictions" in errors
+
+
 def test_research_design_ontology_snapshot_is_deeply_immutable():
     ontology = build_research_design_ontology_snapshot()
     assert isinstance(ontology.eligible_independent_variables_by_design_kind, MappingProxyType)
@@ -493,7 +731,7 @@ def test_ready_for_spec_authorization_required_before_provider_invocation(tmp_pa
     candidate = _blocked_candidate()
     _, latest = _submit_candidate(store, registry, candidate)
     designer = _StaticDesigner(_design_decision(candidate.id))
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=designer)
+    governed = _governed_v1(store, registry, designer)
     with pytest.raises(RuntimeError, match="READY_FOR_SPEC"):
         governed.generate_design_intent(
             candidate_id=candidate.id,
@@ -508,7 +746,7 @@ def test_explicit_authorization_id_required(tmp_path):
     registry = _registry()
     candidate = _ready_candidate()
     _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
     with pytest.raises(KeyError, match="Feasibility decision not found"):
         governed.generate_design_intent(
             candidate_id=candidate.id,
@@ -523,7 +761,7 @@ def test_wrong_candidate_authorization_rejected(tmp_path):
     _, latest_a = _submit_candidate(store, registry, candidate_a)
     candidate_b = _ready_candidate(statement="Different candidate")
     _submit_candidate(store, registry, candidate_b)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
     with pytest.raises(RuntimeError, match="does not belong"):
         governed.generate_design_intent(
             candidate_id=candidate_b.id,
@@ -536,7 +774,7 @@ def test_valid_design_materializes_authoritative_intent_and_persists_invocation(
     registry = _registry()
     candidate = _ready_candidate()
     _, latest = _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
 
     result = governed.generate_design_intent(
         candidate_id=candidate.id,
@@ -552,13 +790,108 @@ def test_valid_design_materializes_authoritative_intent_and_persists_invocation(
     assert invocations[0].resulting_design_intent_id == result.design_intent.id
 
 
+def test_valid_v2_design_materializes_prediction_plan_before_downstream_execution(tmp_path):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate = _ready_directional_candidate()
+    _, latest = _submit_candidate(store, registry, candidate)
+    governed = _governed_v2(store, registry, FakeResearchDesigner(prompt_version="v2"))
+
+    result = governed.generate_design_intent(
+        candidate_id=candidate.id,
+        candidate_feasibility_decision_id=latest.id,
+    )
+
+    assert result.design_intent is not None
+    assert result.prediction_plan is not None
+    assert result.design_intent.source.startswith("research_designer_v2:fake:fake-v1")
+    assert result.design_intent.ontology_version == RESEARCH_DESIGN_ONTOLOGY_V2_VERSION
+    assert result.prediction_plan.design_intent_id == result.design_intent.id
+    assert result.prediction_plan.candidate_id == candidate.id
+    assert result.prediction_plan.research_designer_invocation_id == result.invocation.id
+    assert result.prediction_plan.prediction_contract_version == RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+    assert [
+        (item.outcome.value, item.expected_direction.value)
+        for item in result.prediction_plan.predictions
+    ] == [
+        ("sharpe", "INCREASE"),
+        ("trade_count", "DECREASE"),
+    ]
+    persisted = store.get_research_prediction_plan(result.prediction_plan.id)
+    assert persisted is not None
+    assert persisted.research_designer_invocation_id == result.invocation.id
+
+
+def test_v2_design_and_prediction_persist_atomically(tmp_path, monkeypatch):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate = _ready_directional_candidate()
+    _, latest = _submit_candidate(store, registry, candidate)
+    governed = _governed_v2(store, registry, FakeResearchDesigner(prompt_version="v2"))
+
+    original_connect = store.connect
+
+    @contextmanager
+    def failing_connect():
+        with original_connect() as conn:
+            class _Proxy:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def execute(self, sql, params=()):
+                    if "INSERT INTO research_prediction_plans" in sql:
+                        raise RuntimeError("simulated_prediction_persistence_failure")
+                    return self._inner.execute(sql, params)
+
+                def __getattr__(self, name):
+                    return getattr(self._inner, name)
+
+            yield _Proxy(conn)
+
+    monkeypatch.setattr(store, "connect", failing_connect)
+
+    with pytest.raises(RuntimeError, match="simulated_prediction_persistence_failure"):
+        governed.generate_design_intent(
+            candidate_id=candidate.id,
+            candidate_feasibility_decision_id=latest.id,
+        )
+
+    assert store.list_research_design_intents(candidate.id) == []
+    assert store.get_research_designer_invocations(candidate.id) == []
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM research_prediction_plans").fetchone()[0] == 0
+
+
+def test_ambiguous_v2_candidate_returns_no_valid_design_instead_of_guessing_direction(tmp_path):
+    store = _store(tmp_path)
+    registry = _registry()
+    candidate = _ready_candidate(
+        statement="Signal threshold changes synthetic performance.",
+        rationale="Changing threshold may alter outcomes, but no defensible direction is specified.",
+    )
+    _, latest = _submit_candidate(store, registry, candidate)
+    governed = _governed_v2(store, registry, FakeResearchDesigner(prompt_version="v2"))
+
+    result = governed.generate_design_intent(
+        candidate_id=candidate.id,
+        candidate_feasibility_decision_id=latest.id,
+    )
+
+    assert result.design_intent is None
+    assert result.prediction_plan is None
+    assert result.decision is not None
+    assert result.decision.decision_type == ResearchDesignerDecisionType.NO_VALID_DESIGN
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM research_prediction_plans").fetchone()[0] == 0
+
+
 def test_governed_service_uses_exact_context_owned_ontology_snapshot_for_provider_and_invocation(tmp_path):
     store = _store(tmp_path)
     registry = _registry()
     candidate = _ready_candidate()
     _, latest = _submit_candidate(store, registry, candidate)
     capturing = _CapturingDesigner()
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=capturing)
+    governed = _governed_v1(store, registry, capturing)
 
     result = governed.generate_design_intent(
         candidate_id=candidate.id,
@@ -584,7 +917,7 @@ def test_no_valid_design_persists_invocation_without_creating_intent(tmp_path):
         rationale="This candidate is about lookback sensitivity only.",
     )
     _, latest = _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
 
     result = governed.generate_design_intent(
         candidate_id=candidate.id,
@@ -609,7 +942,7 @@ def test_validation_failure_persists_invocation_and_no_intent(tmp_path):
     invalid_designer = _StaticDesigner(
         _design_decision(candidate.id, rationale="Compare signal_threshold = 2.0 to another level.")
     )
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=invalid_designer)
+    governed = _governed_v1(store, registry, invalid_designer)
 
     result = governed.generate_design_intent(
         candidate_id=candidate.id,
@@ -629,7 +962,7 @@ def test_invocation_history_is_append_only(tmp_path):
     registry = _registry()
     candidate = _ready_candidate()
     _, latest = _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
 
     governed.generate_design_intent(candidate_id=candidate.id, candidate_feasibility_decision_id=latest.id)
     governed.generate_design_intent(candidate_id=candidate.id, candidate_feasibility_decision_id=latest.id)
@@ -644,7 +977,7 @@ def test_provider_error_is_persisted_then_re_raised(tmp_path):
     registry = _registry()
     candidate = _ready_candidate()
     _, latest = _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=_RaisingDesigner())
+    governed = _governed_v1(store, registry, _RaisingDesigner())
 
     with pytest.raises(RuntimeError, match="boom"):
         governed.generate_design_intent(
@@ -665,7 +998,7 @@ def test_ai_created_intent_is_downstream_compatible_with_existing_materializer(t
         rationale="Even if someone mentions 2.0, 2.5, or 20 in prose, the design intent should stay abstract."
     )
     _, latest = _submit_candidate(store, registry, candidate)
-    governed = GovernedResearchDesigner(store=store, registry=registry, designer=FakeResearchDesigner())
+    governed = _governed_v1(store, registry, FakeResearchDesigner(prompt_version="v1"))
     result = governed.generate_design_intent(
         candidate_id=candidate.id,
         candidate_feasibility_decision_id=latest.id,
@@ -706,7 +1039,7 @@ def test_openai_research_designer_adapter_parses_design():
         candidate_feasibility_decision_id="auth-1",
         ontology=build_research_design_ontology_snapshot(),
     )
-    decision = OpenAIResearchDesigner(client=client).design(context)
+    decision = OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
     assert decision.decision_type == ResearchDesignerDecisionType.DESIGN
     assert decision.independent_variables == (DesignVariable.SIGNAL_THRESHOLD,)
     assert decision.controls == (DesignVariable.LOOKBACK,)
@@ -735,7 +1068,7 @@ def test_openai_research_designer_sends_exact_supplied_context_ontology_snapshot
         candidate_feasibility_decision_id="auth-1",
         ontology=build_research_design_ontology_snapshot(),
     )
-    decision = OpenAIResearchDesigner(client=client).design(context)
+    decision = OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
     provider_payload = json.loads(captured["input"])
     assert provider_payload["research_design_ontology"] == context.design_ontology_payload
     assert decision.ontology_version == context.design_ontology_version
@@ -793,7 +1126,7 @@ def test_openai_research_designer_does_not_substitute_global_current_ontology():
         ],
     })
     context = _context_with_payload(candidate, custom_payload)
-    decision = OpenAIResearchDesigner(client=client).design(context)
+    decision = OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
     provider_payload = json.loads(captured["input"])
     assert provider_payload["research_design_ontology"] == custom_payload
     assert provider_payload["research_design_ontology"]["version"] != RESEARCH_DESIGN_ONTOLOGY_VERSION
@@ -827,7 +1160,7 @@ def test_openai_research_designer_fails_closed_before_provider_invocation_on_pay
     object.__setattr__(context, "design_ontology_payload_json", _canonical_payload_json(tampered_payload))
 
     with pytest.raises(ValueError, match="payload fingerprint must match the semantic ontology payload"):
-        OpenAIResearchDesigner(client=client).design(context)
+        OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
 
     client.responses.parse.assert_not_called()
 
@@ -855,7 +1188,7 @@ def test_openai_research_designer_input_contains_ontology_without_capability_or_
         candidate_feasibility_decision_id="auth-1",
         ontology=build_research_design_ontology_snapshot(),
     )
-    OpenAIResearchDesigner(client=client).design(context)
+    OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
     payload = json.loads(captured["input"])
     payload_str = json.dumps(payload, sort_keys=True)
     assert payload["research_design_ontology"]["version"] == RESEARCH_DESIGN_ONTOLOGY_VERSION
@@ -889,7 +1222,7 @@ def test_openai_research_designer_schema_has_no_governance_or_exact_value_fields
         candidate_feasibility_decision_id="auth-1",
         ontology=build_research_design_ontology_snapshot(),
     )
-    OpenAIResearchDesigner(client=client).design(context)
+    OpenAIResearchDesigner(client=client, prompt_version="v1").design(context)
     tf = captured["text_format"]
     fields = list(tf.model_fields.keys())
     for forbidden in (
@@ -918,21 +1251,21 @@ def test_eval_harness_runs_fake_designer_without_api_calls(monkeypatch):
     called = []
     monkeypatch.setattr(urllib.request, "urlopen", lambda *args, **kwargs: called.append(True))
     cases = load_cases_from_file("evals/research_designer_v1.json")
-    results = ResearchDesignerEvalSuite(cases).run(FakeResearchDesigner())
+    results = ResearchDesignerEvalSuite(cases).run(FakeResearchDesigner(prompt_version="v1"))
     assert len(results) == 8
     assert not called
 
 
 def test_eval_harness_blocked_case_stays_pre_call():
     cases = {case.id: case for case in load_cases_from_file("evals/research_designer_v1.json")}
-    result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner())[0]
+    result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner(prompt_version="v1"))[0]
     assert result.runner_outcome == "BLOCKED_PRE_CALL"
     assert result.resulting_design_intent_id is None
 
 
 def test_blocked_pre_call_representation_remains_separate_from_contract_passed():
     cases = {case.id: case for case in load_cases_from_file("evals/research_designer_v1.json")}
-    result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner())[0]
+    result = ResearchDesignerEvalSuite([cases["case-07"]]).run(FakeResearchDesigner(prompt_version="v1"))[0]
     assert result.runner_outcome == "BLOCKED_PRE_CALL"
     assert result.contract_passed is False
 
@@ -946,7 +1279,7 @@ def test_live_runner_requires_allow_live_api():
         )
 
 
-def test_v8_to_v9_migration_adds_research_designer_invocations_and_intent_provenance(tmp_path):
+def test_v8_to_v10_migration_adds_research_designer_invocations_and_preserves_v15_tables(tmp_path):
     db = Path(tmp_path) / "v8.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -988,7 +1321,7 @@ def test_v8_to_v9_migration_adds_research_designer_invocations_and_intent_proven
     store = SQLiteStore(db)
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert version == 9
+        assert version == 10
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
@@ -998,9 +1331,11 @@ def test_v8_to_v9_migration_adds_research_designer_invocations_and_intent_proven
             row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         ]
         assert "research_designer_invocations" in tables
+        assert "research_prediction_plans" in tables
+        assert "scientific_verdicts" in tables
 
 
-def test_fresh_v9_db_has_research_designer_tables(tmp_path):
+def test_fresh_v10_db_has_research_designer_and_prediction_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
@@ -1010,7 +1345,9 @@ def test_fresh_v9_db_has_research_designer_tables(tmp_path):
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
-    assert version == 9
+    assert version == 10
     assert "research_designer_invocations" in tables
+    assert "research_prediction_plans" in tables
+    assert "scientific_verdicts" in tables
     assert "ontology_version" in intent_columns
     assert "ontology_fingerprint" in intent_columns

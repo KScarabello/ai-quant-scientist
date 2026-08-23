@@ -126,7 +126,7 @@ def _run_preparation(
     store = SQLiteStore(db_path)
     registry = build_v1_registry()
     scientist = OpenAIHypothesisScientist(model=model, prompt_version="v3")
-    designer = OpenAIResearchDesigner(model=model, prompt_version="v1")
+    designer = OpenAIResearchDesigner(model=model, prompt_version="v2")
     cycle = SupervisedResearchCycle(
         store=store,
         registry=registry,
@@ -214,6 +214,15 @@ def _build_preparation_artifact(
         if preparation.initial_experiment_plan_id is not None
         else None
     )
+    prediction_plan = (
+        store.get_research_prediction_plan(preparation.research_prediction_plan_id)
+        if preparation.research_prediction_plan_id is not None
+        else (
+            None
+            if plan is None or plan.research_prediction_plan_id is None
+            else store.get_research_prediction_plan(plan.research_prediction_plan_id)
+        )
+    )
     proposal = (
         store.get_initial_experiment_plan_proposal(preparation.materialization_proposal_id)
         if preparation.materialization_proposal_id is not None
@@ -262,6 +271,11 @@ def _build_preparation_artifact(
             "research_designer": None if design_intent is None else design_intent.ontology_fingerprint,
         },
         "research_design_intent_id": None if design_intent is None else design_intent.id,
+        "research_prediction_plan_id": None if prediction_plan is None else prediction_plan.id,
+        "prediction_contract_version": (
+            None if prediction_plan is None else prediction_plan.prediction_contract_version
+        ),
+        "structured_predictions": _prediction_plan_summary(prediction_plan),
         "initial_experiment_plan_id": None if plan is None else plan.id,
         "materialization_proposal_id": None if proposal is None else proposal.id,
         "exact_materialized_conditions": _condition_summaries(plan),
@@ -313,6 +327,22 @@ def _build_acceptance_execution_artifact(
     designer_invocation = store.find_research_designer_invocation_by_resulting_design_intent_id(design_intent.id)
     execution_records = store.list_condition_execution_records(plan.id)
     contrast_result = store.get_parameter_sensitivity_contrast_result(plan.id)
+    prediction_plan = (
+        None
+        if plan.research_prediction_plan_id is None
+        else _require_present(
+            store.get_research_prediction_plan(plan.research_prediction_plan_id),
+            f"ResearchPredictionPlan not found: {plan.research_prediction_plan_id!r}",
+        )
+    )
+    scientific_verdict = (
+        None
+        if execution.scientific_verdict_id is None
+        else _require_present(
+            store.get_scientific_verdict(execution.scientific_verdict_id),
+            f"ScientificVerdict not found: {execution.scientific_verdict_id!r}",
+        )
+    )
 
     return {
         "mode": "accept_and_execute",
@@ -324,6 +354,11 @@ def _build_acceptance_execution_artifact(
             _feasibility_summary(feasibility)
         ),
         "research_design_intent_id": design_intent.id,
+        "research_prediction_plan_id": None if prediction_plan is None else prediction_plan.id,
+        "prediction_contract_version": (
+            None if prediction_plan is None else prediction_plan.prediction_contract_version
+        ),
+        "structured_predictions": _prediction_plan_summary(prediction_plan),
         "initial_experiment_plan_id": plan.id,
         "materialization_proposal_id": proposal.id,
         "exact_materialized_conditions": _condition_summaries(plan),
@@ -338,6 +373,7 @@ def _build_acceptance_execution_artifact(
         "execution_message": execution.message,
         "execution_records": _execution_record_summaries(execution_records),
         "contrast_result": _contrast_result_summary(contrast_result),
+        "scientific_verdict": _scientific_verdict_summary(scientific_verdict),
     }
 
 
@@ -397,6 +433,52 @@ def _contrast_result_summary(contrast_result) -> dict[str, Any] | None:
                 "delta": outcome.delta,
             }
             for outcome in contrast_result.outcomes
+        ],
+    }
+
+
+def _prediction_plan_summary(prediction_plan) -> dict[str, Any] | None:
+    if prediction_plan is None:
+        return None
+    return {
+        "id": prediction_plan.id,
+        "independent_variable": prediction_plan.independent_variable.value,
+        "prediction_contract_version": prediction_plan.prediction_contract_version,
+        "ontology_version": prediction_plan.ontology_version,
+        "ontology_fingerprint": prediction_plan.ontology_fingerprint,
+        "predictions": [
+            {
+                "outcome": item.outcome.value,
+                "expected_direction": item.expected_direction.value,
+            }
+            for item in prediction_plan.predictions
+        ],
+    }
+
+
+def _scientific_verdict_summary(verdict) -> dict[str, Any] | None:
+    if verdict is None:
+        return None
+    return {
+        "id": verdict.id,
+        "prediction_plan_id": verdict.prediction_plan_id,
+        "design_intent_id": verdict.design_intent_id,
+        "experiment_plan_id": verdict.experiment_plan_id,
+        "contrast_result_id": verdict.contrast_result_id,
+        "verdict_policy_version": verdict.verdict_policy_version,
+        "verdict_policy_fingerprint": verdict.verdict_policy_fingerprint,
+        "overall_status": verdict.overall_status.value,
+        "per_outcome_verdicts": [
+            {
+                "outcome": item.outcome.value,
+                "expected_direction": item.expected_direction.value,
+                "observed_direction": None if item.observed_direction is None else item.observed_direction.value,
+                "baseline_value": item.baseline_value,
+                "comparator_value": item.comparator_value,
+                "delta": item.delta,
+                "result": item.result.value,
+            }
+            for item in verdict.per_outcome_verdicts
         ],
     }
 

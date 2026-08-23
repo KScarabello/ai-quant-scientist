@@ -10,7 +10,17 @@ from typing import Any, Protocol
 
 from ..capabilities.gate import GateDecision, ResearchCandidate
 from ..capabilities.serialization import compute_candidate_fingerprint, requirements_to_json
-from ..models.design import ResearchDesignIntent
+from ..models.design import (
+    AnalysisIntent,
+    ComparisonIntent,
+    DesignOutcome,
+    DesignVariable,
+    ExpectedDirection,
+    OutcomePrediction,
+    ResearchDesignIntent,
+    ResearchDesignKind,
+    ResearchPredictionPlan,
+)
 from ..models.research import new_id
 from ..models.research_designer import (
     RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
@@ -21,6 +31,8 @@ from ..models.research_designer import (
 )
 from .research_design_ontology import (
     ResearchDesignOntologySnapshot,
+    RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
+    build_current_research_design_ontology_snapshot,
     build_research_design_ontology_snapshot,
 )
 
@@ -29,13 +41,20 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-RESEARCH_DESIGNER_SOURCE = "research_designer_v1"
+_RESEARCH_DESIGNER_SOURCES = {
+    "v1": "research_designer_v1",
+    "v2": "research_designer_v2",
+}
 _PARAMETER_ASSIGNMENT_RE = re.compile(
     r"\b(signal_threshold|lookback)\b\s*(=|:)?\s*-?\d+(?:\.\d+)?",
     re.IGNORECASE,
 )
 _ORDERING_RE = re.compile(
     r"\b(baseline|comparator|condition\s*[12]|first condition|second condition)\b",
+    re.IGNORECASE,
+)
+_RESULT_LEAKAGE_RE = re.compile(
+    r"\b(observed|actual result|results showed|after seeing results|measured outcome)\b",
     re.IGNORECASE,
 )
 
@@ -54,6 +73,7 @@ class GovernedResearchDesignerResult:
     invocation: ResearchDesignerInvocation
     decision: ResearchDesignerDecision | None
     design_intent: ResearchDesignIntent | None
+    prediction_plan: ResearchPredictionPlan | None
 
 
 def candidate_to_payload(candidate: ResearchCandidate) -> dict[str, Any]:
@@ -208,6 +228,51 @@ class ResearchDesignProposalValidator:
             if unsupported:
                 errors["dependent_outcomes"] = f"Unsupported dependent outcomes: {unsupported}"
 
+        predictions = decision.predictions or ()
+        if ontology.prediction_contract_version is None:
+            if predictions:
+                errors["predictions"] = "Predictions are unsupported under the supplied ontology"
+        else:
+            if not predictions:
+                errors["predictions"] = (
+                    "DESIGN requires exactly one directional prediction for every selected dependent outcome"
+                )
+            else:
+                allowed_directions = set(ontology.supported_expected_directions or ())
+                seen_prediction_outcomes: list[str] = []
+                unsupported_prediction_outcomes: list[str] = []
+                unsupported_directions: list[str] = []
+                for item in predictions:
+                    if not isinstance(item, OutcomePrediction):
+                        errors["predictions"] = "Predictions must be structured outcome/direction pairs"
+                        break
+                    seen_prediction_outcomes.append(item.outcome.value)
+                    if item.outcome.value not in allowed_outcomes:
+                        unsupported_prediction_outcomes.append(item.outcome.value)
+                    if item.expected_direction.value not in allowed_directions:
+                        unsupported_directions.append(item.expected_direction.value)
+                if len(seen_prediction_outcomes) != len(set(seen_prediction_outcomes)):
+                    errors["predictions_duplicate"] = "Predictions must not repeat outcomes"
+                if unsupported_prediction_outcomes:
+                    errors["predictions_outcomes"] = (
+                        f"Predictions must target only supported dependent outcomes: {sorted(set(unsupported_prediction_outcomes))}"
+                    )
+                if unsupported_directions:
+                    errors["predictions_directions"] = (
+                        f"Predictions use unsupported directions: {sorted(set(unsupported_directions))}"
+                    )
+                if dependent_outcomes:
+                    missing = sorted(set(item.value for item in dependent_outcomes) - set(seen_prediction_outcomes))
+                    extra = sorted(set(seen_prediction_outcomes) - set(item.value for item in dependent_outcomes))
+                    if missing:
+                        errors["predictions_missing"] = (
+                            f"Predictions missing required dependent outcomes: {missing}"
+                        )
+                    if extra:
+                        errors["predictions_extra"] = (
+                            f"Predictions must not target unselected dependent outcomes: {extra}"
+                        )
+
         if decision.comparison_intent is None:
             errors["comparison_intent"] = "DESIGN requires comparison_intent"
         elif not hasattr(decision.comparison_intent, "value") or decision.comparison_intent.value not in ontology.comparison_intents:
@@ -267,6 +332,9 @@ class ResearchDesignProposalValidator:
             return
         if _ORDERING_RE.search(stripped):
             errors[field_name] = f"{field_name} must not choose condition ordering or roles"
+            return
+        if _RESULT_LEAKAGE_RE.search(stripped):
+            errors[field_name] = f"{field_name} must not use post-result language"
 
 
 def materialize_research_design_intent(
@@ -276,6 +344,10 @@ def materialize_research_design_intent(
 ) -> ResearchDesignIntent:
     if decision.decision_type != ResearchDesignerDecisionType.DESIGN:
         raise ValueError("Only DESIGN decisions can materialize an authoritative ResearchDesignIntent")
+    source_name = _RESEARCH_DESIGNER_SOURCES.get(
+        decision.prompt_version or "",
+        "research_designer_unknown",
+    )
     return ResearchDesignIntent.create(
         candidate_id=candidate_id,
         design_kind=decision.design_kind,
@@ -286,12 +358,41 @@ def materialize_research_design_intent(
         analysis_intent=decision.analysis_intent,
         falsification_condition=decision.falsification_condition or "",
         rationale=decision.rationale or "",
-        source=f"{RESEARCH_DESIGNER_SOURCE}:{decision.provider or 'unknown'}:{decision.model or 'unknown'}",
+        source=f"{source_name}:{decision.provider or 'unknown'}:{decision.model or 'unknown'}",
         provider=decision.provider,
         model=decision.model,
         prompt_version=decision.prompt_version,
         ontology_version=decision.ontology_version,
         ontology_fingerprint=decision.ontology_fingerprint,
+    )
+
+
+def materialize_research_prediction_plan(
+    decision: ResearchDesignerDecision,
+    *,
+    candidate_id: str,
+    design_intent_id: str,
+    research_designer_invocation_id: str,
+    prediction_contract_version: str,
+) -> ResearchPredictionPlan | None:
+    if decision.decision_type != ResearchDesignerDecisionType.DESIGN:
+        raise ValueError("Only DESIGN decisions can materialize an authoritative ResearchPredictionPlan")
+    predictions = decision.predictions or ()
+    if not predictions:
+        return None
+    independent_variables = decision.independent_variables or ()
+    if len(independent_variables) != 1:
+        raise ValueError("ResearchPredictionPlan requires exactly one independent variable")
+    return ResearchPredictionPlan(
+        id=new_id(),
+        candidate_id=candidate_id,
+        design_intent_id=design_intent_id,
+        research_designer_invocation_id=research_designer_invocation_id,
+        prediction_contract_version=prediction_contract_version,
+        ontology_version=decision.ontology_version or "",
+        ontology_fingerprint=decision.ontology_fingerprint or "",
+        independent_variable=independent_variables[0],
+        predictions=predictions,
     )
 
 
@@ -319,6 +420,17 @@ def _decision_to_json(decision: ResearchDesignerDecision | None) -> str | None:
             ),
             "comparison_intent": decision.comparison_intent.value if decision.comparison_intent else None,
             "analysis_intent": decision.analysis_intent.value if decision.analysis_intent else None,
+            "predictions": (
+                [
+                    {
+                        "outcome": item.outcome.value,
+                        "expected_direction": item.expected_direction.value,
+                    }
+                    for item in decision.predictions
+                ]
+                if decision.predictions is not None
+                else None
+            ),
             "falsification_condition": decision.falsification_condition,
             "rationale": decision.rationale,
             "no_valid_design_reason": decision.no_valid_design_reason,
@@ -347,7 +459,7 @@ class GovernedResearchDesigner:
         self._store = store
         self._registry = registry
         self._designer = designer
-        self._ontology = ontology or build_research_design_ontology_snapshot()
+        self._ontology = ontology or build_current_research_design_ontology_snapshot()
         self._validator = validator or ResearchDesignProposalValidator(
             capability_id_tokens=tuple(
                 capability.capability_id for capability in registry.list_capabilities()
@@ -402,14 +514,26 @@ class GovernedResearchDesigner:
 
         valid, errors = self._validator.validate(decision, context, self._ontology)
         design_intent = None
+        prediction_plan = None
         design_intent_id = None
+        invocation_id = new_id()
         if valid and decision.decision_type == ResearchDesignerDecisionType.DESIGN:
             design_intent = materialize_research_design_intent(decision, candidate_id=candidate_id)
             design_intent_id = design_intent.id
-            self._store.save_research_design_intent(design_intent)
+            prediction_contract_version = (
+                self._ontology.prediction_contract_version
+                or RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+            )
+            prediction_plan = materialize_research_prediction_plan(
+                decision,
+                candidate_id=candidate_id,
+                design_intent_id=design_intent.id,
+                research_designer_invocation_id=invocation_id,
+                prediction_contract_version=prediction_contract_version,
+            )
 
         invocation = ResearchDesignerInvocation(
-            id=new_id(),
+            id=invocation_id,
             candidate_id=candidate_id,
             candidate_snapshot_json=candidate_to_json(candidate),
             candidate_feasibility_decision_id=candidate_feasibility_decision_id,
@@ -425,11 +549,16 @@ class GovernedResearchDesigner:
             validation_errors_json=json.dumps(errors, sort_keys=True) if errors else None,
             resulting_design_intent_id=design_intent_id,
         )
-        self._store.save_research_designer_invocation(invocation)
+        self._store.save_governed_research_design_bundle(
+            invocation=invocation,
+            design_intent=design_intent,
+            prediction_plan=prediction_plan,
+        )
         return GovernedResearchDesignerResult(
             invocation=invocation,
             decision=decision,
             design_intent=design_intent,
+            prediction_plan=prediction_plan,
         )
 
 
@@ -438,17 +567,11 @@ class FakeResearchDesigner:
 
     provider = "fake"
     model = "fake-v1"
-    prompt_version = "v1"
+
+    def __init__(self, prompt_version: str = "v2") -> None:
+        self.prompt_version = prompt_version
 
     def design(self, context: ResearchDesignerContext) -> ResearchDesignerDecision:
-        from ..models.design import (
-            AnalysisIntent,
-            ComparisonIntent,
-            DesignOutcome,
-            DesignVariable,
-            ResearchDesignKind,
-        )
-
         text = (
             f"{context.candidate.hypothesis_statement} {context.candidate.hypothesis_rationale}"
         ).lower()
@@ -481,6 +604,85 @@ class FakeResearchDesigner:
                 decision_type=ResearchDesignerDecisionType.NO_VALID_DESIGN,
                 no_valid_design_reason=(
                     "The bounded V1 contract does not support lookback as the independent variable."
+                ),
+                provider=self.provider,
+                model=self.model,
+                prompt_version=self.prompt_version,
+                ontology_version=context.design_ontology_version,
+                ontology_fingerprint=context.design_ontology_fingerprint,
+            )
+
+        ontology_is_v2 = context.design_ontology_version == "research_design_ontology_v2"
+        if ontology_is_v2:
+            trade_decrease = any(
+                token in text
+                for token in (
+                    "lower trade frequency",
+                    "reduce trade frequency",
+                    "reduces trade frequency",
+                    "fewer trades",
+                    "decrease trade count",
+                    "decreases trade count",
+                )
+            )
+            sharpe_increase = any(
+                token in text
+                for token in (
+                    "higher risk-adjusted performance",
+                    "improve risk-adjusted performance",
+                    "improves risk-adjusted performance",
+                    "increase sharpe",
+                    "increases sharpe",
+                    "higher sharpe",
+                )
+            )
+            if not (trade_decrease and sharpe_increase):
+                return ResearchDesignerDecision(
+                    id=new_id(),
+                    candidate_id=context.candidate_id,
+                    decision_type=ResearchDesignerDecisionType.NO_VALID_DESIGN,
+                    no_valid_design_reason=(
+                        "The bounded V2 contract requires explicit defensible directional predictions "
+                        "for every selected dependent outcome."
+                    ),
+                    provider=self.provider,
+                    model=self.model,
+                    prompt_version=self.prompt_version,
+                    ontology_version=context.design_ontology_version,
+                    ontology_fingerprint=context.design_ontology_fingerprint,
+                )
+
+            return ResearchDesignerDecision(
+                id=new_id(),
+                candidate_id=context.candidate_id,
+                decision_type=ResearchDesignerDecisionType.DESIGN,
+                design_kind=ResearchDesignKind.PARAMETER_SENSITIVITY,
+                independent_variables=(DesignVariable.SIGNAL_THRESHOLD,),
+                dependent_outcomes=(
+                    DesignOutcome.SHARPE,
+                    DesignOutcome.TRADE_COUNT,
+                ),
+                controls=(DesignVariable.LOOKBACK,),
+                comparison_intent=ComparisonIntent.CONTRAST_PARAMETER_LEVELS,
+                analysis_intent=AnalysisIntent.SENSITIVITY_ANALYSIS,
+                predictions=(
+                    OutcomePrediction(
+                        outcome=DesignOutcome.TRADE_COUNT,
+                        expected_direction=ExpectedDirection.DECREASE,
+                    ),
+                    OutcomePrediction(
+                        outcome=DesignOutcome.SHARPE,
+                        expected_direction=ExpectedDirection.INCREASE,
+                    ),
+                ),
+                falsification_condition=(
+                    "The hypothesis is falsified if a stricter signal threshold does not yield "
+                    "lower trade frequency and higher risk-adjusted performance under fixed controls."
+                ),
+                rationale=(
+                    "Use a bounded parameter-sensitivity design that varies signal threshold while "
+                    "holding lookback fixed, and precommit directional expectations for trade_count "
+                    "and sharpe before deterministic materialization."
                 ),
                 provider=self.provider,
                 model=self.model,

@@ -1,0 +1,103 @@
+{
+  "timestamp": 1787384031,
+  "mode": "accept_and_execute",
+  "requested_proposal_id": "7d4c04d5-9f36-49bc-ab15-8cd630f10999",
+  "hypothesis_scientist_invocation_id": "8eebb440-6881-44af-8cc3-fed5d0e11d7a",
+  "research_designer_invocation_id": "6333181b-5887-40fd-baad-c85c19f8c75a",
+  "candidate_id": "ae1e1272-336a-422f-8c64-54b83034ba77",
+  "candidate_feasibility_decision": {
+    "id": "76556cfc-009b-43b9-b7cd-109834566b5e",
+    "status": "READY_FOR_SPEC",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53",
+    "satisfied_ids": [
+      "synthetic_parametric_input",
+      "deterministic_backtest_execution"
+    ],
+    "unsatisfied_ids": [],
+    "reason_codes": []
+  },
+  "research_design_intent_id": "43d11594-d179-4b75-917f-c386370ae5e5",
+  "initial_experiment_plan_id": "25743ed7-be87-4826-a836-674764e13273",
+  "materialization_proposal_id": "7d4c04d5-9f36-49bc-ab15-8cd630f10999",
+  "exact_materialized_conditions": [
+    {
+      "condition_id": "10475412-adcb-4097-abab-dc29ae440ace",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.0
+      }
+    },
+    {
+      "condition_id": "62fca1e6-e52a-469b-90b2-950cf1d1fd1f",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.5
+      }
+    }
+  ],
+  "preparation_outcome": "PROPOSED",
+  "preparation_message": "Loaded exact persisted proposal for explicit acceptance/execution.",
+  "human_acceptance_occurred": true,
+  "execution_outcome": "COMPLETED",
+  "execution_message": "Deterministic execution completed and persisted a contrast result.",
+  "execution_records": [
+    {
+      "condition_id": "10475412-adcb-4097-abab-dc29ae440ace",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "status": "COMPLETED",
+      "metrics": {
+        "lookback": 20,
+        "net_pnl": 12.5,
+        "score": 10.0,
+        "sharpe": 1.0,
+        "signal_threshold": 2.0,
+        "trade_count": 4
+      },
+      "tool_name": "stub_backtester"
+    },
+    {
+      "condition_id": "62fca1e6-e52a-469b-90b2-950cf1d1fd1f",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "status": "COMPLETED",
+      "metrics": {
+        "lookback": 20,
+        "net_pnl": 9.38,
+        "score": 7.5,
+        "sharpe": 0.75,
+        "signal_threshold": 2.5,
+        "trade_count": 4
+      },
+      "tool_name": "stub_backtester"
+    }
+  ],
+  "contrast_result": {
+    "id": "3abcbf83-3ae9-48f0-8b39-dc0aae0cc749",
+    "plan_id": "25743ed7-be87-4826-a836-674764e13273",
+    "independent_variable": "signal_threshold",
+    "baseline_parameter_value": 2.0,
+    "comparator_parameter_value": 2.5,
+    "outcomes": [
+      {
+        "outcome": "sharpe",
+        "baseline_value": 1.0,
+        "comparator_value": 0.75,
+        "delta": -0.25
+      },
+      {
+        "outcome": "trade_count",
+        "baseline_value": 4.0,
+        "comparator_value": 4.0,
+        "delta": 0.0
+      }
+    ]
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "timestamp": 1787383593,
+  "mode": "prepare",
+  "models": {
+    "hypothesis_scientist": "gpt-5.6-terra",
+    "research_designer": "gpt-5.6-terra"
+  },
+  "prompt_versions": {
+    "hypothesis_scientist": "v3",
+    "research_designer": "v1"
+  },
+  "brief": {
+    "id": "c39c5361-6a9c-4a43-a24f-0c27c5d16d4b",
+    "research_question": "For this bounded synthetic smoke test, does making a signal threshold stricter change trade frequency and risk-adjusted performance for the same synthetic strategy logic when a synthetic-parametric dataset is treated as the prerequisite input?",
+    "asset_class_focus": "SYNTHETIC",
+    "instrument_focus": null,
+    "methodological_constraints": [
+      "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
+      "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+      "Do not require particular primitive synthetic data fields at candidate-feasibility time.",
+      "Leave required_fields unset unless a primitive input field is strictly unavoidable for broad feasibility.",
+      "Do not assert required_parameters for this smoke test.",
+      "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
+      "Do not require a separate statistical-analysis tool for this bounded fixture.",
+      "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
+      "Do not assume real market data or live trading capabilities.",
+      "Focus on a single falsifiable hypothesis that can be expressed as a parameter-sensitivity design without exact execution values."
+    ],
+    "exclusions": [
+      "Do not propose exact execution parameter values.",
+      "Do not mention capability IDs.",
+      "Do not assume autonomous execution approval."
+    ],
+    "source": "live_supervised_cycle_v1"
+  },
+  "hypothesis_scientist_invocation_id": "5fb98054-2362-4306-8f6d-dd19478ce2e5",
+  "hypothesis_decision": {
+    "decision_type": "PROPOSE_HYPOTHESIS",
+    "hypothesis_rationale": "A signal threshold controls which signal observations qualify for action; tightening it mechanically changes the set and frequency of qualifying observations, and that selection can alter the distribution of realized strategy returns and therefore its risk-adjusted performance. The hypothesis is falsified if the deterministic contrast between threshold conditions does not show a change in either measured trade frequency or risk-adjusted performance.",
+    "hypothesis_statement": "For identical synthetic strategy logic applied to the same synthetic-parametric dataset, a stricter signal-threshold setting changes both trade frequency and risk-adjusted performance relative to a less strict setting.",
+    "no_hypothesis_reason": null,
+    "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "ontology_version": "requirement_ontology_v2",
+    "requirements_snapshot": "[{\"asset_class\":\"SYNTHETIC\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"end_date\":null,\"instruments\":null,\"label\":\"\",\"point_in_time_required\":false,\"required_fields\":null,\"required_parameters\":null,\"requirement_id\":\"synthetic_parametric_input\",\"resolution\":\"N/A\",\"start_date\":null,\"type\":\"DataRequirement\"},{\"label\":\"Deterministic backtest execution for the synthetic threshold-sensitivity contrast\",\"requirement_id\":\"deterministic_backtest_execution\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"type\":\"ToolRequirement\"}]"
+  },
+  "candidate_id": "46d4ef3b-c64d-4881-8fef-80ef4a1471ff",
+  "candidate_feasibility_decision": {
+    "id": "f374bc0d-fc89-456a-9d20-38cb8817e37d",
+    "status": "READY_FOR_SPEC",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53",
+    "satisfied_ids": [
+      "synthetic_parametric_input",
+      "deterministic_backtest_execution"
+    ],
+    "unsatisfied_ids": [],
+    "reason_codes": []
+  },
+  "research_designer_invocation_id": "1085388c-3f31-4d26-8a05-068aaf68650e",
+  "designer_decision": {
+    "analysis_intent": "SENSITIVITY_ANALYSIS",
+    "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+    "controls": [
+      "lookback"
+    ],
+    "decision_type": "DESIGN",
+    "dependent_outcomes": [
+      "sharpe",
+      "trade_count"
+    ],
+    "design_kind": "PARAMETER_SENSITIVITY",
+    "falsification_condition": "The hypothesis is falsified if the deterministic contrast across signal-threshold levels shows no change in either trade frequency or risk-adjusted performance.",
+    "independent_variables": [
+      "signal_threshold"
+    ],
+    "model": "gpt-5.6-terra",
+    "no_valid_design_reason": null,
+    "ontology_fingerprint": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e",
+    "ontology_version": "research_design_ontology_v1",
+    "prompt_version": "v1",
+    "provider": "openai",
+    "rationale": "Varying the signal threshold while retaining lookback as a fixed control tests whether signal-gating strictness changes trade frequency and risk-adjusted performance on the same synthetic-parametric dataset."
+  },
+  "ontology_versions": {
+    "hypothesis_scientist": "requirement_ontology_v2",
+    "research_designer": "research_design_ontology_v1"
+  },
+  "ontology_fingerprints": {
+    "hypothesis_scientist": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "research_designer": "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e"
+  },
+  "research_design_intent_id": "27ec9b70-430b-4aea-b8ff-2fb41a45f201",
+  "initial_experiment_plan_id": "0807ff4a-e89f-4cc3-93af-252b0a6c9b36",
+  "materialization_proposal_id": "17f8b226-76fd-479a-9306-e70d241ae1dc",
+  "exact_materialized_conditions": [
+    {
+      "condition_id": "ac12f2bb-8ea9-48d9-afd7-3f811e2ba5cb",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.0
+      }
+    },
+    {
+      "condition_id": "4b9f2ab1-2375-43a2-9c22-8fc9eab8ec9e",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.5
+      }
+    }
+  ],
+  "preparation_outcome": "AWAITING_HUMAN_ACCEPTANCE",
+  "preparation_message": "Preparation completed. Explicit human acceptance is required before execution.",
+  "human_acceptance_occurred": false,
+  "execution_outcome": null,
+  "execution_message": null,
+  "execution_records": [],
+  "contrast_result": null
+}

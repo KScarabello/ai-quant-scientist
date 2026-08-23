@@ -8,8 +8,23 @@ from datetime import timedelta
 import pytest
 
 from ai_quant_scientist.capabilities import CapabilityRegistry, build_v1_registry
+from ai_quant_scientist.capabilities.gate import ResearchCandidate
 from ai_quant_scientist.models.design import (
+    AnalysisIntent,
+    ComparisonIntent,
+    DesignOutcome,
+    DesignVariable,
+    ExperimentCondition,
+    ExperimentConditionRole,
+    InitialExperimentCompletionRule,
+    InitialExperimentPlan,
+    InitialExperimentPlanProposal,
     InitialExperimentPlanProposalStatus,
+    OutcomeContrast,
+    ParameterSensitivityContrastResult,
+    ResearchDesignIntent,
+    ResearchDesignKind,
+    ScientificVerdictStatus,
     SpecFeasibilityPhase,
 )
 from ai_quant_scientist.models.hypothesis_scientist import (
@@ -35,7 +50,10 @@ from ai_quant_scientist.services.research_designer import FakeResearchDesigner
 from ai_quant_scientist.models.research_designer import ResearchDesignerDecisionType
 from ai_quant_scientist.models.research_designer import ResearchDesignerInvocation
 from ai_quant_scientist.services.research_designer_prompts import get_research_designer_instructions
-from ai_quant_scientist.services.research_design_ontology import build_research_design_ontology_snapshot
+from ai_quant_scientist.services.research_design_ontology import (
+    build_current_research_design_ontology_snapshot,
+    build_research_design_ontology_snapshot,
+)
 from ai_quant_scientist.services.scientist_requirement_ontology import (
     REQUIREMENT_ONTOLOGY_VERSION,
     build_requirement_ontology_snapshot,
@@ -100,6 +118,7 @@ class _NoHypothesisScientist(FakeHypothesisScientist):
 
 class _CountingDesigner(FakeResearchDesigner):
     def __init__(self) -> None:
+        super().__init__(prompt_version="v2")
         self.called = 0
 
     def design(self, context):
@@ -186,6 +205,7 @@ class _SyntheticFieldConstrainedScientist(FakeHypothesisScientist):
 
 class _NoValidDesignDesigner(FakeResearchDesigner):
     def __init__(self) -> None:
+        super().__init__(prompt_version="v2")
         self.called = 0
 
     def design(self, context):
@@ -257,6 +277,7 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
     assert preparation.candidate_id is not None
     assert preparation.candidate_feasibility_decision_id is not None
     assert preparation.research_design_intent_id is not None
+    assert preparation.research_prediction_plan_id is not None
     assert preparation.initial_experiment_plan_id is not None
     assert preparation.materialization_proposal_id is not None
     assert scientist.called == 1
@@ -267,15 +288,19 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
     intents = store.list_research_design_intents(preparation.candidate_id)
     plan = store.get_initial_experiment_plan(preparation.initial_experiment_plan_id)
     proposal = store.get_initial_experiment_plan_proposal(preparation.materialization_proposal_id)
+    prediction_plan = store.get_research_prediction_plan(preparation.research_prediction_plan_id)
     assert candidate is not None
     assert feasibility is not None
     assert plan is not None
     assert proposal is not None
+    assert prediction_plan is not None
     assert len(intents) == 1
     assert plan.candidate_feasibility_decision_id == preparation.candidate_feasibility_decision_id
     assert proposal.candidate_feasibility_decision_id == preparation.candidate_feasibility_decision_id
     assert plan.design_intent_id == preparation.research_design_intent_id
+    assert plan.research_prediction_plan_id == preparation.research_prediction_plan_id
     assert proposal.design_intent_id == preparation.research_design_intent_id
+    assert prediction_plan.design_intent_id == preparation.research_design_intent_id
     assert len(plan.ordered_conditions) == 2
     baseline, comparator = plan.ordered_conditions
     assert baseline.ordinal == 1
@@ -293,25 +318,29 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
 
     assert execution.status == SupervisedResearchCycleExecutionStatus.COMPLETED
     assert execution.contrast_result_id is not None
+    assert execution.scientific_verdict_id is not None
     assert scientist.called == 1
     assert designer.called == 1
 
     records = store.list_condition_execution_records(plan.id)
     contrast = store.get_parameter_sensitivity_contrast_result(plan.id)
+    verdict = store.get_scientific_verdict(execution.scientific_verdict_id)
     assert len(records) == 2
     assert [record.ordinal for record in records] == [1, 2]
     assert contrast is not None
+    assert verdict is not None
     assert {outcome.outcome.value for outcome in contrast.outcomes} == {
         "trade_count",
-        "net_pnl",
         "sharpe",
     }
+    assert verdict.overall_status == ScientificVerdictStatus.FALSIFIED
     assert store.get_hypothesis_scientist_invocations(brief.id)
     assert store.get_research_designer_invocations(preparation.candidate_id)
     with store.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM critic_invocations").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM spec_revision_proposals").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM research_runs").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM scientific_verdicts").fetchone()[0] == 1
 
 
 def test_no_hypothesis_stops_before_intake_and_design(tmp_path):
@@ -429,6 +458,8 @@ def test_prepare_valid_plan_does_not_execute_before_explicit_acceptance(tmp_path
     assert result.initial_experiment_plan_id is not None
     assert store.list_condition_execution_records(result.initial_experiment_plan_id) == []
     assert store.get_parameter_sensitivity_contrast_result(result.initial_experiment_plan_id) is None
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scientific_verdicts").fetchone()[0] == 0
 
 
 def test_acceptance_time_feasibility_failure_returns_typed_failure(tmp_path):
@@ -464,6 +495,33 @@ def test_acceptance_time_feasibility_failure_returns_typed_failure(tmp_path):
     assert store.list_condition_execution_records(preparation.initial_experiment_plan_id) == []
 
 
+def test_v15_tampered_prediction_plan_reference_fails_before_execution(tmp_path):
+    store = _store(tmp_path)
+    cycle = SupervisedResearchCycle(
+        store=store,
+        registry=_registry(),
+        scientist=FakeHypothesisScientist(),
+        designer=FakeResearchDesigner(),
+    )
+    preparation = cycle.prepare(build_supported_supervised_cycle_brief())
+    assert preparation.materialization_proposal_id is not None
+    assert preparation.initial_experiment_plan_id is not None
+
+    with store.connect() as conn:
+        conn.execute(
+            "UPDATE initial_experiment_plans SET research_prediction_plan_id = ? WHERE id = ?",
+            ("missing-prediction-plan", preparation.initial_experiment_plan_id),
+        )
+
+    execution = cycle.accept_and_execute(preparation.materialization_proposal_id)
+
+    assert execution.status == SupervisedResearchCycleExecutionStatus.ACCEPTANCE_FAILED
+    assert "missing ResearchPredictionPlan" in (execution.message or "")
+    assert store.list_condition_execution_records(preparation.initial_experiment_plan_id) == []
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scientific_verdicts").fetchone()[0] == 0
+
+
 def test_retry_execution_does_not_duplicate_completed_conditions(tmp_path):
     store = _store(tmp_path)
     cycle = SupervisedResearchCycle(
@@ -482,7 +540,10 @@ def test_retry_execution_does_not_duplicate_completed_conditions(tmp_path):
     assert first.status == SupervisedResearchCycleExecutionStatus.COMPLETED
     assert second.status == SupervisedResearchCycleExecutionStatus.COMPLETED
     assert first.contrast_result_id == second.contrast_result_id
+    assert first.scientific_verdict_id == second.scientific_verdict_id
     assert len(store.list_condition_execution_records(preparation.initial_experiment_plan_id)) == 2
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scientific_verdicts").fetchone()[0] == 1
 
 
 def test_wrong_proposal_id_fails_closed_without_substituting_latest(tmp_path):
@@ -506,16 +567,151 @@ def test_wrong_proposal_id_fails_closed_without_substituting_latest(tmp_path):
     assert execution.materialization_proposal_id == first.materialization_proposal_id
 
 
+def test_completed_historical_v014_plan_remains_readable_and_does_not_fabricate_verdict_on_retry(tmp_path):
+    store = _store(tmp_path)
+    candidate = ResearchCandidate.create(
+        hypothesis_statement="Historical threshold hypothesis.",
+        hypothesis_rationale="Historical completed plan without precommitted predictions.",
+        requirements=[
+            DataRequirement(
+                requirement_id="data",
+                data_kind=DataKind.SYNTHETIC_PARAMETRIC,
+                asset_class=AssetClass.SYNTHETIC,
+            ),
+            ToolRequirement(
+                requirement_id="tool",
+                tool_kind=ToolKind.BACKTEST_EXECUTION,
+            ),
+        ],
+    )
+    store.save_research_candidate(candidate)
+    design_intent = ResearchDesignIntent.create(
+        candidate_id=candidate.id,
+        design_kind=ResearchDesignKind.PARAMETER_SENSITIVITY,
+        independent_variables=(DesignVariable.SIGNAL_THRESHOLD,),
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+        controls=(DesignVariable.LOOKBACK,),
+        comparison_intent=ComparisonIntent.CONTRAST_PARAMETER_LEVELS,
+        analysis_intent=AnalysisIntent.SENSITIVITY_ANALYSIS,
+        falsification_condition="Historical V0.14 design intent.",
+        rationale="Historical completed plan without machine-readable predictions.",
+        source="historical_v014",
+    )
+    store.save_research_design_intent(design_intent)
+    plan = InitialExperimentPlan(
+        id=new_id(),
+        candidate_id=candidate.id,
+        design_intent_id=design_intent.id,
+        candidate_feasibility_decision_id="historical-ready-1",
+        selected_capability_id="stub_backtester_v1",
+        design_kind=ResearchDesignKind.PARAMETER_SENSITIVITY,
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        control_variables=(DesignVariable.LOOKBACK,),
+        dependent_outcomes=(DesignOutcome.SHARPE, DesignOutcome.TRADE_COUNT),
+        ordered_conditions=(
+            ExperimentCondition(
+                id=new_id(),
+                ordinal=1,
+                role=ExperimentConditionRole.BASELINE,
+                exact_parameters={"signal_threshold": 2.0, "lookback": 20},
+                selected_capability_id="stub_backtester_v1",
+                expected_tool_kind="BACKTEST_EXECUTION",
+            ),
+            ExperimentCondition(
+                id=new_id(),
+                ordinal=2,
+                role=ExperimentConditionRole.COMPARATOR,
+                exact_parameters={"signal_threshold": 2.5, "lookback": 20},
+                selected_capability_id="stub_backtester_v1",
+                expected_tool_kind="BACKTEST_EXECUTION",
+            ),
+        ),
+        completion_rule=InitialExperimentCompletionRule.ALL_CONDITIONS_REQUIRED,
+        materializer_version="spec_materializer_v2",
+        materialization_policy_version="stub_spec_materialization_policy_v2",
+        materialization_policy_fingerprint="policy-fingerprint",
+        registry_version="capability_registry_v1",
+        registry_fingerprint="registry-fingerprint",
+        research_prediction_plan_id=None,
+    )
+    store.save_initial_experiment_plan(plan)
+    proposal = InitialExperimentPlanProposal(
+        id="7d4c04d5-9f36-49bc-ab15-8cd630f10999",
+        plan_id=plan.id,
+        candidate_id=candidate.id,
+        design_intent_id=design_intent.id,
+        candidate_feasibility_decision_id="historical-ready-1",
+        materialization_feasibility_decision_ids=("hist-feasibility-1", "hist-feasibility-2"),
+        materialization_trace={},
+        status=InitialExperimentPlanProposalStatus.COMPLETED,
+        contrast_result_id="historical-contrast-1",
+    )
+    store.save_initial_experiment_plan_proposal(proposal)
+    contrast = ParameterSensitivityContrastResult(
+        id="historical-contrast-1",
+        plan_id=plan.id,
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        baseline_condition_id=plan.ordered_conditions[0].id,
+        comparator_condition_id=plan.ordered_conditions[1].id,
+        baseline_parameter_value=2.0,
+        comparator_parameter_value=2.5,
+        outcomes=(
+            OutcomeContrast(
+                outcome=DesignOutcome.TRADE_COUNT,
+                baseline_value=4.0,
+                comparator_value=4.0,
+                delta=0.0,
+                baseline_condition_id=plan.ordered_conditions[0].id,
+                comparator_condition_id=plan.ordered_conditions[1].id,
+            ),
+            OutcomeContrast(
+                outcome=DesignOutcome.SHARPE,
+                baseline_value=1.0,
+                comparator_value=0.75,
+                delta=-0.25,
+                baseline_condition_id=plan.ordered_conditions[0].id,
+                comparator_condition_id=plan.ordered_conditions[1].id,
+            ),
+        ),
+    )
+    store.save_parameter_sensitivity_contrast_result(contrast)
+
+    cycle = SupervisedResearchCycle(
+        store=store,
+        registry=_registry(),
+        scientist=FakeHypothesisScientist(),
+        designer=FakeResearchDesigner(),
+    )
+
+    execution = cycle.accept_and_execute(proposal.id)
+
+    assert execution.status == SupervisedResearchCycleExecutionStatus.COMPLETED
+    assert execution.contrast_result_id == contrast.id
+    assert execution.scientific_verdict_id is None
+    assert store.get_parameter_sensitivity_contrast_result(plan.id).id == contrast.id
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scientific_verdicts").fetchone()[0] == 0
+
+
 def test_supervised_cycle_integration_preserves_prompt_and_ontology_hashes():
     assert build_requirement_ontology_snapshot().version == REQUIREMENT_ONTOLOGY_VERSION
     assert build_requirement_ontology_snapshot().fingerprint == (
         "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917"
+    )
+    assert build_research_design_ontology_snapshot().fingerprint == (
+        "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e"
+    )
+    assert build_current_research_design_ontology_snapshot().fingerprint == (
+        "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d"
     )
     assert hashlib.sha256(get_scientist_instructions("v3").encode("utf-8")).hexdigest() == (
         "aa89aa587b8b26332562b2055eeb2813dff148201d96bec8bf79eed34b93661a"
     )
     assert hashlib.sha256(get_research_designer_instructions("v1").encode("utf-8")).hexdigest() == (
         "8744692f166fdb6058a4597abb6bcbad17489817efc1879c3506643e1d922fac"
+    )
+    assert hashlib.sha256(get_research_designer_instructions("v2").encode("utf-8")).hexdigest() == (
+        "721392d5160f82c8de83eaef67f4c3fc96fc13872bd1823f43b7c681737187cb"
     )
 
 
@@ -567,6 +763,7 @@ def test_supported_fake_candidate_keeps_candidate_feasibility_broad(tmp_path):
     assert data_requirements[0].required_fields is None
     assert data_requirements[0].required_parameters is None
     assert [req.tool_kind for req in tool_requirements] == [ToolKind.BACKTEST_EXECUTION]
+    assert preparation.research_prediction_plan_id is not None
 
 
 def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_path, monkeypatch):
@@ -593,6 +790,8 @@ def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_p
     payload = json.loads(open(out, "r", encoding="utf-8").read())
     assert payload["mode"] == "prepare"
     assert payload["preparation_outcome"] == SupervisedResearchCyclePreparationStatus.AWAITING_HUMAN_ACCEPTANCE.value
+    assert payload["research_prediction_plan_id"] is not None
+    assert payload["structured_predictions"] is not None
     assert payload["materialization_proposal_id"] is not None
     assert scientist.called == 1
     assert designer.called == 1
@@ -700,8 +899,11 @@ def test_live_runner_acceptance_mode_uses_explicit_existing_proposal_and_zero_ai
     assert payload["materialization_proposal_id"] == preparation.materialization_proposal_id
     assert payload["initial_experiment_plan_id"] == preparation.initial_experiment_plan_id
     assert payload["human_acceptance_occurred"] is True
+    assert payload["research_prediction_plan_id"] == preparation.research_prediction_plan_id
+    assert payload["structured_predictions"] is not None
     assert len(payload["execution_records"]) == 2
     assert payload["contrast_result"] is not None
+    assert payload["scientific_verdict"] is not None
 
     with store.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM research_candidates").fetchone()[0] == before_candidates
@@ -834,6 +1036,7 @@ def test_live_runner_accepting_proposal_a_cannot_execute_proposal_b(tmp_path):
     assert payload["materialization_proposal_id"] == first.materialization_proposal_id
     assert payload["initial_experiment_plan_id"] == first.initial_experiment_plan_id
     assert store.get_parameter_sensitivity_contrast_result(first.initial_experiment_plan_id) is not None
+    assert payload["scientific_verdict"] is not None
     assert store.get_parameter_sensitivity_contrast_result(second.initial_experiment_plan_id) is None
     second_proposal = store.get_initial_experiment_plan_proposal(second.materialization_proposal_id)
     assert second_proposal is not None
@@ -906,6 +1109,8 @@ def test_preparation_artifact_reconstruction_uses_exact_invocation_ids_not_lates
     assert artifact["research_designer_invocation_id"] == original_designer.id
     assert artifact["hypothesis_decision"]["decision_type"] == "PROPOSE_HYPOTHESIS"
     assert artifact["designer_decision"]["decision_type"] == "DESIGN"
+    assert artifact["research_prediction_plan_id"] == preparation.research_prediction_plan_id
+    assert artifact["structured_predictions"] is not None
 
 
 def test_acceptance_artifact_reloads_persisted_state_and_reports_exact_records(tmp_path):
@@ -940,12 +1145,14 @@ def test_acceptance_artifact_reloads_persisted_state_and_reports_exact_records(t
     assert artifact["research_designer_invocation_id"] == original_designer.id
     assert len(artifact["execution_records"]) == 2
     assert artifact["contrast_result"] is not None
+    assert artifact["research_prediction_plan_id"] == preparation.research_prediction_plan_id
+    assert artifact["scientific_verdict"] is not None
 
 
-def test_schema_remains_v9(tmp_path):
+def test_schema_remains_v10(tmp_path):
     store = _store(tmp_path)
     with store.connect() as conn:
-        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 9
+        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 10
 
 
 def test_registry_truth_remains_unchanged():

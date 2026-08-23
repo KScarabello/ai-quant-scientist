@@ -42,6 +42,7 @@ Research Designer path after explicit `READY_FOR_SPEC` authorization:
 -> structured design decision
 -> deterministic validator
 -> authoritative `ResearchDesignIntent`
+-> authoritative `ResearchPredictionPlan`
 -> stop
 
 Supervised end-to-end cycle:
@@ -51,13 +52,15 @@ Supervised end-to-end cycle:
 -> `ResearchCandidate`
 -> `GovernedResearchIntake`
 -> explicit candidate-feasibility authorization
--> `ResearchDesigner`
+-> `ResearchDesigner` V2
 -> authoritative `ResearchDesignIntent`
+-> precommitted `ResearchPredictionPlan`
 -> deterministic `SpecMaterializer` V2
 -> `InitialExperimentPlan`
 -> explicit human acceptance of the whole plan
 -> deterministic ordered execution of `BASELINE` then `COMPARATOR`
 -> deterministic parameter-sensitivity contrast result
+-> deterministic scientific verdict
 
 Deterministic contrast-plan path after `ResearchDesignIntent`:
 
@@ -109,7 +112,8 @@ The Research Designer is now implemented and bounded.
 
 It may:
 - propose one bounded `ResearchDesignIntent`
-- return `NO_VALID_DESIGN` when the candidate cannot be responsibly expressed under the bounded V1 ontology
+- propose exactly one directional prediction per selected dependent outcome under V2
+- return `NO_VALID_DESIGN` when the candidate cannot be responsibly expressed under the bounded ontology
 
 It may not:
 - choose exact parameter values
@@ -117,18 +121,20 @@ It may not:
 - choose condition count or order
 - choose capability IDs
 - declare exact feasibility
+- declare post-execution verdicts
 - execute research
 - automatically call the `SpecMaterializer`
 
 Current adapter defaults:
 - model: `gpt-5.6-terra`
-- prompt version: `v1`
+- prompt version: `v2`
 
 Current boundary:
 - runs only after an explicit `READY_FOR_SPEC` authorization
 - receives a deterministic AI-safe design ontology snapshot with version and fingerprint
 - persists every invocation
-- stops at `ResearchDesignIntent`; only the separate supervised cycle may pass that exact intent into deterministic materialization
+- leaves Research Designer V1 frozen for historical reproducibility
+- stops at `ResearchDesignIntent` plus `ResearchPredictionPlan`; only the separate supervised cycle may pass that exact intent into deterministic materialization
 
 ### Research Critic
 
@@ -155,11 +161,16 @@ Core invariants:
 - `ResultEvaluator` owns `PROMOTE` / `ITERATE` / `REJECT`.
 - `READY_FOR_SPEC` means broad prerequisites exist; it does not authorize execution.
 - Exact reproducibility-critical values come from deterministic policy, not AI-authored intent.
+- Structured predictions are frozen before execution.
 - Planned comparison conditions are precommitted before execution.
 - Human acceptance authorizes the whole precommitted plan.
 - The supervised cycle stops at plan preparation unless a separate explicit acceptance action executes the exact persisted proposal.
+- The AI does not see experiment results before prediction commitment.
+- Deterministic software alone computes `SUPPORTED` / `FALSIFIED` from the persisted prediction plan and measured contrast result.
+- `SUPPORTED` / `FALSIFIED` applies only to the bounded precommitted contrast, not general market truth.
 - Lifecycle promotion remains downstream and separate from condition sequencing.
 - `falsification_condition` is retained as non-authoritative scientific prose and is not parsed into governance thresholds.
+- No Critic, revision planner, or lifecycle promotion is automatically invoked after verdict computation.
 
 ## Current Implemented Milestones
 
@@ -175,6 +186,7 @@ Core invariants:
 - `V0.13A.1`: deterministic contrast plan, precommitted baseline/comparator execution, append-only acceptance-time revalidation, restart-safe condition execution records, deterministic contrast result, and semantic closure for `PARAMETER_SENSITIVITY`
 - `V0.13B`: bounded Research Designer V1, deterministic design ontology, prompt V1, governed READY_FOR_SPEC-only design service, append-only invocation persistence, and schema `v9`
 - `V0.14`: first supervised end-to-end scientist cycle connecting brief -> hypothesis -> candidate feasibility -> design -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
+- `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10`
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -224,15 +236,16 @@ There are now three relevant deterministic layers:
 - candidate feasibility: broad data/tool-class availability
 - condition feasibility: exact stub payload support for each precommitted condition
 - plan execution: deterministic ordered execution and comparison of all required conditions
+- verdict evaluation: deterministic comparison of precommitted expected direction versus observed direction
 
 There is now one supervised orchestration layer:
 
 - `SupervisedResearchCycle.prepare(...)`: bounded AI generation and deterministic plan preparation, stopping at `AWAITING_HUMAN_ACCEPTANCE`
-- `SupervisedResearchCycle.accept_and_execute(...)`: separate explicit human-governed acceptance plus deterministic execution of the exact previously prepared persisted plan
+- `SupervisedResearchCycle.accept_and_execute(...)`: separate explicit human-governed acceptance plus deterministic execution of the exact previously prepared persisted plan and deterministic verdict evaluation
 
 ## Persistence
 
-Current schema version: `v9`
+Current schema version: `v10`
 
 SQLite persists authoritative history for:
 
@@ -241,6 +254,7 @@ SQLite persists authoritative history for:
 - hypothesis scientist invocations
 - research designer invocations
 - research design intents
+- research prediction plans
 - historical single-spec materialization records from `V0.13A`
 - `InitialExperimentPlan`
 - ordered experiment conditions
@@ -249,13 +263,14 @@ SQLite persists authoritative history for:
 - plan proposal status
 - condition execution records
 - deterministic parameter-sensitivity contrast results
+- deterministic scientific verdicts
 
 ## Evals
 
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `509 passed`
+- result: `533 passed`
 
 Relevant scientist artifact note:
 
@@ -275,18 +290,18 @@ PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --p
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.14 interfaces.
+There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15 interfaces.
 
 Live supervised cycle workflow:
 
 1. Run preparation once and note the printed `proposal_id`.
-2. Inspect that exact persisted proposal and plan.
+2. Inspect that exact persisted proposal, plan, and precommitted prediction mapping.
 3. Execute only with `--proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute`.
 
 ## Current Limitations / Future Work
 
 - no autonomous loop
-- no autonomous iterative chaining from contrast results into Critic, revision, replication, or holdout
+- no autonomous iterative chaining from verdicts into Critic, revision, replication, or holdout
 - no generalized multi-capability exact materializer
 - no generalized multi-condition experiment DSL
 - no RAG or vector canonical memory
@@ -300,4 +315,6 @@ Historical evidence remains in the repository, but it should not be mistaken for
 - `V0.13A` proved governed baseline-spec materialization.
 - `V0.13A.1` closes the semantic gap by precommitting and executing a complete deterministic parameter contrast.
 - `V0.13B` adds the bounded AI layer that may author `ResearchDesignIntent` but still cannot control exact reproducibility-critical values.
+- `V0.14` is complete and frozen historical evidence of the first supervised end-to-end run. Attempts on Saturday, August 22, 2026 correctly blocked twice before the approved proposal `7d4c04d5-9f36-49bc-ab15-8cd630f10999` reached human acceptance and deterministic execution, observing `trade_count` `4 -> 4` and `sharpe` `1.0 -> 0.75`.
+- That historical `V0.14` execution does not receive a retrospective `V0.15` verdict because it did not persist a machine-readable precommitted prediction plan before execution.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.

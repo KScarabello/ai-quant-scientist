@@ -33,6 +33,7 @@ from ..models.design import (
     DesignVariable,
     ConditionExecutionRecord,
     ConditionExecutionStatus,
+    ExpectedDirection,
     ExperimentCondition,
     ExperimentConditionRole,
     InitialExperimentCompletionRule,
@@ -40,9 +41,15 @@ from ..models.design import (
     InitialExperimentPlanProposal,
     InitialExperimentPlanProposalStatus,
     OutcomeContrast,
+    OutcomePrediction,
+    OutcomeScientificVerdict,
     ParameterSensitivityContrastResult,
     ResearchDesignIntent,
     ResearchDesignKind,
+    ResearchPredictionPlan,
+    ScientificVerdict,
+    ScientificVerdictStatus,
+    PredictionVerdictResult,
     SpecFeasibilityDecision,
     SpecFeasibilityPhase,
     SpecFeasibilityReasonCode,
@@ -54,7 +61,7 @@ from ..models.design import (
 from ..models.research_designer import ResearchDesignerInvocation
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 class SQLiteStore:
@@ -330,6 +337,7 @@ class SQLiteStore:
                     id TEXT PRIMARY KEY,
                     candidate_id TEXT NOT NULL,
                     design_intent_id TEXT NOT NULL,
+                    research_prediction_plan_id TEXT,
                     candidate_feasibility_decision_id TEXT NOT NULL,
                     selected_capability_id TEXT NOT NULL,
                     design_kind TEXT NOT NULL,
@@ -407,6 +415,38 @@ class SQLiteStore:
                     FOREIGN KEY (plan_id) REFERENCES initial_experiment_plans(id),
                     FOREIGN KEY (baseline_condition_id) REFERENCES initial_experiment_conditions(id),
                     FOREIGN KEY (comparator_condition_id) REFERENCES initial_experiment_conditions(id)
+                );
+                CREATE TABLE IF NOT EXISTS research_prediction_plans (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL UNIQUE,
+                    research_designer_invocation_id TEXT NOT NULL UNIQUE,
+                    prediction_contract_version TEXT NOT NULL,
+                    ontology_version TEXT NOT NULL,
+                    ontology_fingerprint TEXT NOT NULL,
+                    independent_variable TEXT NOT NULL,
+                    predictions_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                    FOREIGN KEY (research_designer_invocation_id) REFERENCES research_designer_invocations(id)
+                );
+                CREATE TABLE IF NOT EXISTS scientific_verdicts (
+                    id TEXT PRIMARY KEY,
+                    prediction_plan_id TEXT NOT NULL,
+                    design_intent_id TEXT NOT NULL,
+                    experiment_plan_id TEXT NOT NULL,
+                    contrast_result_id TEXT NOT NULL,
+                    verdict_policy_version TEXT NOT NULL,
+                    verdict_policy_fingerprint TEXT NOT NULL,
+                    overall_status TEXT NOT NULL,
+                    per_outcome_verdicts_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(prediction_plan_id, contrast_result_id),
+                    FOREIGN KEY (prediction_plan_id) REFERENCES research_prediction_plans(id),
+                    FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                    FOREIGN KEY (experiment_plan_id) REFERENCES initial_experiment_plans(id),
+                    FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id)
                 );
                 """
             )
@@ -757,6 +797,48 @@ class SQLiteStore:
                             resulting_design_intent_id TEXT,
                             created_at TEXT NOT NULL,
                             FOREIGN KEY (candidate_id) REFERENCES research_candidates(id)
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
+                elif v == 9:
+                    if not column_exists(connection, "initial_experiment_plans", "research_prediction_plan_id"):
+                        connection.execute(
+                            "ALTER TABLE initial_experiment_plans ADD COLUMN research_prediction_plan_id TEXT"
+                        )
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_prediction_plans (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL UNIQUE,
+                            research_designer_invocation_id TEXT NOT NULL UNIQUE,
+                            prediction_contract_version TEXT NOT NULL,
+                            ontology_version TEXT NOT NULL,
+                            ontology_fingerprint TEXT NOT NULL,
+                            independent_variable TEXT NOT NULL,
+                            predictions_json TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                            FOREIGN KEY (research_designer_invocation_id) REFERENCES research_designer_invocations(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS scientific_verdicts (
+                            id TEXT PRIMARY KEY,
+                            prediction_plan_id TEXT NOT NULL,
+                            design_intent_id TEXT NOT NULL,
+                            experiment_plan_id TEXT NOT NULL,
+                            contrast_result_id TEXT NOT NULL,
+                            verdict_policy_version TEXT NOT NULL,
+                            verdict_policy_fingerprint TEXT NOT NULL,
+                            overall_status TEXT NOT NULL,
+                            per_outcome_verdicts_json TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            UNIQUE(prediction_plan_id, contrast_result_id),
+                            FOREIGN KEY (prediction_plan_id) REFERENCES research_prediction_plans(id),
+                            FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
+                            FOREIGN KEY (experiment_plan_id) REFERENCES initial_experiment_plans(id),
+                            FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id)
                         );
                         """
                     )
@@ -1634,6 +1716,195 @@ class SQLiteStore:
                 ),
             )
 
+    def save_governed_research_design_bundle(
+        self,
+        *,
+        invocation: ResearchDesignerInvocation,
+        design_intent: ResearchDesignIntent | None = None,
+        prediction_plan: ResearchPredictionPlan | None = None,
+    ) -> None:
+        if design_intent is None:
+            if invocation.resulting_design_intent_id is not None:
+                raise ValueError(
+                    "ResearchDesignerInvocation resulting_design_intent_id must be None when no authoritative design intent is saved"
+                )
+            if prediction_plan is not None:
+                raise ValueError("ResearchPredictionPlan cannot be saved without an authoritative ResearchDesignIntent")
+        else:
+            if invocation.resulting_design_intent_id != design_intent.id:
+                raise ValueError(
+                    "ResearchDesignerInvocation resulting_design_intent_id must match the authoritative ResearchDesignIntent"
+                )
+            if invocation.candidate_id != design_intent.candidate_id:
+                raise ValueError("ResearchDesignerInvocation candidate_id must match the authoritative ResearchDesignIntent")
+            if prediction_plan is not None:
+                if prediction_plan.design_intent_id != design_intent.id:
+                    raise ValueError("ResearchPredictionPlan design_intent_id must match the authoritative ResearchDesignIntent")
+                if prediction_plan.candidate_id != design_intent.candidate_id:
+                    raise ValueError("ResearchPredictionPlan candidate_id must match the authoritative ResearchDesignIntent")
+                if prediction_plan.research_designer_invocation_id != invocation.id:
+                    raise ValueError(
+                        "ResearchPredictionPlan research_designer_invocation_id must match the authoritative ResearchDesignerInvocation"
+                    )
+
+        with self.connect() as conn:
+            if design_intent is not None:
+                conn.execute(
+                    """INSERT INTO research_design_intents
+                       (id, candidate_id, design_kind, independent_variables_json,
+                        dependent_outcomes_json, controls_json, comparison_intent,
+                        analysis_intent, falsification_condition, rationale, source,
+                        provider, model, prompt_version, ontology_version,
+                        ontology_fingerprint, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        design_intent.id,
+                        design_intent.candidate_id,
+                        design_intent.design_kind.value,
+                        self._dumps([item.value for item in design_intent.independent_variables]),
+                        self._dumps([item.value for item in design_intent.dependent_outcomes]),
+                        self._dumps([item.value for item in design_intent.controls]),
+                        design_intent.comparison_intent.value,
+                        design_intent.analysis_intent.value,
+                        design_intent.falsification_condition,
+                        design_intent.rationale,
+                        design_intent.source,
+                        design_intent.provider,
+                        design_intent.model,
+                        design_intent.prompt_version,
+                        design_intent.ontology_version,
+                        design_intent.ontology_fingerprint,
+                        design_intent.created_at.isoformat(),
+                    ),
+                )
+            conn.execute(
+                """INSERT INTO research_designer_invocations
+                   (id, candidate_id, candidate_snapshot_json, candidate_feasibility_decision_id,
+                    prompt_version, ontology_version, ontology_fingerprint, intent_contract_version,
+                    provider, model, raw_response, parsed_decision_json, validation_status,
+                    validation_errors_json, resulting_design_intent_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.candidate_id,
+                    invocation.candidate_snapshot_json,
+                    invocation.candidate_feasibility_decision_id,
+                    invocation.prompt_version,
+                    invocation.ontology_version,
+                    invocation.ontology_fingerprint,
+                    invocation.intent_contract_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_design_intent_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+            if prediction_plan is not None:
+                conn.execute(
+                    """INSERT INTO research_prediction_plans
+                       (id, candidate_id, design_intent_id, research_designer_invocation_id,
+                        prediction_contract_version, ontology_version, ontology_fingerprint,
+                        independent_variable, predictions_json, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        prediction_plan.id,
+                        prediction_plan.candidate_id,
+                        prediction_plan.design_intent_id,
+                        prediction_plan.research_designer_invocation_id,
+                        prediction_plan.prediction_contract_version,
+                        prediction_plan.ontology_version,
+                        prediction_plan.ontology_fingerprint,
+                        prediction_plan.independent_variable.value,
+                        self._dumps(
+                            [
+                                {
+                                    "outcome": item.outcome.value,
+                                    "expected_direction": item.expected_direction.value,
+                                }
+                                for item in prediction_plan.predictions
+                            ]
+                        ),
+                        prediction_plan.created_at.isoformat(),
+                    ),
+                )
+
+    def save_research_prediction_plan(self, prediction_plan: ResearchPredictionPlan) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO research_prediction_plans
+                   (id, candidate_id, design_intent_id, research_designer_invocation_id,
+                    prediction_contract_version, ontology_version, ontology_fingerprint,
+                    independent_variable, predictions_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    prediction_plan.id,
+                    prediction_plan.candidate_id,
+                    prediction_plan.design_intent_id,
+                    prediction_plan.research_designer_invocation_id,
+                    prediction_plan.prediction_contract_version,
+                    prediction_plan.ontology_version,
+                    prediction_plan.ontology_fingerprint,
+                    prediction_plan.independent_variable.value,
+                    self._dumps(
+                        [
+                            {
+                                "outcome": item.outcome.value,
+                                "expected_direction": item.expected_direction.value,
+                            }
+                            for item in prediction_plan.predictions
+                        ]
+                    ),
+                    prediction_plan.created_at.isoformat(),
+                ),
+            )
+
+    def _row_to_research_prediction_plan(self, row: sqlite3.Row) -> ResearchPredictionPlan:
+        return ResearchPredictionPlan(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            design_intent_id=row["design_intent_id"],
+            research_designer_invocation_id=row["research_designer_invocation_id"],
+            prediction_contract_version=row["prediction_contract_version"],
+            ontology_version=row["ontology_version"],
+            ontology_fingerprint=row["ontology_fingerprint"],
+            independent_variable=DesignVariable(row["independent_variable"]),
+            predictions=tuple(
+                OutcomePrediction(
+                    outcome=DesignOutcome(item["outcome"]),
+                    expected_direction=ExpectedDirection(item["expected_direction"]),
+                )
+                for item in self._loads(row["predictions_json"])
+            ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_research_prediction_plan(self, prediction_plan_id: str) -> ResearchPredictionPlan | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_prediction_plans WHERE id = ?",
+                (prediction_plan_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_research_prediction_plan(row)
+
+    def get_research_prediction_plan_by_design_intent_id(
+        self,
+        design_intent_id: str,
+    ) -> ResearchPredictionPlan | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM research_prediction_plans WHERE design_intent_id = ?",
+                (design_intent_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_research_prediction_plan(row["id"])
+
     def get_research_design_intent(self, design_intent_id: str) -> ResearchDesignIntent | None:
         with self.connect() as conn:
             row = conn.execute(
@@ -2019,19 +2290,22 @@ class SQLiteStore:
 
     def save_initial_experiment_plan(self, plan: InitialExperimentPlan) -> None:
         with self.connect() as conn:
+            self._validate_research_prediction_plan_linkage(conn, plan)
             conn.execute(
                 """INSERT OR IGNORE INTO initial_experiment_plans
-                   (id, candidate_id, design_intent_id, candidate_feasibility_decision_id,
+                   (id, candidate_id, design_intent_id, research_prediction_plan_id,
+                    candidate_feasibility_decision_id,
                     selected_capability_id, design_kind, independent_variable,
                     control_variables_json, dependent_outcomes_json, ordered_condition_ids_json,
                     completion_rule, materializer_version, materialization_policy_version,
                     materialization_policy_fingerprint, registry_version, registry_fingerprint,
                     created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     plan.id,
                     plan.candidate_id,
                     plan.design_intent_id,
+                    plan.research_prediction_plan_id,
                     plan.candidate_feasibility_decision_id,
                     plan.selected_capability_id,
                     plan.design_kind.value,
@@ -2066,6 +2340,43 @@ class SQLiteStore:
                     ),
                 )
 
+    def _validate_research_prediction_plan_linkage(
+        self,
+        conn: sqlite3.Connection,
+        plan: InitialExperimentPlan,
+    ) -> ResearchPredictionPlan | None:
+        if plan.research_prediction_plan_id is None:
+            return None
+        row = conn.execute(
+            "SELECT * FROM research_prediction_plans WHERE id = ?",
+            (plan.research_prediction_plan_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("InitialExperimentPlan references a missing ResearchPredictionPlan")
+        prediction_plan = self._row_to_research_prediction_plan(row)
+        if prediction_plan.candidate_id != plan.candidate_id:
+            raise ValueError("ResearchPredictionPlan candidate_id must match the InitialExperimentPlan candidate_id")
+        if prediction_plan.design_intent_id != plan.design_intent_id:
+            raise ValueError("ResearchPredictionPlan design_intent_id must match the InitialExperimentPlan design_intent_id")
+        if prediction_plan.independent_variable != plan.independent_variable:
+            raise ValueError(
+                "ResearchPredictionPlan independent_variable must match the InitialExperimentPlan independent_variable"
+            )
+        prediction_outcomes = tuple(sorted((item.outcome for item in prediction_plan.predictions), key=lambda item: item.value))
+        plan_outcomes = tuple(sorted(plan.dependent_outcomes, key=lambda item: item.value))
+        if prediction_outcomes != plan_outcomes:
+            raise ValueError(
+                "ResearchPredictionPlan predicted outcomes must match the InitialExperimentPlan dependent_outcomes exactly"
+            )
+        return prediction_plan
+
+    def validate_research_prediction_plan_linkage(
+        self,
+        plan: InitialExperimentPlan,
+    ) -> ResearchPredictionPlan | None:
+        with self.connect() as conn:
+            return self._validate_research_prediction_plan_linkage(conn, plan)
+
     def get_initial_experiment_plan(self, plan_id: str) -> InitialExperimentPlan | None:
         with self.connect() as conn:
             row = conn.execute(
@@ -2094,6 +2405,11 @@ class SQLiteStore:
             id=row["id"],
             candidate_id=row["candidate_id"],
             design_intent_id=row["design_intent_id"],
+            research_prediction_plan_id=(
+                row["research_prediction_plan_id"]
+                if "research_prediction_plan_id" in row.keys()
+                else None
+            ),
             candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
             selected_capability_id=row["selected_capability_id"],
             design_kind=ResearchDesignKind(row["design_kind"]),
@@ -2238,6 +2554,7 @@ class SQLiteStore:
             plan = self.get_initial_experiment_plan(proposal.plan_id)
             if plan is None:
                 raise KeyError(f"Unknown plan: {proposal.plan_id}")
+            self._validate_research_prediction_plan_linkage(conn, plan)
             if current_policy_version != plan.materialization_policy_version:
                 raise ValueError("Materialization policy version drift requires rematerialization")
             if current_policy_fingerprint != plan.materialization_policy_fingerprint:
@@ -2398,6 +2715,39 @@ class SQLiteStore:
                 ),
             )
 
+    def get_parameter_sensitivity_contrast_result_by_id(
+        self,
+        contrast_result_id: str,
+    ) -> ParameterSensitivityContrastResult | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM parameter_sensitivity_contrast_results WHERE id = ?",
+                (contrast_result_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ParameterSensitivityContrastResult(
+            id=row["id"],
+            plan_id=row["plan_id"],
+            independent_variable=DesignVariable(row["independent_variable"]),
+            baseline_condition_id=row["baseline_condition_id"],
+            comparator_condition_id=row["comparator_condition_id"],
+            baseline_parameter_value=row["baseline_parameter_value"],
+            comparator_parameter_value=row["comparator_parameter_value"],
+            outcomes=tuple(
+                OutcomeContrast(
+                    outcome=DesignOutcome(item["outcome"]),
+                    baseline_value=item["baseline_value"],
+                    comparator_value=item["comparator_value"],
+                    delta=item["delta"],
+                    baseline_condition_id=item["baseline_condition_id"],
+                    comparator_condition_id=item["comparator_condition_id"],
+                )
+                for item in self._loads(row["outcomes_json"])
+            ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
     def get_parameter_sensitivity_contrast_result(
         self,
         plan_id: str,
@@ -2430,6 +2780,95 @@ class SQLiteStore:
             ),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
+
+    def save_scientific_verdict(self, verdict: ScientificVerdict) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO scientific_verdicts
+                   (id, prediction_plan_id, design_intent_id, experiment_plan_id, contrast_result_id,
+                    verdict_policy_version, verdict_policy_fingerprint, overall_status,
+                    per_outcome_verdicts_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    verdict.id,
+                    verdict.prediction_plan_id,
+                    verdict.design_intent_id,
+                    verdict.experiment_plan_id,
+                    verdict.contrast_result_id,
+                    verdict.verdict_policy_version,
+                    verdict.verdict_policy_fingerprint,
+                    verdict.overall_status.value,
+                    self._dumps(
+                        [
+                            {
+                                "outcome": item.outcome.value,
+                                "expected_direction": item.expected_direction.value,
+                                "observed_direction": (
+                                    None if item.observed_direction is None else item.observed_direction.value
+                                ),
+                                "baseline_value": item.baseline_value,
+                                "comparator_value": item.comparator_value,
+                                "delta": item.delta,
+                                "result": item.result.value,
+                            }
+                            for item in verdict.per_outcome_verdicts
+                        ]
+                    ),
+                    verdict.created_at.isoformat(),
+                ),
+            )
+
+    def get_scientific_verdict(self, verdict_id: str) -> ScientificVerdict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM scientific_verdicts WHERE id = ?",
+                (verdict_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ScientificVerdict(
+            id=row["id"],
+            prediction_plan_id=row["prediction_plan_id"],
+            design_intent_id=row["design_intent_id"],
+            experiment_plan_id=row["experiment_plan_id"],
+            contrast_result_id=row["contrast_result_id"],
+            verdict_policy_version=row["verdict_policy_version"],
+            verdict_policy_fingerprint=row["verdict_policy_fingerprint"],
+            overall_status=ScientificVerdictStatus(row["overall_status"]),
+            per_outcome_verdicts=tuple(
+                OutcomeScientificVerdict(
+                    outcome=DesignOutcome(item["outcome"]),
+                    expected_direction=ExpectedDirection(item["expected_direction"]),
+                    observed_direction=(
+                        None if item["observed_direction"] is None else ExpectedDirection(item["observed_direction"])
+                    ),
+                    baseline_value=item["baseline_value"],
+                    comparator_value=item["comparator_value"],
+                    delta=item["delta"],
+                    result=PredictionVerdictResult(item["result"]),
+                )
+                for item in self._loads(row["per_outcome_verdicts_json"])
+            ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_scientific_verdict_by_prediction_plan_and_contrast_result(
+        self,
+        *,
+        prediction_plan_id: str,
+        contrast_result_id: str,
+    ) -> ScientificVerdict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id FROM scientific_verdicts
+                WHERE prediction_plan_id = ? AND contrast_result_id = ?
+                """,
+                (prediction_plan_id, contrast_result_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_scientific_verdict(row["id"])
 
     # ─── Research designer invocations ───────────────────────────────────────
 

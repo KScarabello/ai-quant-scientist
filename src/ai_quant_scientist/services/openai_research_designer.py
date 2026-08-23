@@ -11,6 +11,8 @@ from ..models.design import (
     ComparisonIntent,
     DesignOutcome,
     DesignVariable,
+    ExpectedDirection,
+    OutcomePrediction,
     ResearchDesignKind,
 )
 from ..models.research import new_id
@@ -29,7 +31,7 @@ except Exception:
 
 
 DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
-DEFAULT_PROMPT_VERSION = "v1"
+DEFAULT_PROMPT_VERSION = "v2"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 
@@ -92,18 +94,38 @@ class OpenAIResearchDesigner:
         from pydantic import BaseModel, ConfigDict
         from typing import Literal
 
-        class ResearchDesignerOutputSchema(BaseModel):
-            decision: Literal["DESIGN", "NO_VALID_DESIGN"]
-            design_kind: Literal["PARAMETER_SENSITIVITY"] | None = None
-            independent_variables: list[Literal["signal_threshold", "lookback"]] | None = None
-            dependent_outcomes: list[Literal["trade_count", "net_pnl", "sharpe"]] | None = None
-            controls: list[Literal["signal_threshold", "lookback"]] | None = None
-            comparison_intent: Literal["CONTRAST_PARAMETER_LEVELS"] | None = None
-            analysis_intent: Literal["SENSITIVITY_ANALYSIS"] | None = None
-            falsification_condition: str | None = None
-            rationale: str | None = None
-            no_valid_design_reason: str | None = None
-            model_config = ConfigDict(extra="forbid")
+        if self.prompt_version == "v2":
+            class PredictionSchema(BaseModel):
+                outcome: Literal["trade_count", "net_pnl", "sharpe"]
+                expected_direction: Literal["INCREASE", "DECREASE", "NO_CHANGE"]
+                model_config = ConfigDict(extra="forbid")
+
+            class ResearchDesignerOutputSchema(BaseModel):
+                decision: Literal["DESIGN", "NO_VALID_DESIGN"]
+                design_kind: Literal["PARAMETER_SENSITIVITY"] | None = None
+                independent_variables: list[Literal["signal_threshold", "lookback"]] | None = None
+                dependent_outcomes: list[Literal["trade_count", "net_pnl", "sharpe"]] | None = None
+                controls: list[Literal["signal_threshold", "lookback"]] | None = None
+                comparison_intent: Literal["CONTRAST_PARAMETER_LEVELS"] | None = None
+                analysis_intent: Literal["SENSITIVITY_ANALYSIS"] | None = None
+                predictions: list[PredictionSchema] | None = None
+                falsification_condition: str | None = None
+                rationale: str | None = None
+                no_valid_design_reason: str | None = None
+                model_config = ConfigDict(extra="forbid")
+        else:
+            class ResearchDesignerOutputSchema(BaseModel):
+                decision: Literal["DESIGN", "NO_VALID_DESIGN"]
+                design_kind: Literal["PARAMETER_SENSITIVITY"] | None = None
+                independent_variables: list[Literal["signal_threshold", "lookback"]] | None = None
+                dependent_outcomes: list[Literal["trade_count", "net_pnl", "sharpe"]] | None = None
+                controls: list[Literal["signal_threshold", "lookback"]] | None = None
+                comparison_intent: Literal["CONTRAST_PARAMETER_LEVELS"] | None = None
+                analysis_intent: Literal["SENSITIVITY_ANALYSIS"] | None = None
+                falsification_condition: str | None = None
+                rationale: str | None = None
+                no_valid_design_reason: str | None = None
+                model_config = ConfigDict(extra="forbid")
 
         instructions = get_research_designer_instructions(self.prompt_version)
         input_str = json.dumps(context_to_payload(context), sort_keys=True)
@@ -179,6 +201,17 @@ class OpenAIResearchDesigner:
             analysis_intent=(
                 AnalysisIntent(parsed["analysis_intent"])
                 if parsed.get("analysis_intent")
+                else None
+            ),
+            predictions=(
+                tuple(
+                    OutcomePrediction(
+                        outcome=DesignOutcome(item["outcome"]),
+                        expected_direction=ExpectedDirection(item["expected_direction"]),
+                    )
+                    for item in parsed.get("predictions", [])
+                )
+                if parsed.get("predictions") is not None
                 else None
             ),
             falsification_condition=parsed.get("falsification_condition"),

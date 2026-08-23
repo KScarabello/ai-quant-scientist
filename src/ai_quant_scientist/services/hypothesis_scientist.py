@@ -282,8 +282,15 @@ class FakeHypothesisScientist:
             id=new_id(),
             decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
             research_brief_id=brief.id,
-            hypothesis_statement="signal_threshold controls trade frequency via eligibility gating",
-            hypothesis_rationale="Reducing the threshold should increase signal eligibility and trade count, revealing whether threshold is the primary driver of sparse observations.",
+            hypothesis_statement=(
+                "For identical synthetic strategy logic, a stricter signal threshold should reduce "
+                "trade frequency and improve risk-adjusted performance."
+            ),
+            hypothesis_rationale=(
+                "A stricter threshold should filter weaker signal realizations, lowering trade frequency "
+                "while concentrating exposure in stronger observations that can improve risk-adjusted "
+                "performance under a bounded deterministic threshold-sensitivity contrast."
+            ),
             requirements_snapshot=requirements_to_json(tuple(reqs)),
             provider=self.provider,
             model=self.model,

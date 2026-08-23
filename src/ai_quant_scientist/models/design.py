@@ -84,6 +84,24 @@ class ConditionExecutionStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class ExpectedDirection(str, Enum):
+    INCREASE = "INCREASE"
+    DECREASE = "DECREASE"
+    NO_CHANGE = "NO_CHANGE"
+
+
+class PredictionVerdictResult(str, Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class ScientificVerdictStatus(str, Enum):
+    SUPPORTED = "SUPPORTED"
+    FALSIFIED = "FALSIFIED"
+    INDETERMINATE = "INDETERMINATE"
+
+
 @dataclass(frozen=True, slots=True)
 class ResearchDesignIntent:
     """Immutable V1 scientific design intent for initial experiment planning."""
@@ -318,6 +336,7 @@ class InitialExperimentPlan:
     materialization_policy_fingerprint: str
     registry_version: str
     registry_fingerprint: str
+    research_prediction_plan_id: str | None = None
     created_at: Any = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
@@ -478,10 +497,138 @@ class ParameterSensitivityContrastResult:
             DesignOutcome,
             "outcomes",
         )
+        outcome_names = [outcome.outcome for outcome in self.outcomes]
+        if len(set(outcome_names)) != len(outcome_names):
+            raise ValueError("ParameterSensitivityContrastResult outcomes must not repeat outcomes")
         object.__setattr__(
             self,
             "outcomes",
             tuple(sorted(self.outcomes, key=lambda item: item.outcome.value)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OutcomePrediction:
+    """One precommitted directional prediction for a selected outcome."""
+
+    outcome: DesignOutcome
+    expected_direction: ExpectedDirection
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.outcome, DesignOutcome):
+            raise ValueError(f"Invalid outcome: {self.outcome!r}")
+        if not isinstance(self.expected_direction, ExpectedDirection):
+            raise ValueError(f"Invalid expected_direction: {self.expected_direction!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchPredictionPlan:
+    """Immutable precommitted machine-readable prediction artifact."""
+
+    id: str
+    candidate_id: str
+    design_intent_id: str
+    research_designer_invocation_id: str
+    prediction_contract_version: str
+    ontology_version: str
+    ontology_fingerprint: str
+    independent_variable: DesignVariable
+    predictions: tuple[OutcomePrediction, ...]
+    created_at: Any = field(default_factory=utcnow)
+
+    def __post_init__(self) -> None:
+        if not self.candidate_id:
+            raise ValueError("ResearchPredictionPlan requires candidate_id")
+        if not self.design_intent_id:
+            raise ValueError("ResearchPredictionPlan requires design_intent_id")
+        if not self.research_designer_invocation_id:
+            raise ValueError("ResearchPredictionPlan requires research_designer_invocation_id")
+        if not self.prediction_contract_version:
+            raise ValueError("ResearchPredictionPlan requires prediction_contract_version")
+        if not self.ontology_version:
+            raise ValueError("ResearchPredictionPlan requires ontology_version")
+        if not self.ontology_fingerprint:
+            raise ValueError("ResearchPredictionPlan requires ontology_fingerprint")
+        if not isinstance(self.independent_variable, DesignVariable):
+            raise ValueError(f"Invalid independent_variable: {self.independent_variable!r}")
+        if not self.predictions:
+            raise ValueError("ResearchPredictionPlan requires at least one prediction")
+        if any(not isinstance(item, OutcomePrediction) for item in self.predictions):
+            raise ValueError("ResearchPredictionPlan predictions must be OutcomePrediction entries")
+        outcomes = [item.outcome for item in self.predictions]
+        if len(set(outcomes)) != len(outcomes):
+            raise ValueError("ResearchPredictionPlan predictions must not repeat outcomes")
+        object.__setattr__(
+            self,
+            "predictions",
+            tuple(sorted(self.predictions, key=lambda item: item.outcome.value)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OutcomeScientificVerdict:
+    """Deterministic verdict for one precommitted predicted outcome."""
+
+    outcome: DesignOutcome
+    expected_direction: ExpectedDirection
+    observed_direction: ExpectedDirection | None
+    baseline_value: float | None
+    comparator_value: float | None
+    delta: float | None
+    result: PredictionVerdictResult
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.outcome, DesignOutcome):
+            raise ValueError(f"Invalid outcome: {self.outcome!r}")
+        if not isinstance(self.expected_direction, ExpectedDirection):
+            raise ValueError(f"Invalid expected_direction: {self.expected_direction!r}")
+        if self.observed_direction is not None and not isinstance(self.observed_direction, ExpectedDirection):
+            raise ValueError(f"Invalid observed_direction: {self.observed_direction!r}")
+        if not isinstance(self.result, PredictionVerdictResult):
+            raise ValueError(f"Invalid result: {self.result!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificVerdict:
+    """Immutable deterministic scientific verdict over a precommitted contrast."""
+
+    id: str
+    prediction_plan_id: str
+    design_intent_id: str
+    experiment_plan_id: str
+    contrast_result_id: str
+    verdict_policy_version: str
+    verdict_policy_fingerprint: str
+    overall_status: ScientificVerdictStatus
+    per_outcome_verdicts: tuple[OutcomeScientificVerdict, ...]
+    created_at: Any = field(default_factory=utcnow)
+
+    def __post_init__(self) -> None:
+        if not self.prediction_plan_id:
+            raise ValueError("ScientificVerdict requires prediction_plan_id")
+        if not self.design_intent_id:
+            raise ValueError("ScientificVerdict requires design_intent_id")
+        if not self.experiment_plan_id:
+            raise ValueError("ScientificVerdict requires experiment_plan_id")
+        if not self.contrast_result_id:
+            raise ValueError("ScientificVerdict requires contrast_result_id")
+        if not self.verdict_policy_version:
+            raise ValueError("ScientificVerdict requires verdict_policy_version")
+        if not self.verdict_policy_fingerprint:
+            raise ValueError("ScientificVerdict requires verdict_policy_fingerprint")
+        if not isinstance(self.overall_status, ScientificVerdictStatus):
+            raise ValueError(f"Invalid overall_status: {self.overall_status!r}")
+        if not self.per_outcome_verdicts:
+            raise ValueError("ScientificVerdict requires per_outcome_verdicts")
+        if any(not isinstance(item, OutcomeScientificVerdict) for item in self.per_outcome_verdicts):
+            raise ValueError("ScientificVerdict per_outcome_verdicts must be OutcomeScientificVerdict entries")
+        outcomes = [item.outcome for item in self.per_outcome_verdicts]
+        if len(set(outcomes)) != len(outcomes):
+            raise ValueError("ScientificVerdict per_outcome_verdicts must not repeat outcomes")
+        object.__setattr__(
+            self,
+            "per_outcome_verdicts",
+            tuple(sorted(self.per_outcome_verdicts, key=lambda item: item.outcome.value)),
         )
 
 

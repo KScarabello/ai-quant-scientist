@@ -15,6 +15,7 @@ from .design import (
     ComparisonIntent,
     DesignOutcome,
     DesignVariable,
+    OutcomePrediction,
     ResearchDesignKind,
 )
 from .research import new_id
@@ -106,6 +107,7 @@ class ResearchDesignerDecision:
     controls: tuple[DesignVariable, ...] | None = None
     comparison_intent: ComparisonIntent | None = None
     analysis_intent: AnalysisIntent | None = None
+    predictions: tuple[OutcomePrediction, ...] | None = None
     falsification_condition: str | None = None
     rationale: str | None = None
     no_valid_design_reason: str | None = None
@@ -137,6 +139,11 @@ class ResearchDesignerDecision:
             if all(hasattr(item, "value") for item in values):
                 values = tuple(sorted(values, key=lambda item: item.value))
             object.__setattr__(self, "controls", values)
+        if self.predictions is not None:
+            values = tuple(self.predictions)
+            if all(hasattr(item, "outcome") for item in values):
+                values = tuple(sorted(values, key=lambda item: item.outcome.value))
+            object.__setattr__(self, "predictions", values)
         if self.ontology_fingerprint is not None and not _SHA256_HEX_RE.match(self.ontology_fingerprint):
             raise ValueError("ResearchDesignerDecision ontology_fingerprint must be SHA-256 hex")
 
