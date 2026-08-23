@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Any
 
 from ..capabilities.gate import ResearchCandidate
+from .hypothesis_scientist import HypothesisClaimSet
 from .design import (
     AnalysisIntent,
     ComparisonIntent,
@@ -38,6 +39,7 @@ class ResearchDesignerContext:
     design_ontology_version: str
     design_ontology_fingerprint: str
     design_ontology_payload_json: str
+    hypothesis_claim_set: HypothesisClaimSet | None = None
     intent_contract_version: str = RESEARCH_DESIGN_INTENT_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -51,6 +53,8 @@ class ResearchDesignerContext:
             raise ValueError("ResearchDesignerContext requires design_ontology_payload_json")
         if not self.intent_contract_version or not self.intent_contract_version.strip():
             raise ValueError("ResearchDesignerContext requires intent_contract_version")
+        if self.hypothesis_claim_set is not None and self.hypothesis_claim_set.candidate_id != self.candidate.id:
+            raise ValueError("ResearchDesignerContext hypothesis_claim_set must belong to the same candidate")
         payload = self.design_ontology_payload
         if payload.get("version") != self.design_ontology_version:
             raise ValueError("ResearchDesignerContext ontology payload version must match design_ontology_version")
@@ -66,6 +70,10 @@ class ResearchDesignerContext:
     @property
     def candidate_id(self) -> str:
         return self.candidate.id
+
+    @property
+    def hypothesis_claim_set_id(self) -> str | None:
+        return None if self.hypothesis_claim_set is None else self.hypothesis_claim_set.id
 
     @property
     def design_ontology_payload(self) -> dict[str, Any]:
@@ -167,6 +175,7 @@ class ResearchDesignerInvocation:
     validation_status: str | None
     validation_errors_json: str | None
     resulting_design_intent_id: str | None
+    hypothesis_claim_set_id: str | None = None
     created_at: datetime = field(default_factory=utcnow)
 
 

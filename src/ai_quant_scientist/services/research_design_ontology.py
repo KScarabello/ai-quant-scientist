@@ -21,6 +21,7 @@ from ..models.research_designer import RESEARCH_DESIGN_INTENT_CONTRACT_VERSION
 
 RESEARCH_DESIGN_ONTOLOGY_V1_VERSION = "research_design_ontology_v1"
 RESEARCH_DESIGN_ONTOLOGY_V2_VERSION = "research_design_ontology_v2"
+RESEARCH_DESIGN_ONTOLOGY_V3_VERSION = "research_design_ontology_v3"
 RESEARCH_DESIGN_ONTOLOGY_VERSION = RESEARCH_DESIGN_ONTOLOGY_V1_VERSION
 RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION = "research_prediction_plan_v1"
 
@@ -47,6 +48,12 @@ PREDICTION_SEMANTICS_V2 = (
     "Directional predictions declare how each selected dependent outcome is expected to move when "
     "the independent variable moves from the deterministic baseline condition to the deterministic "
     "comparator condition. The AI does not choose exact condition values or verdicts."
+)
+
+CLAIM_COVERAGE_SEMANTICS_V3 = (
+    "A valid design must preserve the complete authoritative candidate-side claim set. The design independent "
+    "variable must match the claim-set independent variable and the selected dependent outcomes must match the "
+    "full set of authoritative material outcomes exactly."
 )
 
 
@@ -139,6 +146,55 @@ def _payload_without_fingerprint(version: str) -> dict[str, Any]:
                 "Return NO_VALID_DESIGN when the candidate cannot be expressed within this bounded V2 contract.",
             ],
         }
+    if version == "v3":
+        return {
+            "version": RESEARCH_DESIGN_ONTOLOGY_V3_VERSION,
+            "intent_contract_version": RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
+            "prediction_contract_version": RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
+            "supported_design_kinds": [ResearchDesignKind.PARAMETER_SENSITIVITY.value],
+            "design_variables": [DesignVariable.SIGNAL_THRESHOLD.value, DesignVariable.LOOKBACK.value],
+            "eligible_independent_variables_by_design_kind": {
+                ResearchDesignKind.PARAMETER_SENSITIVITY.value: [DesignVariable.SIGNAL_THRESHOLD.value],
+            },
+            "required_controls_by_design_kind": {
+                ResearchDesignKind.PARAMETER_SENSITIVITY.value: [DesignVariable.LOOKBACK.value],
+            },
+            "supported_dependent_outcomes": [
+                DesignOutcome.TRADE_COUNT.value,
+                DesignOutcome.NET_PNL.value,
+                DesignOutcome.SHARPE.value,
+            ],
+            "comparison_intents": [ComparisonIntent.CONTRAST_PARAMETER_LEVELS.value],
+            "analysis_intents": [AnalysisIntent.SENSITIVITY_ANALYSIS.value],
+            "supported_expected_directions": [
+                ExpectedDirection.DECREASE.value,
+                ExpectedDirection.INCREASE.value,
+                ExpectedDirection.NO_CHANGE.value,
+            ],
+            "prediction_authority": "DETERMINISTIC_FROM_CLAIM_SET",
+            "variable_semantics": {
+                DesignVariable.SIGNAL_THRESHOLD.value: "Primary signal gating threshold for sensitivity comparison.",
+                DesignVariable.LOOKBACK.value: "Historical lookback control retained as a fixed context variable.",
+            },
+            "outcome_semantics": {
+                DesignOutcome.TRADE_COUNT.value: "Number of executed trades under deterministic execution.",
+                DesignOutcome.NET_PNL.value: "Net profit and loss measured by deterministic execution.",
+                DesignOutcome.SHARPE.value: "Risk-adjusted outcome measured by deterministic execution.",
+            },
+            "parameter_sensitivity_semantics": PARAMETER_SENSITIVITY_SEMANTICS,
+            "claim_coverage_semantics": CLAIM_COVERAGE_SEMANTICS_V3,
+            "exact_value_boundary": EXACT_VALUE_BOUNDARY,
+            "falsification_boundary": FALSIFICATION_BOUNDARY,
+            "control_boundary": CONTROL_BOUNDARY,
+            "constraints": [
+                "Exactly one independent variable is allowed.",
+                "Controls must be separate from independent variables.",
+                "Dependent outcomes must use only supported ontology values.",
+                "The design must cover every authoritative material outcome claim exactly.",
+                "Prediction directions are not AI-authored in V3; deterministic software projects them from the authoritative claim set.",
+                "Return NO_VALID_DESIGN when the candidate claim set cannot be fully expressed within this bounded V3 contract.",
+            ],
+        }
     raise KeyError(f"Unknown research design ontology version {version!r}")
 
 
@@ -183,6 +239,8 @@ class ResearchDesignOntologySnapshot:
     prediction_contract_version: str | None = None
     supported_expected_directions: tuple[str, ...] | None = None
     prediction_semantics: str | None = None
+    prediction_authority: str | None = None
+    claim_coverage_semantics: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -246,6 +304,10 @@ class ResearchDesignOntologySnapshot:
             payload["supported_expected_directions"] = list(self.supported_expected_directions)
         if self.prediction_semantics is not None:
             payload["prediction_semantics"] = self.prediction_semantics
+        if self.prediction_authority is not None:
+            payload["prediction_authority"] = self.prediction_authority
+        if self.claim_coverage_semantics is not None:
+            payload["claim_coverage_semantics"] = self.claim_coverage_semantics
         return payload
 
 
@@ -297,8 +359,10 @@ def build_research_design_ontology_snapshot(version: str = "v1") -> ResearchDesi
             else None
         ),
         prediction_semantics=payload.get("prediction_semantics"),
+        prediction_authority=payload.get("prediction_authority"),
+        claim_coverage_semantics=payload.get("claim_coverage_semantics"),
     )
 
 
 def build_current_research_design_ontology_snapshot() -> ResearchDesignOntologySnapshot:
-    return build_research_design_ontology_snapshot(version="v2")
+    return build_research_design_ontology_snapshot(version="v3")

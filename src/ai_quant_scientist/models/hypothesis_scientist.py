@@ -1,4 +1,4 @@
-"""Domain models for the Bounded Hypothesis Scientist (V0.12A)."""
+"""Domain models for the bounded Hypothesis Scientist."""
 from __future__ import annotations
 
 import re
@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
+from .design import DesignOutcome, DesignVariable, ExpectedDirection, OutcomePrediction
 from .research import new_id
 
 
@@ -17,6 +18,11 @@ def utcnow() -> datetime:
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 MAX_PRIOR_CANDIDATE_SUMMARIES = 5
+HYPOTHESIS_CLAIM_SET_CONTRACT_VERSION = "hypothesis_claim_set_v1"
+
+
+class HypothesisClaimAggregation(str, Enum):
+    ALL_CLAIMS_REQUIRED = "ALL_CLAIMS_REQUIRED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +145,10 @@ class HypothesisScientistDecision:
     hypothesis_rationale: str | None = None
     # Serialized as JSON for storage; runtime type is tuple[AnyRequirement, ...] | None
     requirements_snapshot: str | None = None   # JSON; use deserialized form for logic
+    independent_variable: DesignVariable | None = None
+    independent_variable_direction: ExpectedDirection | None = None
+    outcome_claims: tuple[OutcomePrediction, ...] | None = None
+    claim_aggregation: HypothesisClaimAggregation | None = None
 
     # Present when NO_HYPOTHESIS
     no_hypothesis_reason: str | None = None
@@ -151,6 +161,13 @@ class HypothesisScientistDecision:
     ontology_fingerprint: str | None = None
     raw_response: str | None = None
     created_at: datetime = field(default_factory=utcnow)
+
+    def __post_init__(self) -> None:
+        if self.outcome_claims is not None:
+            values = tuple(self.outcome_claims)
+            if all(hasattr(item, "outcome") for item in values):
+                values = tuple(sorted(values, key=lambda item: item.outcome.value))
+            object.__setattr__(self, "outcome_claims", values)
 
 
 # ─── Invocation persistence model ────────────────────────────────────────────
@@ -169,4 +186,62 @@ class HypothesisScientistInvocation:
     validation_status: str | None   # "VALID", "INVALID", None (pending)
     validation_errors_json: str | None
     resulting_candidate_id: str | None
+    resulting_claim_set_id: str | None = None
     created_at: datetime = field(default_factory=utcnow)
+
+
+@dataclass(frozen=True, slots=True)
+class HypothesisClaimSet:
+    """Immutable canonical scientific intent for a candidate-side hypothesis."""
+
+    id: str
+    candidate_id: str
+    hypothesis_scientist_invocation_id: str
+    independent_variable: DesignVariable
+    independent_variable_direction: ExpectedDirection
+    claims: tuple[OutcomePrediction, ...]
+    claim_aggregation: HypothesisClaimAggregation
+    claim_contract_version: str
+    ontology_version: str
+    ontology_fingerprint: str
+    created_at: datetime = field(default_factory=utcnow)
+
+    def __post_init__(self) -> None:
+        if not self.candidate_id:
+            raise ValueError("HypothesisClaimSet requires candidate_id")
+        if not self.hypothesis_scientist_invocation_id:
+            raise ValueError("HypothesisClaimSet requires hypothesis_scientist_invocation_id")
+        if not isinstance(self.independent_variable, DesignVariable):
+            raise ValueError(f"Invalid independent_variable: {self.independent_variable!r}")
+        if self.independent_variable_direction not in (
+            ExpectedDirection.INCREASE,
+            ExpectedDirection.DECREASE,
+        ):
+            raise ValueError(
+                "HypothesisClaimSet independent_variable_direction must be INCREASE or DECREASE"
+            )
+        if not self.claims:
+            raise ValueError("HypothesisClaimSet requires at least one claim")
+        if any(not isinstance(item, OutcomePrediction) for item in self.claims):
+            raise ValueError("HypothesisClaimSet claims must be OutcomePrediction entries")
+        for item in self.claims:
+            if item.expected_direction not in (ExpectedDirection.INCREASE, ExpectedDirection.DECREASE):
+                raise ValueError("HypothesisClaimSet claim directions must be INCREASE or DECREASE")
+            if item.outcome == DesignOutcome.SCORE:
+                raise ValueError("HypothesisClaimSet does not support SCORE claims")
+        outcomes = [item.outcome for item in self.claims]
+        if len(set(outcomes)) != len(outcomes):
+            raise ValueError("HypothesisClaimSet claims must not repeat outcomes")
+        if not isinstance(self.claim_aggregation, HypothesisClaimAggregation):
+            raise ValueError(f"Invalid claim_aggregation: {self.claim_aggregation!r}")
+        if not self.claim_contract_version:
+            raise ValueError("HypothesisClaimSet requires claim_contract_version")
+        if not self.ontology_version:
+            raise ValueError("HypothesisClaimSet requires ontology_version")
+        if not _SHA256_HEX_RE.match(self.ontology_fingerprint):
+            raise ValueError("HypothesisClaimSet requires a SHA-256 ontology_fingerprint")
+        object.__setattr__(
+            self,
+            "claims",
+            tuple(sorted(self.claims, key=lambda item: item.outcome.value)),
+        )

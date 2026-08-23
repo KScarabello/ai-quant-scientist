@@ -43,7 +43,7 @@ def _json_safe(obj: Any):
 class _UnusedScientist:
     provider = "unused"
     model = "unused"
-    prompt_version = "v3"
+    prompt_version = "v4"
 
     def generate(self, brief):
         raise AssertionError("Acceptance/execution mode must not invoke Hypothesis Scientist")
@@ -52,7 +52,7 @@ class _UnusedScientist:
 class _UnusedDesigner:
     provider = "unused"
     model = "unused"
-    prompt_version = "v1"
+    prompt_version = "v3"
 
     def design(self, context):
         raise AssertionError("Acceptance/execution mode must not invoke Research Designer")
@@ -125,8 +125,8 @@ def _run_preparation(
 ) -> str:
     store = SQLiteStore(db_path)
     registry = build_v1_registry()
-    scientist = OpenAIHypothesisScientist(model=model, prompt_version="v3")
-    designer = OpenAIResearchDesigner(model=model, prompt_version="v2")
+    scientist = OpenAIHypothesisScientist(model=model, prompt_version="v4")
+    designer = OpenAIResearchDesigner(model=model, prompt_version="v3")
     cycle = SupervisedResearchCycle(
         store=store,
         registry=registry,
@@ -185,6 +185,15 @@ def _build_preparation_artifact(
     hypothesis_invocation = _require_present(
         store.get_hypothesis_scientist_invocation(preparation.hypothesis_scientist_invocation_id),
         f"HypothesisScientistInvocation not found: {preparation.hypothesis_scientist_invocation_id!r}",
+    )
+    claim_set = (
+        store.get_hypothesis_claim_set(preparation.hypothesis_claim_set_id)
+        if preparation.hypothesis_claim_set_id is not None
+        else (
+            None
+            if hypothesis_invocation.resulting_claim_set_id is None
+            else store.get_hypothesis_claim_set(hypothesis_invocation.resulting_claim_set_id)
+        )
     )
     candidate = (
         store.get_research_candidate(preparation.candidate_id)
@@ -253,6 +262,8 @@ def _build_preparation_artifact(
         "hypothesis_scientist_invocation_id": hypothesis_invocation.id,
         "hypothesis_decision": _parsed_json_object(hypothesis_invocation.parsed_decision_json),
         "candidate_id": None if candidate is None else candidate.id,
+        "hypothesis_claim_set_id": None if claim_set is None else claim_set.id,
+        "canonical_structured_scientific_claims": _claim_set_summary(claim_set),
         "candidate_feasibility_decision": _json_safe(
             _feasibility_summary(feasibility)
         ),
@@ -335,6 +346,11 @@ def _build_acceptance_execution_artifact(
             f"ResearchPredictionPlan not found: {plan.research_prediction_plan_id!r}",
         )
     )
+    claim_set = (
+        None
+        if prediction_plan is None or prediction_plan.hypothesis_claim_set_id is None
+        else store.get_hypothesis_claim_set(prediction_plan.hypothesis_claim_set_id)
+    )
     scientific_verdict = (
         None
         if execution.scientific_verdict_id is None
@@ -350,6 +366,8 @@ def _build_acceptance_execution_artifact(
         "hypothesis_scientist_invocation_id": None if hypothesis_invocation is None else hypothesis_invocation.id,
         "research_designer_invocation_id": None if designer_invocation is None else designer_invocation.id,
         "candidate_id": candidate.id,
+        "hypothesis_claim_set_id": None if claim_set is None else claim_set.id,
+        "canonical_structured_scientific_claims": _claim_set_summary(claim_set),
         "candidate_feasibility_decision": _json_safe(
             _feasibility_summary(feasibility)
         ),
@@ -442,16 +460,39 @@ def _prediction_plan_summary(prediction_plan) -> dict[str, Any] | None:
         return None
     return {
         "id": prediction_plan.id,
+        "hypothesis_claim_set_id": prediction_plan.hypothesis_claim_set_id,
         "independent_variable": prediction_plan.independent_variable.value,
         "prediction_contract_version": prediction_plan.prediction_contract_version,
         "ontology_version": prediction_plan.ontology_version,
         "ontology_fingerprint": prediction_plan.ontology_fingerprint,
+        "prediction_aggregation_rule": prediction_plan.prediction_aggregation_rule.value,
         "predictions": [
             {
                 "outcome": item.outcome.value,
                 "expected_direction": item.expected_direction.value,
             }
             for item in prediction_plan.predictions
+        ],
+    }
+
+
+def _claim_set_summary(claim_set) -> dict[str, Any] | None:
+    if claim_set is None:
+        return None
+    return {
+        "id": claim_set.id,
+        "independent_variable": claim_set.independent_variable.value,
+        "independent_variable_direction": claim_set.independent_variable_direction.value,
+        "claim_aggregation": claim_set.claim_aggregation.value,
+        "claim_contract_version": claim_set.claim_contract_version,
+        "ontology_version": claim_set.ontology_version,
+        "ontology_fingerprint": claim_set.ontology_fingerprint,
+        "claims": [
+            {
+                "outcome": item.outcome.value,
+                "expected_direction": item.expected_direction.value,
+            }
+            for item in claim_set.claims
         ],
     }
 

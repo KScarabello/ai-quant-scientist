@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from contextlib import contextmanager
 from ai_quant_scientist.capabilities import (
     AssetClass,
     DataKind,
@@ -37,16 +38,22 @@ from ai_quant_scientist.evals.scientist_eval import (
 )
 from ai_quant_scientist.evals.run_live_scientist_eval import run_live_scientist_eval
 from ai_quant_scientist.models.hypothesis_scientist import (
+    HypothesisClaimAggregation,
     HypothesisScientistDecision,
     HypothesisScientistDecisionType,
     HypothesisScientistInvocation,
     PriorCandidateSummary,
     ResearchBrief,
 )
+from ai_quant_scientist.models.design import DesignOutcome, DesignVariable, ExpectedDirection, OutcomePrediction
 from ai_quant_scientist.services.hypothesis_prompts import (
     SCIENTIST_VERSION,
     available_versions,
     get_scientist_instructions,
+)
+from ai_quant_scientist.services.hypothesis_claim_ontology import (
+    HYPOTHESIS_CLAIM_ONTOLOGY_VERSION,
+    build_hypothesis_claim_ontology_snapshot,
 )
 from ai_quant_scientist.services.hypothesis_scientist import (
     FakeHypothesisScientist,
@@ -55,6 +62,7 @@ from ai_quant_scientist.services.hypothesis_scientist import (
     brief_to_json,
     brief_to_payload,
     generate_candidate,
+    materialize_hypothesis_claim_set,
     materialize_research_candidate,
 )
 from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
@@ -247,6 +255,7 @@ def test_prompt_v1_available():
     assert "v1" in available_versions()
     assert "v2" in available_versions()
     assert "v3" in available_versions()
+    assert "v4" in available_versions()
 
 
 def test_prompt_v1_contains_core_instructions():
@@ -284,6 +293,13 @@ def test_prompt_v3_preserves_policy_but_removes_pre_spec_parameter_contract():
     assert "future ResearchSpec design details" in p
 
 
+def test_prompt_v4_introduces_authoritative_claim_contract():
+    p = get_scientist_instructions("v4")
+    assert "authoritative machine-readable claim set" in p
+    assert "outcome_claims" in p
+    assert "ALL_CLAIMS_REQUIRED" in p
+
+
 def test_prompt_versions_exact_hashes_unchanged():
     assert hashlib.sha256(get_scientist_instructions("v1").encode("utf-8")).hexdigest() == (
         "34693e305202cae2ee96f84d328bdbd53e8cee8f65765afb9a3c0f35614ec37e"
@@ -294,6 +310,15 @@ def test_prompt_versions_exact_hashes_unchanged():
     assert hashlib.sha256(get_scientist_instructions("v3").encode("utf-8")).hexdigest() == (
         "aa89aa587b8b26332562b2055eeb2813dff148201d96bec8bf79eed34b93661a"
     )
+    assert hashlib.sha256(get_scientist_instructions("v4").encode("utf-8")).hexdigest() == (
+        "71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef"
+    )
+
+
+def test_claim_ontology_v1_fingerprint_preserved():
+    ontology = build_hypothesis_claim_ontology_snapshot()
+    assert ontology.version == HYPOTHESIS_CLAIM_ONTOLOGY_VERSION
+    assert ontology.fingerprint == "23f6c4019ea3ffebc56a3486c19d4da0b733c4c08c7d8b4d18769945a26afcd3"
 
 
 # ─── Validator ────────────────────────────────────────────────────────────────
@@ -303,6 +328,42 @@ def test_valid_propose_passes():
     decision = _propose_decision(brief)
     valid, errors = HypothesisProposalValidator().validate(decision, brief)
     assert valid and not errors
+
+
+def test_valid_v4_claim_set_passes():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v4"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid and not errors
+
+
+def test_v4_missing_directional_claim_fails_closed():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v4"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=None,
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "outcome_claims" in errors
 
 
 def test_valid_no_hypothesis_passes():
@@ -482,6 +543,35 @@ def test_fake_scientist_materializes_candidate_without_required_parameters():
     data_reqs = [req for req in candidate.requirements if isinstance(req, DataRequirement)]
     assert data_reqs
     assert all(req.required_parameters is None for req in data_reqs)
+
+
+def test_materialize_hypothesis_claim_set_assigns_authoritative_provenance():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v4"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    claim_set = materialize_hypothesis_claim_set(
+        decision,
+        candidate_id="cand-1",
+        hypothesis_scientist_invocation_id="inv-1",
+    )
+    assert claim_set is not None
+    assert claim_set.candidate_id == "cand-1"
+    assert claim_set.hypothesis_scientist_invocation_id == "inv-1"
+    assert [item.outcome.value for item in claim_set.claims] == ["sharpe", "trade_count"]
 
 
 def test_quotes_case_06_vocabulary_remains_valid():
@@ -676,6 +766,10 @@ def test_save_and_retrieve_propose_invocation(tmp_path):
     assert snapshot["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
     assert parsed["ontology_version"] == REQUIREMENT_ONTOLOGY_VERSION
     assert parsed["ontology_fingerprint"] == snapshot["requirement_ontology"]["fingerprint"]
+    assert r.resulting_claim_set_id is not None
+    claim_set = store.get_hypothesis_claim_set(r.resulting_claim_set_id)
+    assert claim_set is not None
+    assert claim_set.candidate_id == candidate.id
 
 
 def test_save_and_retrieve_no_hypothesis_invocation(tmp_path):
@@ -713,6 +807,42 @@ def test_invalid_decision_persisted_with_validation_failure(tmp_path):
     assert candidate is None
     retrieved = store.get_hypothesis_scientist_invocations(brief.id)
     assert retrieved[0].validation_status == "INVALID"
+
+
+def test_generate_candidate_v4_persists_claim_set_atomically(tmp_path, monkeypatch):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+    scientist = FakeHypothesisScientist()
+
+    original_connect = store.connect
+
+    @contextmanager
+    def failing_connect():
+        with original_connect() as conn:
+            class _Proxy:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def execute(self, sql, params=()):
+                    if "INSERT INTO hypothesis_claim_sets" in sql:
+                        raise RuntimeError("simulated_claim_set_persistence_failure")
+                    return self._inner.execute(sql, params)
+
+                def __getattr__(self, name):
+                    return getattr(self._inner, name)
+
+            yield _Proxy(conn)
+
+    monkeypatch.setattr(store, "connect", failing_connect)
+
+    with pytest.raises(RuntimeError, match="simulated_claim_set_persistence_failure"):
+        generate_candidate(scientist, brief, store)
+
+    monkeypatch.setattr(store, "connect", original_connect)
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM research_candidates").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM hypothesis_scientist_invocations").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM hypothesis_claim_sets").fetchone()[0] == 0
 
 
 def test_invocations_immutable(tmp_path):
@@ -755,24 +885,24 @@ def test_v5_to_v6_migration(tmp_path):
         assert "research_candidates" in tables
 
 
-def test_fresh_v10_db_has_all_tables(tmp_path):
+def test_fresh_v11_db_has_all_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-    assert ver == 10
+    assert ver == 11
     for t in ("hypothesis_scientist_invocations", "research_candidates", "feasibility_decisions",
-              "critic_invocations", "research_runs"):
+              "hypothesis_claim_sets", "critic_invocations", "research_runs"):
         assert t in tables
 
 
-def test_v10_migration_idempotent(tmp_path):
+def test_v11_migration_idempotent(tmp_path):
     SQLiteStore(tmp_path / "t.db")
     SQLiteStore(tmp_path / "t.db")  # second open on current DB should stay current
     store = SQLiteStore(tmp_path / "t.db")
     with store.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 10
+        assert ver == 11
 
 
 # ─── Eval harness ─────────────────────────────────────────────────────────────
@@ -796,7 +926,7 @@ def test_harness_runs_fake_scientist():
 def test_harness_defaults_to_scientist_prompt_version():
     cases = load_cases_from_file("evals/scientist_v1.json")
     result = ScientistEvalSuite(cases[:1]).run(FakeHypothesisScientist())[0]
-    assert result.prompt_version == "v3"
+    assert result.prompt_version == "v4"
 
 
 def test_harness_no_api_calls(monkeypatch):

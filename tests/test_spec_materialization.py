@@ -800,7 +800,7 @@ def test_semantic_closure_end_to_end_executes_true_parameter_sensitivity_contras
         assert conn.execute("SELECT COUNT(*) FROM spec_revision_proposals").fetchone()[0] == 0
 
 
-def test_v7_to_v10_migration_adds_plan_prediction_and_verdict_tables(tmp_path):
+def test_v7_to_v11_migration_adds_plan_prediction_and_verdict_tables(tmp_path):
     db = tmp_path / "v7.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -892,7 +892,7 @@ def test_v7_to_v10_migration_adds_plan_prediction_and_verdict_tables(tmp_path):
     store = SQLiteStore(db)
     with store.connect() as c:
         version = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert version == 10
+        assert version == 11
         spec_feasibility_columns = [row[1] for row in c.execute("PRAGMA table_info(spec_feasibility_decisions)").fetchall()]
         assert "plan_id" in spec_feasibility_columns
         assert "condition_id" in spec_feasibility_columns
@@ -913,14 +913,14 @@ def test_v7_to_v10_migration_adds_plan_prediction_and_verdict_tables(tmp_path):
         assert "scientific_verdicts" in tables
 
 
-def test_fresh_v10_db_has_plan_prediction_and_verdict_tables(tmp_path):
+def test_fresh_v11_db_has_plan_prediction_and_verdict_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as c:
         version = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
         tables = [row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         design_intent_columns = [row[1] for row in c.execute("PRAGMA table_info(research_design_intents)").fetchall()]
         plan_columns = [row[1] for row in c.execute("PRAGMA table_info(initial_experiment_plans)").fetchall()]
-    assert version == 10
+    assert version == 11
     for table in (
         "research_design_intents",
         "research_designer_invocations",

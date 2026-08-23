@@ -45,10 +45,12 @@ from ai_quant_scientist.models.research_designer import (
     ResearchDesignerDecision,
     ResearchDesignerDecisionType,
 )
+from ai_quant_scientist.models.hypothesis_scientist import ResearchBrief
 from ai_quant_scientist.services.openai_research_designer import OpenAIResearchDesigner
 from ai_quant_scientist.services.research_design_ontology import (
     RESEARCH_DESIGN_ONTOLOGY_VERSION,
     RESEARCH_DESIGN_ONTOLOGY_V2_VERSION,
+    RESEARCH_DESIGN_ONTOLOGY_V3_VERSION,
     RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION,
     build_current_research_design_ontology_snapshot,
     build_research_design_ontology_snapshot,
@@ -61,6 +63,7 @@ from ai_quant_scientist.services.research_designer import (
     build_research_designer_context,
     context_to_payload,
 )
+from ai_quant_scientist.services.hypothesis_scientist import FakeHypothesisScientist, generate_candidate
 from ai_quant_scientist.services.research_designer_prompts import (
     CURRENT_RESEARCH_DESIGNER_VERSION,
     RESEARCH_DESIGNER_VERSION,
@@ -147,6 +150,10 @@ def _ontology_v1():
 
 
 def _ontology_v2():
+    return build_research_design_ontology_snapshot(version="v2")
+
+
+def _ontology_v3():
     return build_current_research_design_ontology_snapshot()
 
 
@@ -166,6 +173,30 @@ def _governed_v2(store: SQLiteStore, registry: CapabilityRegistry, designer) -> 
         designer=designer,
         ontology=_ontology_v2(),
     )
+
+
+def _governed_v3(store: SQLiteStore, registry: CapabilityRegistry, designer) -> GovernedResearchDesigner:
+    return GovernedResearchDesigner(
+        store=store,
+        registry=registry,
+        designer=designer,
+        ontology=_ontology_v3(),
+    )
+
+
+def _persist_v4_candidate_and_claim_set(store: SQLiteStore):
+    brief = ResearchBrief.create(
+        research_question=(
+            "For identical synthetic strategy logic, does a stricter signal threshold reduce trade frequency "
+            "and improve risk-adjusted performance?"
+        ),
+        asset_class_focus="SYNTHETIC",
+    )
+    invocation, candidate = generate_candidate(FakeHypothesisScientist(), brief, store)
+    assert candidate is not None
+    claim_set = store.get_hypothesis_claim_set(invocation.resulting_claim_set_id)
+    assert claim_set is not None
+    return candidate, claim_set
 
 
 def _make_openai_response(parsed: dict):
@@ -349,10 +380,10 @@ def test_research_design_ontology_payload_omits_exact_materialization_values():
 
 
 def test_research_designer_prompt_v1_available_and_hash_locked():
-    assert available_versions() == ("v1", "v2")
+    assert available_versions() == ("v1", "v2", "v3")
     prompt = get_research_designer_instructions("v1")
     assert RESEARCH_DESIGNER_VERSION == "research_designer_v1"
-    assert CURRENT_RESEARCH_DESIGNER_VERSION == "research_designer_v2"
+    assert CURRENT_RESEARCH_DESIGNER_VERSION == "research_designer_v3"
     assert "NO_VALID_DESIGN" in prompt
     assert "signal_threshold is the only supported independent variable" in prompt
     assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == (
@@ -366,6 +397,15 @@ def test_research_designer_prompt_v2_available_and_hash_locked():
     assert "must not contain exact numeric targets" in prompt
     assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == (
         "721392d5160f82c8de83eaef67f4c3fc96fc13872bd1823f43b7c681737187cb"
+    )
+
+
+def test_research_designer_prompt_v3_available():
+    prompt = get_research_designer_instructions("v3")
+    assert "HypothesisClaimSet" in prompt
+    assert "must cover every authoritative material outcome claim exactly" in prompt
+    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == (
+        "2f94172fb0219955bced7deab320d778ab4e83fe8c8e57466aeeed707955df36"
     )
 
 
@@ -508,6 +548,15 @@ def test_research_design_ontology_v2_exposes_prediction_contract():
     assert compute_research_design_ontology_fingerprint(ontology.to_payload()) == ontology.fingerprint
 
 
+def test_research_design_ontology_v3_exposes_claim_coverage_contract():
+    ontology = _ontology_v3()
+    assert ontology.version == RESEARCH_DESIGN_ONTOLOGY_V3_VERSION
+    assert ontology.fingerprint == "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183"
+    assert ontology.prediction_contract_version == RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+    assert ontology.prediction_authority == "DETERMINISTIC_FROM_CLAIM_SET"
+    assert ontology.claim_coverage_semantics is not None
+
+
 def test_context_built_from_ontology_v2_passes_semantic_fingerprint_validation():
     ontology = _ontology_v2()
     context = build_research_designer_context(
@@ -607,6 +656,80 @@ def test_validator_rejects_prediction_for_unselected_outcome():
     valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
     assert not valid
     assert "predictions_extra" in errors
+
+
+def test_validator_accepts_complete_v3_claim_coverage(tmp_path):
+    store = _store(tmp_path)
+    candidate, claim_set = _persist_v4_candidate_and_claim_set(store)
+    ontology = _ontology_v3()
+    context = build_research_designer_context(
+        candidate=candidate,
+        hypothesis_claim_set=claim_set,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision(
+        candidate.id,
+        dependent_outcomes=tuple(item.outcome for item in claim_set.claims),
+        prompt_version="v3",
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert valid
+    assert errors == {}
+
+
+def test_validator_rejects_v3_design_that_omits_authoritative_claim_outcome(tmp_path):
+    store = _store(tmp_path)
+    candidate, claim_set = _persist_v4_candidate_and_claim_set(store)
+    ontology = _ontology_v3()
+    context = build_research_designer_context(
+        candidate=candidate,
+        hypothesis_claim_set=claim_set,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision(
+        candidate.id,
+        dependent_outcomes=(DesignOutcome.TRADE_COUNT,),
+        prompt_version="v3",
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert errors["claim_set_outcomes_missing"] == (
+        "DESIGN must cover every authoritative claim outcome: missing ['sharpe']"
+    )
+
+
+def test_validator_rejects_v3_design_that_adds_extra_scientific_outcome(tmp_path):
+    store = _store(tmp_path)
+    candidate, claim_set = _persist_v4_candidate_and_claim_set(store)
+    ontology = _ontology_v3()
+    context = build_research_designer_context(
+        candidate=candidate,
+        hypothesis_claim_set=claim_set,
+        candidate_feasibility_decision_id="auth-1",
+        ontology=ontology,
+    )
+    decision = _design_decision(
+        candidate.id,
+        dependent_outcomes=(
+            DesignOutcome.TRADE_COUNT,
+            DesignOutcome.SHARPE,
+            DesignOutcome.NET_PNL,
+        ),
+        prompt_version="v3",
+        ontology_version=ontology.version,
+        ontology_fingerprint=ontology.fingerprint,
+    )
+    valid, errors = ResearchDesignProposalValidator().validate(decision, context, ontology)
+    assert not valid
+    assert errors["claim_set_outcomes_extra"] == (
+        "DESIGN must not add scientific outcomes outside the authoritative claim set: ['net_pnl']"
+    )
 
 
 def test_validator_rejects_unsupported_direction_like_value():
@@ -1279,7 +1402,7 @@ def test_live_runner_requires_allow_live_api():
         )
 
 
-def test_v8_to_v10_migration_adds_research_designer_invocations_and_preserves_v15_tables(tmp_path):
+def test_v8_to_v11_migration_adds_research_designer_invocations_and_preserves_v15_1_tables(tmp_path):
     db = Path(tmp_path) / "v8.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -1321,7 +1444,7 @@ def test_v8_to_v10_migration_adds_research_designer_invocations_and_preserves_v1
     store = SQLiteStore(db)
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert version == 10
+        assert version == 11
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
@@ -1331,11 +1454,12 @@ def test_v8_to_v10_migration_adds_research_designer_invocations_and_preserves_v1
             row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         ]
         assert "research_designer_invocations" in tables
+        assert "hypothesis_claim_sets" in tables
         assert "research_prediction_plans" in tables
         assert "scientific_verdicts" in tables
 
 
-def test_fresh_v10_db_has_research_designer_and_prediction_tables(tmp_path):
+def test_fresh_v11_db_has_research_designer_and_prediction_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
@@ -1345,8 +1469,9 @@ def test_fresh_v10_db_has_research_designer_and_prediction_tables(tmp_path):
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
-    assert version == 10
+    assert version == 11
     assert "research_designer_invocations" in tables
+    assert "hypothesis_claim_sets" in tables
     assert "research_prediction_plans" in tables
     assert "scientific_verdicts" in tables
     assert "ontology_version" in intent_columns

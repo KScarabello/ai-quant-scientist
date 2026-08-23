@@ -1,0 +1,144 @@
+{
+  "timestamp": 1787458529,
+  "mode": "prepare",
+  "models": {
+    "hypothesis_scientist": "gpt-5.6-terra",
+    "research_designer": "gpt-5.6-terra"
+  },
+  "prompt_versions": {
+    "hypothesis_scientist": "v3",
+    "research_designer": "v2"
+  },
+  "brief": {
+    "id": "beafffa3-db07-4f40-be59-0d2b3cad0d48",
+    "research_question": "For this bounded synthetic smoke test, does making a signal threshold stricter change trade frequency and risk-adjusted performance for the same synthetic strategy logic when a synthetic-parametric dataset is treated as the prerequisite input?",
+    "asset_class_focus": "SYNTHETIC",
+    "instrument_focus": null,
+    "methodological_constraints": [
+      "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
+      "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+      "Do not require particular primitive synthetic data fields at candidate-feasibility time.",
+      "Leave required_fields unset unless a primitive input field is strictly unavoidable for broad feasibility.",
+      "Do not assert required_parameters for this smoke test.",
+      "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
+      "Do not require a separate statistical-analysis tool for this bounded fixture.",
+      "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
+      "Do not assume real market data or live trading capabilities.",
+      "Focus on a single falsifiable hypothesis that can be expressed as a parameter-sensitivity design without exact execution values."
+    ],
+    "exclusions": [
+      "Do not propose exact execution parameter values.",
+      "Do not mention capability IDs.",
+      "Do not assume autonomous execution approval."
+    ],
+    "source": "live_supervised_cycle_v1"
+  },
+  "hypothesis_scientist_invocation_id": "e684e053-3719-423c-99b4-964ddaceb4c1",
+  "hypothesis_decision": {
+    "decision_type": "PROPOSE_HYPOTHESIS",
+    "hypothesis_rationale": "The threshold controls which signal realizations trigger trades; tightening it filters marginal signals, mechanically altering the number of qualifying trades and potentially changing the distribution of realized returns underlying risk-adjusted performance. The hypothesis is falsified if the deterministic contrast between threshold settings shows no change in one or both measured outcomes.",
+    "hypothesis_statement": "For identical strategy logic applied to the same synthetic-parametric dataset, a stricter signal-threshold setting changes both executed trade frequency and risk-adjusted performance relative to a less strict setting.",
+    "no_hypothesis_reason": null,
+    "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "ontology_version": "requirement_ontology_v2",
+    "requirements_snapshot": "[{\"asset_class\":\"SYNTHETIC\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"end_date\":null,\"instruments\":null,\"label\":\"\",\"point_in_time_required\":false,\"required_fields\":null,\"required_parameters\":null,\"requirement_id\":\"synthetic_parametric_fixture\",\"resolution\":\"N/A\",\"start_date\":null,\"type\":\"DataRequirement\"},{\"label\":\"Deterministic backtest execution and output contrast measurement\",\"requirement_id\":\"deterministic_backtest_execution\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"type\":\"ToolRequirement\"}]"
+  },
+  "candidate_id": "d607c2f4-a8fc-4c2e-bd3b-6e4c4bef7acb",
+  "candidate_feasibility_decision": {
+    "id": "a949a4a6-9027-41bd-aed6-55c9c2916355",
+    "status": "READY_FOR_SPEC",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53",
+    "satisfied_ids": [
+      "synthetic_parametric_fixture",
+      "deterministic_backtest_execution"
+    ],
+    "unsatisfied_ids": [],
+    "reason_codes": []
+  },
+  "research_designer_invocation_id": "c25adc03-97db-4f9d-aabf-85f5b623832b",
+  "designer_decision": {
+    "analysis_intent": "SENSITIVITY_ANALYSIS",
+    "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+    "controls": [
+      "lookback"
+    ],
+    "decision_type": "DESIGN",
+    "dependent_outcomes": [
+      "trade_count"
+    ],
+    "design_kind": "PARAMETER_SENSITIVITY",
+    "falsification_condition": "The hypothesis is falsified if tightening the signal threshold does not decrease the number of executed trades under otherwise fixed strategy context.",
+    "independent_variables": [
+      "signal_threshold"
+    ],
+    "model": "gpt-5.6-terra",
+    "no_valid_design_reason": null,
+    "ontology_fingerprint": "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d",
+    "ontology_version": "research_design_ontology_v2",
+    "predictions": [
+      {
+        "expected_direction": "DECREASE",
+        "outcome": "trade_count"
+      }
+    ],
+    "prompt_version": "v2",
+    "provider": "openai",
+    "rationale": "A stricter signal threshold filters marginal signal realizations, so fewer signals should qualify for execution while lookback remains fixed."
+  },
+  "ontology_versions": {
+    "hypothesis_scientist": "requirement_ontology_v2",
+    "research_designer": "research_design_ontology_v2"
+  },
+  "ontology_fingerprints": {
+    "hypothesis_scientist": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "research_designer": "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d"
+  },
+  "research_design_intent_id": "33b59ea8-7b2f-44a1-a400-ffa41ef4f738",
+  "research_prediction_plan_id": "fdc841fd-9be7-46dc-bbca-99a5c7830690",
+  "prediction_contract_version": "research_prediction_plan_v1",
+  "structured_predictions": {
+    "id": "fdc841fd-9be7-46dc-bbca-99a5c7830690",
+    "independent_variable": "signal_threshold",
+    "prediction_contract_version": "research_prediction_plan_v1",
+    "ontology_version": "research_design_ontology_v2",
+    "ontology_fingerprint": "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d",
+    "predictions": [
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE"
+      }
+    ]
+  },
+  "initial_experiment_plan_id": "ef519407-2aad-49cf-bffe-91bca0c64974",
+  "materialization_proposal_id": "2f641366-3e40-4aa3-90df-4423ba0fff65",
+  "exact_materialized_conditions": [
+    {
+      "condition_id": "45ba09be-3b22-49f1-bbb7-16ec59cb60c8",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.0
+      }
+    },
+    {
+      "condition_id": "f594497a-a8f1-458f-a694-014d5a336204",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.5
+      }
+    }
+  ],
+  "preparation_outcome": "AWAITING_HUMAN_ACCEPTANCE",
+  "preparation_message": "Preparation completed. Explicit human acceptance is required before execution.",
+  "human_acceptance_occurred": false,
+  "execution_outcome": null,
+  "execution_message": null,
+  "execution_records": [],
+  "contrast_result": null
+}

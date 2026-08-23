@@ -44,6 +44,7 @@ from ..models.design import (
     OutcomePrediction,
     OutcomeScientificVerdict,
     ParameterSensitivityContrastResult,
+    PredictionAggregationRule,
     ResearchDesignIntent,
     ResearchDesignKind,
     ResearchPredictionPlan,
@@ -58,10 +59,15 @@ from ..models.design import (
     SpecMaterializationProposalStatus,
     thaw_mapping,
 )
+from ..models.hypothesis_scientist import (
+    HypothesisClaimAggregation,
+    HypothesisClaimSet,
+    HypothesisScientistInvocation,
+)
 from ..models.research_designer import ResearchDesignerInvocation
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 class SQLiteStore:
@@ -251,7 +257,23 @@ class SQLiteStore:
                     validation_status TEXT,
                     validation_errors_json TEXT,
                     resulting_candidate_id TEXT,
+                    resulting_claim_set_id TEXT,
                     created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS hypothesis_claim_sets (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL UNIQUE,
+                    hypothesis_scientist_invocation_id TEXT NOT NULL UNIQUE,
+                    independent_variable TEXT NOT NULL,
+                    independent_variable_direction TEXT NOT NULL,
+                    claims_json TEXT NOT NULL,
+                    claim_aggregation TEXT NOT NULL,
+                    claim_contract_version TEXT NOT NULL,
+                    ontology_version TEXT NOT NULL,
+                    ontology_fingerprint TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (hypothesis_scientist_invocation_id) REFERENCES hypothesis_scientist_invocations(id)
                 );
                 CREATE TABLE IF NOT EXISTS research_design_intents (
                     id TEXT PRIMARY KEY,
@@ -276,6 +298,7 @@ class SQLiteStore:
                 CREATE TABLE IF NOT EXISTS research_designer_invocations (
                     id TEXT PRIMARY KEY,
                     candidate_id TEXT NOT NULL,
+                    hypothesis_claim_set_id TEXT,
                     candidate_snapshot_json TEXT NOT NULL,
                     candidate_feasibility_decision_id TEXT NOT NULL,
                     prompt_version TEXT NOT NULL,
@@ -419,12 +442,14 @@ class SQLiteStore:
                 CREATE TABLE IF NOT EXISTS research_prediction_plans (
                     id TEXT PRIMARY KEY,
                     candidate_id TEXT NOT NULL,
+                    hypothesis_claim_set_id TEXT,
                     design_intent_id TEXT NOT NULL UNIQUE,
                     research_designer_invocation_id TEXT NOT NULL UNIQUE,
                     prediction_contract_version TEXT NOT NULL,
                     ontology_version TEXT NOT NULL,
                     ontology_fingerprint TEXT NOT NULL,
                     independent_variable TEXT NOT NULL,
+                    prediction_aggregation_rule TEXT NOT NULL,
                     predictions_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
@@ -842,6 +867,43 @@ class SQLiteStore:
                         );
                         """
                     )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (10,))
+                elif v == 10:
+                    if not column_exists(connection, "hypothesis_scientist_invocations", "resulting_claim_set_id"):
+                        connection.execute(
+                            "ALTER TABLE hypothesis_scientist_invocations ADD COLUMN resulting_claim_set_id TEXT"
+                        )
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS hypothesis_claim_sets (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL UNIQUE,
+                            hypothesis_scientist_invocation_id TEXT NOT NULL UNIQUE,
+                            independent_variable TEXT NOT NULL,
+                            independent_variable_direction TEXT NOT NULL,
+                            claims_json TEXT NOT NULL,
+                            claim_aggregation TEXT NOT NULL,
+                            claim_contract_version TEXT NOT NULL,
+                            ontology_version TEXT NOT NULL,
+                            ontology_fingerprint TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (hypothesis_scientist_invocation_id) REFERENCES hypothesis_scientist_invocations(id)
+                        );
+                        """
+                    )
+                    if not column_exists(connection, "research_designer_invocations", "hypothesis_claim_set_id"):
+                        connection.execute(
+                            "ALTER TABLE research_designer_invocations ADD COLUMN hypothesis_claim_set_id TEXT"
+                        )
+                    if not column_exists(connection, "research_prediction_plans", "hypothesis_claim_set_id"):
+                        connection.execute(
+                            "ALTER TABLE research_prediction_plans ADD COLUMN hypothesis_claim_set_id TEXT"
+                        )
+                    if not column_exists(connection, "research_prediction_plans", "prediction_aggregation_rule"):
+                        connection.execute(
+                            "ALTER TABLE research_prediction_plans ADD COLUMN prediction_aggregation_rule TEXT NOT NULL DEFAULT 'ALL_PREDICTIONS_REQUIRED'"
+                        )
                     connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
                 else:
                     raise RuntimeError(f"Unsupported schema version {v}")
@@ -1548,6 +1610,88 @@ class SQLiteStore:
                 ),
             )
 
+    def save_hypothesis_claim_set(self, claim_set: HypothesisClaimSet) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO hypothesis_claim_sets
+                   (id, candidate_id, hypothesis_scientist_invocation_id, independent_variable,
+                    independent_variable_direction, claims_json, claim_aggregation,
+                    claim_contract_version, ontology_version, ontology_fingerprint, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    claim_set.id,
+                    claim_set.candidate_id,
+                    claim_set.hypothesis_scientist_invocation_id,
+                    claim_set.independent_variable.value,
+                    claim_set.independent_variable_direction.value,
+                    self._dumps(
+                        [
+                            {
+                                "outcome": item.outcome.value,
+                                "expected_direction": item.expected_direction.value,
+                            }
+                            for item in claim_set.claims
+                        ]
+                    ),
+                    claim_set.claim_aggregation.value,
+                    claim_set.claim_contract_version,
+                    claim_set.ontology_version,
+                    claim_set.ontology_fingerprint,
+                    claim_set.created_at.isoformat(),
+                ),
+            )
+
+    def _row_to_hypothesis_claim_set(self, row: sqlite3.Row) -> HypothesisClaimSet:
+        return HypothesisClaimSet(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            hypothesis_scientist_invocation_id=row["hypothesis_scientist_invocation_id"],
+            independent_variable=DesignVariable(row["independent_variable"]),
+            independent_variable_direction=ExpectedDirection(row["independent_variable_direction"]),
+            claims=tuple(
+                OutcomePrediction(
+                    outcome=DesignOutcome(item["outcome"]),
+                    expected_direction=ExpectedDirection(item["expected_direction"]),
+                )
+                for item in self._loads(row["claims_json"])
+            ),
+            claim_aggregation=HypothesisClaimAggregation(row["claim_aggregation"]),
+            claim_contract_version=row["claim_contract_version"],
+            ontology_version=row["ontology_version"],
+            ontology_fingerprint=row["ontology_fingerprint"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_hypothesis_claim_set(self, claim_set_id: str) -> HypothesisClaimSet | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM hypothesis_claim_sets WHERE id = ?",
+                (claim_set_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_hypothesis_claim_set(row)
+
+    def get_hypothesis_claim_set_by_candidate_id(self, candidate_id: str) -> HypothesisClaimSet | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM hypothesis_claim_sets WHERE candidate_id = ?",
+                (candidate_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_hypothesis_claim_set(row)
+
+    def get_hypothesis_claim_set_by_invocation_id(self, invocation_id: str) -> HypothesisClaimSet | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM hypothesis_claim_sets WHERE hypothesis_scientist_invocation_id = ?",
+                (invocation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_hypothesis_claim_set(row)
+
     def get_research_candidate(self, candidate_id: str):
         """Return a ResearchCandidate or None if not found."""
         from ..capabilities.gate import ResearchCandidate
@@ -1723,6 +1867,12 @@ class SQLiteStore:
         design_intent: ResearchDesignIntent | None = None,
         prediction_plan: ResearchPredictionPlan | None = None,
     ) -> None:
+        if invocation.hypothesis_claim_set_id is not None:
+            claim_set = self.get_hypothesis_claim_set(invocation.hypothesis_claim_set_id)
+            if claim_set is None:
+                raise ValueError("ResearchDesignerInvocation hypothesis_claim_set_id references a missing HypothesisClaimSet")
+            if claim_set.candidate_id != invocation.candidate_id:
+                raise ValueError("ResearchDesignerInvocation hypothesis_claim_set_id must belong to the same candidate")
         if design_intent is None:
             if invocation.resulting_design_intent_id is not None:
                 raise ValueError(
@@ -1745,6 +1895,10 @@ class SQLiteStore:
                 if prediction_plan.research_designer_invocation_id != invocation.id:
                     raise ValueError(
                         "ResearchPredictionPlan research_designer_invocation_id must match the authoritative ResearchDesignerInvocation"
+                    )
+                if invocation.hypothesis_claim_set_id != prediction_plan.hypothesis_claim_set_id:
+                    raise ValueError(
+                        "ResearchPredictionPlan hypothesis_claim_set_id must match the authoritative ResearchDesignerInvocation"
                     )
 
         with self.connect() as conn:
@@ -1779,14 +1933,15 @@ class SQLiteStore:
                 )
             conn.execute(
                 """INSERT INTO research_designer_invocations
-                   (id, candidate_id, candidate_snapshot_json, candidate_feasibility_decision_id,
+                   (id, candidate_id, hypothesis_claim_set_id, candidate_snapshot_json, candidate_feasibility_decision_id,
                     prompt_version, ontology_version, ontology_fingerprint, intent_contract_version,
                     provider, model, raw_response, parsed_decision_json, validation_status,
                     validation_errors_json, resulting_design_intent_id, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     invocation.id,
                     invocation.candidate_id,
+                    invocation.hypothesis_claim_set_id,
                     invocation.candidate_snapshot_json,
                     invocation.candidate_feasibility_decision_id,
                     invocation.prompt_version,
@@ -1806,19 +1961,21 @@ class SQLiteStore:
             if prediction_plan is not None:
                 conn.execute(
                     """INSERT INTO research_prediction_plans
-                       (id, candidate_id, design_intent_id, research_designer_invocation_id,
+                       (id, candidate_id, hypothesis_claim_set_id, design_intent_id, research_designer_invocation_id,
                         prediction_contract_version, ontology_version, ontology_fingerprint,
-                        independent_variable, predictions_json, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        independent_variable, prediction_aggregation_rule, predictions_json, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         prediction_plan.id,
                         prediction_plan.candidate_id,
+                        prediction_plan.hypothesis_claim_set_id,
                         prediction_plan.design_intent_id,
                         prediction_plan.research_designer_invocation_id,
                         prediction_plan.prediction_contract_version,
                         prediction_plan.ontology_version,
                         prediction_plan.ontology_fingerprint,
                         prediction_plan.independent_variable.value,
+                        prediction_plan.prediction_aggregation_rule.value,
                         self._dumps(
                             [
                                 {
@@ -1836,19 +1993,21 @@ class SQLiteStore:
         with self.connect() as conn:
             conn.execute(
                 """INSERT OR IGNORE INTO research_prediction_plans
-                   (id, candidate_id, design_intent_id, research_designer_invocation_id,
+                   (id, candidate_id, hypothesis_claim_set_id, design_intent_id, research_designer_invocation_id,
                     prediction_contract_version, ontology_version, ontology_fingerprint,
-                    independent_variable, predictions_json, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    independent_variable, prediction_aggregation_rule, predictions_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     prediction_plan.id,
                     prediction_plan.candidate_id,
+                    prediction_plan.hypothesis_claim_set_id,
                     prediction_plan.design_intent_id,
                     prediction_plan.research_designer_invocation_id,
                     prediction_plan.prediction_contract_version,
                     prediction_plan.ontology_version,
                     prediction_plan.ontology_fingerprint,
                     prediction_plan.independent_variable.value,
+                    prediction_plan.prediction_aggregation_rule.value,
                     self._dumps(
                         [
                             {
@@ -1866,12 +2025,22 @@ class SQLiteStore:
         return ResearchPredictionPlan(
             id=row["id"],
             candidate_id=row["candidate_id"],
+            hypothesis_claim_set_id=(
+                row["hypothesis_claim_set_id"]
+                if "hypothesis_claim_set_id" in row.keys()
+                else None
+            ),
             design_intent_id=row["design_intent_id"],
             research_designer_invocation_id=row["research_designer_invocation_id"],
             prediction_contract_version=row["prediction_contract_version"],
             ontology_version=row["ontology_version"],
             ontology_fingerprint=row["ontology_fingerprint"],
             independent_variable=DesignVariable(row["independent_variable"]),
+            prediction_aggregation_rule=PredictionAggregationRule(
+                row["prediction_aggregation_rule"]
+                if "prediction_aggregation_rule" in row.keys()
+                else PredictionAggregationRule.ALL_PREDICTIONS_REQUIRED.value
+            ),
             predictions=tuple(
                 OutcomePrediction(
                     outcome=DesignOutcome(item["outcome"]),
@@ -2356,6 +2525,12 @@ class SQLiteStore:
         prediction_plan = self._row_to_research_prediction_plan(row)
         if prediction_plan.candidate_id != plan.candidate_id:
             raise ValueError("ResearchPredictionPlan candidate_id must match the InitialExperimentPlan candidate_id")
+        if prediction_plan.hypothesis_claim_set_id is not None:
+            claim_set = self.get_hypothesis_claim_set(prediction_plan.hypothesis_claim_set_id)
+            if claim_set is None:
+                raise ValueError("ResearchPredictionPlan references a missing HypothesisClaimSet")
+            if claim_set.candidate_id != plan.candidate_id:
+                raise ValueError("HypothesisClaimSet candidate_id must match the InitialExperimentPlan candidate_id")
         if prediction_plan.design_intent_id != plan.design_intent_id:
             raise ValueError("ResearchPredictionPlan design_intent_id must match the InitialExperimentPlan design_intent_id")
         if prediction_plan.independent_variable != plan.independent_variable:
@@ -2876,14 +3051,15 @@ class SQLiteStore:
         with self.connect() as conn:
             conn.execute(
                 """INSERT OR IGNORE INTO research_designer_invocations
-                   (id, candidate_id, candidate_snapshot_json, candidate_feasibility_decision_id,
+                   (id, candidate_id, hypothesis_claim_set_id, candidate_snapshot_json, candidate_feasibility_decision_id,
                     prompt_version, ontology_version, ontology_fingerprint, intent_contract_version,
                     provider, model, raw_response, parsed_decision_json, validation_status,
                     validation_errors_json, resulting_design_intent_id, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     inv.id,
                     inv.candidate_id,
+                    inv.hypothesis_claim_set_id,
                     inv.candidate_snapshot_json,
                     inv.candidate_feasibility_decision_id,
                     inv.prompt_version,
@@ -2912,6 +3088,11 @@ class SQLiteStore:
         return ResearchDesignerInvocation(
             id=row["id"],
             candidate_id=row["candidate_id"],
+            hypothesis_claim_set_id=(
+                row["hypothesis_claim_set_id"]
+                if "hypothesis_claim_set_id" in row.keys()
+                else None
+            ),
             candidate_snapshot_json=row["candidate_snapshot_json"],
             candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
             prompt_version=row["prompt_version"],
@@ -2959,6 +3140,11 @@ class SQLiteStore:
             ResearchDesignerInvocation(
                 id=row["id"],
                 candidate_id=row["candidate_id"],
+                hypothesis_claim_set_id=(
+                    row["hypothesis_claim_set_id"]
+                    if "hypothesis_claim_set_id" in row.keys()
+                    else None
+                ),
                 candidate_snapshot_json=row["candidate_snapshot_json"],
                 candidate_feasibility_decision_id=row["candidate_feasibility_decision_id"],
                 prompt_version=row["prompt_version"],
@@ -2979,6 +3165,119 @@ class SQLiteStore:
 
     # ─── Hypothesis scientist invocations ─────────────────────────────────────
 
+    def save_governed_hypothesis_bundle(
+        self,
+        *,
+        invocation: HypothesisScientistInvocation,
+        candidate=None,
+        claim_set: HypothesisClaimSet | None = None,
+    ) -> None:
+        if candidate is None:
+            if invocation.resulting_candidate_id is not None:
+                raise ValueError(
+                    "HypothesisScientistInvocation resulting_candidate_id must be None when no authoritative candidate is saved"
+                )
+            if claim_set is not None or invocation.resulting_claim_set_id is not None:
+                raise ValueError("HypothesisClaimSet cannot be saved without an authoritative ResearchCandidate")
+        else:
+            if invocation.resulting_candidate_id != candidate.id:
+                raise ValueError(
+                    "HypothesisScientistInvocation resulting_candidate_id must match the authoritative ResearchCandidate"
+                )
+            if invocation.prompt_version == "v4" and claim_set is None:
+                raise ValueError("V4 Hypothesis Scientist persistence requires an authoritative HypothesisClaimSet")
+            if claim_set is not None:
+                if invocation.resulting_claim_set_id != claim_set.id:
+                    raise ValueError(
+                        "HypothesisScientistInvocation resulting_claim_set_id must match the authoritative HypothesisClaimSet"
+                    )
+                if claim_set.candidate_id != candidate.id:
+                    raise ValueError("HypothesisClaimSet candidate_id must match the authoritative ResearchCandidate")
+                if claim_set.hypothesis_scientist_invocation_id != invocation.id:
+                    raise ValueError(
+                        "HypothesisClaimSet hypothesis_scientist_invocation_id must match the authoritative HypothesisScientistInvocation"
+                    )
+
+        with self.connect() as conn:
+            if candidate is not None:
+                from ..capabilities.serialization import (
+                    compute_candidate_fingerprint,
+                    requirements_to_json,
+                )
+
+                fingerprint = compute_candidate_fingerprint(
+                    candidate.hypothesis_statement,
+                    candidate.hypothesis_rationale,
+                    candidate.requirements,
+                )
+                conn.execute(
+                    """INSERT INTO research_candidates
+                       (id, hypothesis_statement, hypothesis_rationale, source,
+                        requirements_json, candidate_fingerprint, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        candidate.id,
+                        candidate.hypothesis_statement,
+                        candidate.hypothesis_rationale,
+                        candidate.source,
+                        requirements_to_json(candidate.requirements),
+                        fingerprint,
+                        candidate.created_at.isoformat(),
+                    ),
+                )
+            conn.execute(
+                """INSERT INTO hypothesis_scientist_invocations
+                   (id, research_brief_id, research_brief_snapshot, prompt_version,
+                    provider, model, raw_response, parsed_decision_json,
+                    validation_status, validation_errors_json, resulting_candidate_id,
+                    resulting_claim_set_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.research_brief_id,
+                    invocation.research_brief_snapshot,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_candidate_id,
+                    invocation.resulting_claim_set_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+            if claim_set is not None:
+                conn.execute(
+                    """INSERT INTO hypothesis_claim_sets
+                       (id, candidate_id, hypothesis_scientist_invocation_id, independent_variable,
+                        independent_variable_direction, claims_json, claim_aggregation,
+                        claim_contract_version, ontology_version, ontology_fingerprint, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        claim_set.id,
+                        claim_set.candidate_id,
+                        claim_set.hypothesis_scientist_invocation_id,
+                        claim_set.independent_variable.value,
+                        claim_set.independent_variable_direction.value,
+                        self._dumps(
+                            [
+                                {
+                                    "outcome": item.outcome.value,
+                                    "expected_direction": item.expected_direction.value,
+                                }
+                                for item in claim_set.claims
+                            ]
+                        ),
+                        claim_set.claim_aggregation.value,
+                        claim_set.claim_contract_version,
+                        claim_set.ontology_version,
+                        claim_set.ontology_fingerprint,
+                        claim_set.created_at.isoformat(),
+                    ),
+                )
+
     def save_hypothesis_scientist_invocation(self, inv) -> None:
         with self.connect() as conn:
             conn.execute(
@@ -2986,13 +3285,14 @@ class SQLiteStore:
                    (id, research_brief_id, research_brief_snapshot, prompt_version,
                     provider, model, raw_response, parsed_decision_json,
                     validation_status, validation_errors_json, resulting_candidate_id,
-                    created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    resulting_claim_set_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     inv.id, inv.research_brief_id, inv.research_brief_snapshot,
                     inv.prompt_version, inv.provider, inv.model, inv.raw_response,
                     inv.parsed_decision_json, inv.validation_status,
                     inv.validation_errors_json, inv.resulting_candidate_id,
+                    inv.resulting_claim_set_id,
                     inv.created_at.isoformat(),
                 ),
             )
@@ -3019,6 +3319,11 @@ class SQLiteStore:
             validation_status=row["validation_status"],
             validation_errors_json=row["validation_errors_json"],
             resulting_candidate_id=row["resulting_candidate_id"],
+            resulting_claim_set_id=(
+                row["resulting_claim_set_id"]
+                if "resulting_claim_set_id" in row.keys()
+                else None
+            ),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -3061,6 +3366,11 @@ class SQLiteStore:
                 validation_status=r["validation_status"],
                 validation_errors_json=r["validation_errors_json"],
                 resulting_candidate_id=r["resulting_candidate_id"],
+                resulting_claim_set_id=(
+                    r["resulting_claim_set_id"]
+                    if "resulting_claim_set_id" in r.keys()
+                    else None
+                ),
                 created_at=datetime.fromisoformat(r["created_at"]),
             )
             for r in rows

@@ -8,7 +8,9 @@ from typing import Any, Optional
 
 from ..capabilities.models import AssetClass, CANONICAL_FIELDS_BY_DATA_KIND, DataKind, Resolution, ToolKind
 from ..capabilities.serialization import requirements_to_json
+from ..models.design import DesignOutcome, DesignVariable, ExpectedDirection, OutcomePrediction
 from ..models.hypothesis_scientist import (
+    HypothesisClaimAggregation,
     HypothesisScientistDecision,
     HypothesisScientistDecisionType,
     ResearchBrief,
@@ -24,7 +26,7 @@ except Exception:
     OpenAI = None  # type: ignore
 
 DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
-DEFAULT_PROMPT_VERSION = "v3"
+DEFAULT_PROMPT_VERSION = "v4"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 ALL_CANONICAL_FIELD_NAMES = tuple(sorted({
@@ -124,14 +126,33 @@ class OpenAIHypothesisScientist:
             label: str = ""
             model_config = ConfigDict(extra="forbid")
 
-        class HypothesisOutputSchema(BaseModel):
-            decision: Literal["PROPOSE_HYPOTHESIS", "NO_HYPOTHESIS"]
-            hypothesis_statement: str | None = None
-            hypothesis_rationale: str | None = None
-            data_requirements: list[DataRequirementSchema] | None = None
-            tool_requirements: list[ToolRequirementSchema] | None = None
-            no_hypothesis_reason: str | None = None
-            model_config = ConfigDict(extra="forbid")
+        if self.prompt_version == "v4":
+            class OutcomeClaimSchema(BaseModel):
+                outcome: Literal["trade_count", "net_pnl", "sharpe"]
+                expected_direction: Literal["INCREASE", "DECREASE"]
+                model_config = ConfigDict(extra="forbid")
+
+            class HypothesisOutputSchema(BaseModel):
+                decision: Literal["PROPOSE_HYPOTHESIS", "NO_HYPOTHESIS"]
+                hypothesis_statement: str | None = None
+                hypothesis_rationale: str | None = None
+                data_requirements: list[DataRequirementSchema] | None = None
+                tool_requirements: list[ToolRequirementSchema] | None = None
+                independent_variable: Literal["signal_threshold"] | None = None
+                independent_variable_direction: Literal["INCREASE", "DECREASE"] | None = None
+                outcome_claims: list[OutcomeClaimSchema] | None = None
+                claim_aggregation: Literal["ALL_CLAIMS_REQUIRED"] | None = None
+                no_hypothesis_reason: str | None = None
+                model_config = ConfigDict(extra="forbid")
+        else:
+            class HypothesisOutputSchema(BaseModel):
+                decision: Literal["PROPOSE_HYPOTHESIS", "NO_HYPOTHESIS"]
+                hypothesis_statement: str | None = None
+                hypothesis_rationale: str | None = None
+                data_requirements: list[DataRequirementSchema] | None = None
+                tool_requirements: list[ToolRequirementSchema] | None = None
+                no_hypothesis_reason: str | None = None
+                model_config = ConfigDict(extra="forbid")
 
         instructions = get_scientist_instructions(self.prompt_version)
         input_str = json.dumps(brief_to_payload(brief), sort_keys=True)
@@ -217,6 +238,32 @@ class OpenAIHypothesisScientist:
             hypothesis_statement=parsed.get("hypothesis_statement"),
             hypothesis_rationale=parsed.get("hypothesis_rationale"),
             requirements_snapshot=requirements_snapshot,
+            independent_variable=(
+                DesignVariable(parsed["independent_variable"])
+                if parsed.get("independent_variable")
+                else None
+            ),
+            independent_variable_direction=(
+                ExpectedDirection(parsed["independent_variable_direction"])
+                if parsed.get("independent_variable_direction")
+                else None
+            ),
+            outcome_claims=(
+                tuple(
+                    OutcomePrediction(
+                        outcome=DesignOutcome(item["outcome"]),
+                        expected_direction=ExpectedDirection(item["expected_direction"]),
+                    )
+                    for item in parsed.get("outcome_claims", [])
+                )
+                if parsed.get("outcome_claims") is not None
+                else None
+            ),
+            claim_aggregation=(
+                HypothesisClaimAggregation(parsed["claim_aggregation"])
+                if parsed.get("claim_aggregation")
+                else None
+            ),
             no_hypothesis_reason=parsed.get("no_hypothesis_reason"),
             provider=self.provider,
             model=self.model,

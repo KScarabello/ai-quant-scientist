@@ -90,6 +90,10 @@ class ExpectedDirection(str, Enum):
     NO_CHANGE = "NO_CHANGE"
 
 
+class PredictionAggregationRule(str, Enum):
+    ALL_PREDICTIONS_REQUIRED = "ALL_PREDICTIONS_REQUIRED"
+
+
 class PredictionVerdictResult(str, Enum):
     PASS = "PASS"
     FAIL = "FAIL"
@@ -534,11 +538,15 @@ class ResearchPredictionPlan:
     ontology_fingerprint: str
     independent_variable: DesignVariable
     predictions: tuple[OutcomePrediction, ...]
+    hypothesis_claim_set_id: str | None = None
+    prediction_aggregation_rule: PredictionAggregationRule = PredictionAggregationRule.ALL_PREDICTIONS_REQUIRED
     created_at: Any = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
         if not self.candidate_id:
             raise ValueError("ResearchPredictionPlan requires candidate_id")
+        if self.hypothesis_claim_set_id is not None and not self.hypothesis_claim_set_id:
+            raise ValueError("ResearchPredictionPlan hypothesis_claim_set_id must be non-empty when provided")
         if not self.design_intent_id:
             raise ValueError("ResearchPredictionPlan requires design_intent_id")
         if not self.research_designer_invocation_id:
@@ -551,6 +559,10 @@ class ResearchPredictionPlan:
             raise ValueError("ResearchPredictionPlan requires ontology_fingerprint")
         if not isinstance(self.independent_variable, DesignVariable):
             raise ValueError(f"Invalid independent_variable: {self.independent_variable!r}")
+        if not isinstance(self.prediction_aggregation_rule, PredictionAggregationRule):
+            raise ValueError(
+                f"Invalid prediction_aggregation_rule: {self.prediction_aggregation_rule!r}"
+            )
         if not self.predictions:
             raise ValueError("ResearchPredictionPlan requires at least one prediction")
         if any(not isinstance(item, OutcomePrediction) for item in self.predictions):

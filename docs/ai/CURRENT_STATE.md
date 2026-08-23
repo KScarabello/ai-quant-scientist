@@ -3,10 +3,10 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.15` implementation changes verified on `2026-08-23` Arizona project-local time (`2026-08-23` UTC)
-- Schema version: `v10`
+- Working tree status: contains uncommitted `V0.15.1` implementation changes verified on `2026-08-23` Arizona project-local time (`2026-08-23` UTC)
+- Schema version: `v11`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `533 passed`
+- Verified test count: `552 passed`
 - Date: `2026-08-23` (Arizona project-local verification date; `2026-08-23` UTC)
 
 Primary evidence:
@@ -60,6 +60,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
 - Hypothesis Scientist may originate exactly one bounded hypothesis or return `NO_HYPOTHESIS`.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
+- For current prompt `v4`, the authoritative downstream scientific meaning is the canonical `HypothesisClaimSet`, not free-form hypothesis prose.
+  Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_claim_ontology.py`
 - Hypothesis Scientist cannot declare feasibility, construct a `ResearchSpec`, or start research.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - `READY_FOR_SPEC` means broad prerequisites are satisfied so deterministic design may begin; it does not authorize execution.
@@ -68,6 +70,10 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`
 - Structured directional predictions are precommitted before execution and are persisted as their own canonical artifact linked to the exact candidate, design intent, and designer invocation that produced them.
   Evidence: `src/ai_quant_scientist/models/design.py`, `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- Under the current `V0.15.1` path, Research Designer no longer owns scientific direction selection; deterministic software constructs the `ResearchPredictionPlan` from the authoritative `HypothesisClaimSet` plus the validated complete `ResearchDesignIntent`.
+  Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/models/design.py`, `tests/test_research_designer.py`
+- Research Designer must completely cover the authoritative claim set and may not narrow, expand, or rewrite it.
+  Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `tests/test_research_designer.py`
 - Planned comparison conditions are precommitted before execution and are not revisions.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `tests/test_spec_materialization.py`
 - Human acceptance now authorizes the whole persisted initial experiment plan before execution begins.
@@ -126,6 +132,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_supervised_research_cycle.py`
 - `V0.15`: precommitted directional prediction plans, Research Designer V2 / ontology V2, deterministic scientific verdict evaluation, supervised-cycle extension, and schema `v10`.
   Evidence: `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/scientific_verdict.py`, `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_scientific_verdict.py`
+- `V0.15.1`: canonical candidate-side `HypothesisClaimSet`, Hypothesis Scientist Prompt `v4`, Research Designer Prompt `v3` / ontology `v3`, deterministic complete-claim coverage validation, deterministic prediction-plan projection from frozen claims, and schema `v11`.
+  Evidence: `src/ai_quant_scientist/services/hypothesis_claim_ontology.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_hypothesis_scientist.py`, `tests/test_research_designer.py`, `tests/test_supervised_research_cycle.py`
 
 ## Current AI Components
 
@@ -142,17 +150,21 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/evals/critic_eval.py`, `tests/test_context_plumbing.py`
 
 ### Hypothesis Scientist
-- Prompt history now has immutable `v1`, preserved hardened `v2`, and current boundary-cleanup `v3`; default adapter prompt is `v3`.
+- Prompt history now has immutable `v1`, preserved hardened `v2`, preserved boundary-cleanup `v3`, and current canonical-claim `v4`; default adapter prompt is `v4`.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`
 - Authority boundary remains exactly one bounded hypothesis or `NO_HYPOTHESIS`; no feasibility claims, no `ResearchSpec`, no research execution.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
 - Every invocation now receives a deterministic AI-safe requirement ontology snapshot with `version` and `fingerprint`, while capability availability remains withheld.
   Evidence: `src/ai_quant_scientist/services/scientist_requirement_ontology.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
+- For prompt `v4`, the same AI call also produces bounded structured scientific directionality sufficient for deterministic `HypothesisClaimSet` materialization; if the model cannot responsibly state complete directional claims, the path fails closed rather than delegating direction invention downstream.
+  Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `tests/test_hypothesis_scientist.py`
 - Current AI-authored candidate contract is broad and pre-spec: `DataRequirement` is prerequisite data, `ToolRequirement` is broad deterministic tool class, and exact spec configuration is deferred until after `READY_FOR_SPEC`.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/capabilities/gate.py`
 - `DataRequirement.required_parameters` remains readable and matchable for historical/manual paths but is no longer part of the new AI-authored candidate contract.
   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/registry.py`
-- Invocation persistence now lives inside overall schema `v10`.
+- Authoritative candidate persistence is now atomic for `v4`: invocation, candidate, and claim set either persist together or fail together.
+  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_hypothesis_scientist.py`
+- Invocation persistence now lives inside overall schema `v11`.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Eval harness remains `12` cases in `evals/scientist_v1.json`.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `evals/scientist_v1.json`
@@ -160,19 +172,21 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `tests/test_hypothesis_scientist.py`
 
 ### Research Designer
-- Research Designer V2 is now the current supervised-cycle path: immutable Prompt `v2`, deterministic ontology `research_design_ontology_v2`, strict structured output, and append-only invocation persistence.
+- Research Designer V3 is now the current supervised-cycle path: immutable Prompt `v3`, deterministic ontology `research_design_ontology_v3`, strict complete-coverage output contract, and append-only invocation persistence.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
 - Research Designer V1 remains frozen historical behavior with unchanged prompt hash `8744692f166fdb6058a4597abb6bcbad17489817efc1879c3506643e1d922fac` and unchanged ontology fingerprint `7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e`.
   Evidence: `tests/test_research_designer.py`, `evals/research_designer_v1.json`
+- Research Designer V2 remains frozen live historical behavior with unchanged prompt hash `721392d5160f82c8de83eaef67f4c3fc96fc13872bd1823f43b7c681737187cb` and unchanged ontology fingerprint `73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d`.
+  Evidence: `tests/test_research_designer.py`, `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787458529.json`
 - Context now carries canonical ontology payload JSON plus matching version/fingerprint, and mismatch between those fields fails closed before provider invocation.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_designer.py`, `tests/test_research_designer.py`
 - Context now also fails closed if the semantic ontology payload is altered without a correspondingly recomputed canonical fingerprint, including nested semantic changes or post-construction tampering before adapter invocation.
   Evidence: `src/ai_quant_scientist/models/research_designer.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `tests/test_research_designer.py`
-- Authority boundary is one bounded `ResearchDesignIntent` or `NO_VALID_DESIGN`; under V2 the same call may also author exactly one directional prediction per selected dependent outcome, but still no exact values, no capability IDs, no feasibility declaration, and no downstream autonomous chaining.
+- Authority boundary is one bounded `ResearchDesignIntent` or `NO_VALID_DESIGN`; under V3 the designer must completely cover the authoritative claim set but may not author or rewrite expected directions, and still no exact values, no capability IDs, no feasibility declaration, and no downstream autonomous chaining.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/openai_research_designer.py`
-- The authoritative current default is Prompt `v2`; Prompt `v1` remains available for historical reproducibility only. No live API call was made during implementation verification on Sunday, August 23, 2026.
+- The authoritative current default is Prompt `v3`; Prompts `v1` and `v2` remain available for historical reproducibility only. No live API call was made during implementation verification on Sunday, August 23, 2026.
   Evidence: `src/ai_quant_scientist/services/openai_research_designer.py`, `tests/test_research_designer.py`
-- The designer stops at authoritative `ResearchDesignIntent` plus immutable `ResearchPredictionPlan`; deterministic materialization, acceptance, execution, contrast, and verdict remain separate.
+- The designer stops at authoritative `ResearchDesignIntent`; deterministic software then projects the immutable `ResearchPredictionPlan` from the exact claim set and validated design before materialization, acceptance, execution, contrast, and verdict.
   Evidence: `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/services/scientific_verdict.py`
 - Latest complete eight-case diagnostic evidence supports freezing `V0.13B`:
   - `case-01`: supported design PASS
@@ -266,6 +280,8 @@ Evidence:
   Evidence: `artifacts/evals/supervised_cycle_execute_7d4c04d5-9f36-49bc-ab15-8cd630f10999_1787384031.json`
 - Those `V0.14` artifacts are frozen historical evidence only. They predate machine-readable precommitted prediction plans, so they must not receive retrospective `V0.15` scientific verdicts.
   Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787383872.json`, `artifacts/evals/supervised_cycle_execute_7d4c04d5-9f36-49bc-ab15-8cd630f10999_1787384031.json`, `src/ai_quant_scientist/services/scientific_verdict.py`
+- First live `V0.15` preparation on Sunday, August 23, 2026 reached `AWAITING_HUMAN_ACCEPTANCE` with exact proposal `2f641366-3e40-4aa3-90df-4423ba0fff65`, but it is `DO NOT ACCEPT`: the V2 designer narrowed a two-outcome candidate hypothesis to `trade_count` only, so the proposal was correctly preserved as rejected negative governance evidence and remains unexecuted.
+  Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787458529.json`, `tests/test_supervised_research_cycle.py`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -286,29 +302,30 @@ These are useful live observations, not statistically exhaustive model evaluatio
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
-2. `V0.15` is still supervised only; there is still no autonomous iterative chaining into Critic, revision, replication, or holdout stages after verdict computation.
+2. `V0.15.1` is still supervised only; there is still no autonomous iterative chaining into Critic, revision, replication, or holdout stages after verdict computation.
    Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
-3. `V0.13A.1` / `V0.13B` / `V0.14` / `V0.15` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
+3. `V0.13A.1` / `V0.13B` / `V0.14` / `V0.15` / `V0.15.1` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
    Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
 4. Deterministic verdicts do not yet feed into Critic, lifecycle promotion, replication, or revision planning; `SUPPORTED` / `FALSIFIED` is currently the terminal supervised truth boundary.
    Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 
 ## Current Milestone
-`V0.15 - Precommitted Predictions + Deterministic Scientific Verdict`
+`V0.15.1 - Canonical Scientific Intent + Complete Claim Coverage`
 
 Status:
 - Implemented in the working tree on `2026-08-23` Arizona project-local time (`2026-08-23` UTC)
 - Stub-only by design; no autonomous chaining
-- Connects `ResearchBrief` -> Hypothesis Scientist -> candidate feasibility -> Research Designer V2 -> authoritative `ResearchDesignIntent` + precommitted `ResearchPredictionPlan` -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result -> deterministic scientific verdict
-- Leaves `V0.14` frozen historical evidence and preserves frozen Research Designer V1 prompt/ontology behavior unchanged
+- Connects `ResearchBrief` -> Hypothesis Scientist `v4` -> authoritative `HypothesisClaimSet` -> candidate feasibility -> Research Designer V3 -> authoritative `ResearchDesignIntent` -> deterministic `ResearchPredictionPlan` projection -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result -> deterministic scientific verdict
+- Leaves `V0.14` frozen historical evidence, preserves frozen Research Designer V1/V2 prompt+ontology behavior unchanged, and preserves the rejected V0.15 proposal `2f641366-3e40-4aa3-90df-4423ba0fff65` as unexecuted negative governance evidence
 - Live runner approval flow remains genuinely two-step: first prepare and inspect an exact persisted proposal ID plus prediction plan, then explicitly accept and execute that same proposal ID in a later separate command with zero AI calls.
-- Persists Research Designer invocations, authoritative `ResearchDesignIntent`, precommitted `ResearchPredictionPlan`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, deterministic contrast results, and deterministic scientific verdicts
+- Persists Hypothesis Scientist invocations, authoritative `HypothesisClaimSet`, Research Designer invocations, authoritative `ResearchDesignIntent`, deterministic `ResearchPredictionPlan`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, deterministic contrast results, and deterministic scientific verdicts
 - Requires explicit human acceptance before executing the whole precommitted plan
-- Preserves Hypothesis Scientist Prompt `v1` / `v2` / `v3`, requirement ontology `v1` / `v2`, frozen Research Designer Prompt `v1`, frozen Research Design Ontology `v1`, Critic V3, `RevisionPlanner` V1, `SpecMaterializer` V2 baseline/comparator policy, and truthful sparse production capability reality
+- Preserves Hypothesis Scientist Prompt `v1` / `v2` / `v3`, requirement ontology `v1` / `v2`, frozen Research Designer Prompt `v1` / `v2`, frozen Research Design Ontology `v1` / `v2`, Critic V3, `RevisionPlanner` V1, `SpecMaterializer` V2 baseline/comparator policy, and truthful sparse production capability reality
 
 ## Files To Read First
 - `src/ai_quant_scientist/services/supervised_research_cycle.py`
 - `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`
+- `src/ai_quant_scientist/services/hypothesis_claim_ontology.py`
 - `src/ai_quant_scientist/models/research_designer.py`
 - `src/ai_quant_scientist/services/research_design_ontology.py`
 - `src/ai_quant_scientist/services/research_designer_prompts.py`

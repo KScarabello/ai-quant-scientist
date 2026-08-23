@@ -16,11 +16,13 @@ from ai_quant_scientist.models.design import (
     DesignVariable,
     ExperimentCondition,
     ExperimentConditionRole,
+    ExpectedDirection,
     InitialExperimentCompletionRule,
     InitialExperimentPlan,
     InitialExperimentPlanProposal,
     InitialExperimentPlanProposalStatus,
     OutcomeContrast,
+    OutcomePrediction,
     ParameterSensitivityContrastResult,
     ResearchDesignIntent,
     ResearchDesignKind,
@@ -28,6 +30,7 @@ from ai_quant_scientist.models.design import (
     SpecFeasibilityPhase,
 )
 from ai_quant_scientist.models.hypothesis_scientist import (
+    HypothesisClaimAggregation,
     HypothesisScientistDecision,
     HypothesisScientistDecisionType,
     HypothesisScientistInvocation,
@@ -118,7 +121,7 @@ class _NoHypothesisScientist(FakeHypothesisScientist):
 
 class _CountingDesigner(FakeResearchDesigner):
     def __init__(self) -> None:
-        super().__init__(prompt_version="v2")
+        super().__init__(prompt_version="v3")
         self.called = 0
 
     def design(self, context):
@@ -153,6 +156,15 @@ class _BlockedCapabilityScientist(FakeHypothesisScientist):
             hypothesis_statement="MES order-book imbalance predicts one-second futures returns.",
             hypothesis_rationale="Requires futures order-book data plus execution support.",
             requirements_snapshot=requirements_to_json(requirements),
+            independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+            independent_variable_direction=ExpectedDirection.INCREASE,
+            outcome_claims=(
+                OutcomePrediction(
+                    outcome=DesignOutcome.TRADE_COUNT,
+                    expected_direction=ExpectedDirection.DECREASE,
+                ),
+            ),
+            claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
@@ -195,6 +207,19 @@ class _SyntheticFieldConstrainedScientist(FakeHypothesisScientist):
                 "truthful fail-closed behavior."
             ),
             requirements_snapshot=requirements_to_json(requirements),
+            independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+            independent_variable_direction=ExpectedDirection.INCREASE,
+            outcome_claims=(
+                OutcomePrediction(
+                    outcome=DesignOutcome.TRADE_COUNT,
+                    expected_direction=ExpectedDirection.DECREASE,
+                ),
+                OutcomePrediction(
+                    outcome=DesignOutcome.SHARPE,
+                    expected_direction=ExpectedDirection.INCREASE,
+                ),
+            ),
+            claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
             provider=self.provider,
             model=self.model,
             prompt_version=self.prompt_version,
@@ -205,7 +230,7 @@ class _SyntheticFieldConstrainedScientist(FakeHypothesisScientist):
 
 class _NoValidDesignDesigner(FakeResearchDesigner):
     def __init__(self) -> None:
-        super().__init__(prompt_version="v2")
+        super().__init__(prompt_version="v3")
         self.called = 0
 
     def design(self, context):
@@ -702,16 +727,22 @@ def test_supervised_cycle_integration_preserves_prompt_and_ontology_hashes():
         "7fd37d3302833d582bde6ad8b17b6b7c1be2d52e8f345b5156037e2c3058002e"
     )
     assert build_current_research_design_ontology_snapshot().fingerprint == (
-        "73364d9d50de6bd0585fe74dd1061f9002515d972d746d45bcb06883bd1d608d"
+        "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183"
     )
     assert hashlib.sha256(get_scientist_instructions("v3").encode("utf-8")).hexdigest() == (
         "aa89aa587b8b26332562b2055eeb2813dff148201d96bec8bf79eed34b93661a"
+    )
+    assert hashlib.sha256(get_scientist_instructions("v4").encode("utf-8")).hexdigest() == (
+        "71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef"
     )
     assert hashlib.sha256(get_research_designer_instructions("v1").encode("utf-8")).hexdigest() == (
         "8744692f166fdb6058a4597abb6bcbad17489817efc1879c3506643e1d922fac"
     )
     assert hashlib.sha256(get_research_designer_instructions("v2").encode("utf-8")).hexdigest() == (
         "721392d5160f82c8de83eaef67f4c3fc96fc13872bd1823f43b7c681737187cb"
+    )
+    assert hashlib.sha256(get_research_designer_instructions("v3").encode("utf-8")).hexdigest() == (
+        "2f94172fb0219955bced7deab320d778ab4e83fe8c8e57466aeeed707955df36"
     )
 
 
@@ -1149,10 +1180,10 @@ def test_acceptance_artifact_reloads_persisted_state_and_reports_exact_records(t
     assert artifact["scientific_verdict"] is not None
 
 
-def test_schema_remains_v10(tmp_path):
+def test_schema_remains_v11(tmp_path):
     store = _store(tmp_path)
     with store.connect() as conn:
-        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 10
+        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 11
 
 
 def test_registry_truth_remains_unchanged():

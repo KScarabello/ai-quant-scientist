@@ -47,6 +47,7 @@ class SupervisedResearchCyclePreparationResult:
     brief_id: str
     hypothesis_scientist_invocation_id: str
     candidate_id: str | None = None
+    hypothesis_claim_set_id: str | None = None
     candidate_feasibility_decision_id: str | None = None
     research_designer_invocation_id: str | None = None
     research_design_intent_id: str | None = None
@@ -112,6 +113,7 @@ class SupervisedResearchCycle:
                 brief_id=brief.id,
                 hypothesis_scientist_invocation_id=invocation.id,
                 candidate_id=candidate.id,
+                hypothesis_claim_set_id=invocation.resulting_claim_set_id,
                 candidate_feasibility_decision_id=feasibility_decision.id,
                 message="Candidate feasibility gate returned BLOCKED_CAPABILITY.",
             )
@@ -130,6 +132,7 @@ class SupervisedResearchCycle:
                     brief_id=brief.id,
                     hypothesis_scientist_invocation_id=invocation.id,
                     candidate_id=candidate.id,
+                    hypothesis_claim_set_id=invocation.resulting_claim_set_id,
                     candidate_feasibility_decision_id=feasibility_decision.id,
                     research_designer_invocation_id=design_result.invocation.id,
                     message=design_result.decision.no_valid_design_reason,
@@ -151,6 +154,7 @@ class SupervisedResearchCycle:
                 brief_id=brief.id,
                 hypothesis_scientist_invocation_id=invocation.id,
                 candidate_id=candidate.id,
+                hypothesis_claim_set_id=invocation.resulting_claim_set_id,
                 candidate_feasibility_decision_id=feasibility_decision.id,
                 research_designer_invocation_id=design_result.invocation.id,
                 research_design_intent_id=design_result.design_intent.id,
@@ -166,6 +170,7 @@ class SupervisedResearchCycle:
                 brief_id=brief.id,
                 hypothesis_scientist_invocation_id=invocation.id,
                 candidate_id=candidate.id,
+                hypothesis_claim_set_id=invocation.resulting_claim_set_id,
                 candidate_feasibility_decision_id=feasibility_decision.id,
                 research_designer_invocation_id=design_result.invocation.id,
                 research_design_intent_id=design_result.design_intent.id,
@@ -182,6 +187,7 @@ class SupervisedResearchCycle:
             brief_id=brief.id,
             hypothesis_scientist_invocation_id=invocation.id,
             candidate_id=candidate.id,
+            hypothesis_claim_set_id=invocation.resulting_claim_set_id,
             candidate_feasibility_decision_id=feasibility_decision.id,
             research_designer_invocation_id=design_result.invocation.id,
             research_design_intent_id=design_result.design_intent.id,

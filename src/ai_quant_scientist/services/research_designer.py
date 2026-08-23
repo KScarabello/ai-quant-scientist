@@ -17,10 +17,12 @@ from ..models.design import (
     DesignVariable,
     ExpectedDirection,
     OutcomePrediction,
+    PredictionAggregationRule,
     ResearchDesignIntent,
     ResearchDesignKind,
     ResearchPredictionPlan,
 )
+from ..models.hypothesis_scientist import HypothesisClaimAggregation, HypothesisClaimSet
 from ..models.research import new_id
 from ..models.research_designer import (
     RESEARCH_DESIGN_INTENT_CONTRACT_VERSION,
@@ -44,6 +46,7 @@ def utcnow() -> datetime:
 _RESEARCH_DESIGNER_SOURCES = {
     "v1": "research_designer_v1",
     "v2": "research_designer_v2",
+    "v3": "research_designer_v3",
 }
 _PARAMETER_ASSIGNMENT_RE = re.compile(
     r"\b(signal_threshold|lookback)\b\s*(=|:)?\s*-?\d+(?:\.\d+)?",
@@ -92,6 +95,27 @@ def candidate_to_payload(candidate: ResearchCandidate) -> dict[str, Any]:
     }
 
 
+def hypothesis_claim_set_to_payload(claim_set: HypothesisClaimSet | None) -> dict[str, Any] | None:
+    if claim_set is None:
+        return None
+    return {
+        "hypothesis_claim_set_id": claim_set.id,
+        "independent_variable": claim_set.independent_variable.value,
+        "independent_variable_direction": claim_set.independent_variable_direction.value,
+        "claim_aggregation": claim_set.claim_aggregation.value,
+        "claim_contract_version": claim_set.claim_contract_version,
+        "ontology_version": claim_set.ontology_version,
+        "ontology_fingerprint": claim_set.ontology_fingerprint,
+        "claims": [
+            {
+                "outcome": item.outcome.value,
+                "expected_direction": item.expected_direction.value,
+            }
+            for item in claim_set.claims
+        ],
+    }
+
+
 def candidate_to_json(candidate: ResearchCandidate) -> str:
     return json.dumps(candidate_to_payload(candidate), sort_keys=True)
 
@@ -105,6 +129,7 @@ def context_to_payload(
         "hypothesis_statement": candidate_payload["hypothesis_statement"],
         "hypothesis_rationale": candidate_payload["hypothesis_rationale"],
         "candidate_requirements": candidate_payload["requirements"],
+        "hypothesis_claim_set": hypothesis_claim_set_to_payload(context.hypothesis_claim_set),
         "candidate_feasibility_authorization": {
             "id": context.candidate_feasibility_decision_id,
             "decision": GateDecision.READY_FOR_SPEC.value,
@@ -123,12 +148,14 @@ def context_to_json(
 def build_research_designer_context(
     *,
     candidate: ResearchCandidate,
+    hypothesis_claim_set: HypothesisClaimSet | None = None,
     candidate_feasibility_decision_id: str,
     ontology: ResearchDesignOntologySnapshot | None = None,
 ) -> ResearchDesignerContext:
     ontology = ontology or build_research_design_ontology_snapshot()
     return ResearchDesignerContext(
         candidate=candidate,
+        hypothesis_claim_set=hypothesis_claim_set,
         candidate_feasibility_decision_id=candidate_feasibility_decision_id,
         design_ontology_version=ontology.version,
         design_ontology_fingerprint=ontology.fingerprint,
@@ -163,6 +190,11 @@ class ResearchDesignProposalValidator:
             errors["ontology_version"] = "Decision ontology_version must match the supplied ontology"
         if decision.ontology_fingerprint != ontology.fingerprint:
             errors["ontology_fingerprint"] = "Decision ontology_fingerprint must match the supplied ontology"
+
+        if ontology.prediction_authority == "DETERMINISTIC_FROM_CLAIM_SET" and context.hypothesis_claim_set is None:
+            errors["hypothesis_claim_set"] = (
+                "The bounded V3 design contract requires an authoritative HypothesisClaimSet"
+            )
 
         if decision.decision_type == ResearchDesignerDecisionType.NO_VALID_DESIGN:
             if self._design_fields_present(decision):
@@ -218,6 +250,8 @@ class ResearchDesignProposalValidator:
         if not dependent_outcomes:
             errors["dependent_outcomes"] = "DESIGN requires at least one dependent outcome"
         else:
+            if len(set(dependent_outcomes)) != len(dependent_outcomes):
+                errors["dependent_outcomes_duplicate"] = "Dependent outcomes must not repeat outcomes"
             allowed_outcomes = set(ontology.supported_dependent_outcomes)
             if any(not hasattr(outcome, "value") for outcome in dependent_outcomes):
                 errors["dependent_outcomes"] = "Dependent outcomes must use legal ontology enum values"
@@ -229,7 +263,10 @@ class ResearchDesignProposalValidator:
                 errors["dependent_outcomes"] = f"Unsupported dependent outcomes: {unsupported}"
 
         predictions = decision.predictions or ()
-        if ontology.prediction_contract_version is None:
+        if ontology.prediction_authority == "DETERMINISTIC_FROM_CLAIM_SET":
+            if predictions:
+                errors["predictions"] = "Predictions are constructed deterministically from the authoritative claim set under V3"
+        elif ontology.prediction_contract_version is None:
             if predictions:
                 errors["predictions"] = "Predictions are unsupported under the supplied ontology"
         else:
@@ -271,6 +308,28 @@ class ResearchDesignProposalValidator:
                     if extra:
                         errors["predictions_extra"] = (
                             f"Predictions must not target unselected dependent outcomes: {extra}"
+                        )
+
+        if context.hypothesis_claim_set is not None:
+            claim_set = context.hypothesis_claim_set
+            if independent_variables:
+                if independent_variables[0] != claim_set.independent_variable:
+                    errors["claim_set_independent_variable"] = (
+                        "DESIGN independent variable must match the authoritative HypothesisClaimSet"
+                    )
+            if dependent_outcomes:
+                claim_outcomes = tuple(sorted((item.outcome for item in claim_set.claims), key=lambda item: item.value))
+                decision_outcomes = tuple(sorted(dependent_outcomes, key=lambda item: item.value))
+                if claim_outcomes != decision_outcomes:
+                    missing = sorted(set(item.value for item in claim_outcomes) - set(item.value for item in decision_outcomes))
+                    extra = sorted(set(item.value for item in decision_outcomes) - set(item.value for item in claim_outcomes))
+                    if missing:
+                        errors["claim_set_outcomes_missing"] = (
+                            f"DESIGN must cover every authoritative claim outcome: missing {missing}"
+                        )
+                    if extra:
+                        errors["claim_set_outcomes_extra"] = (
+                            f"DESIGN must not add scientific outcomes outside the authoritative claim set: {extra}"
                         )
 
         if decision.comparison_intent is None:
@@ -368,31 +427,39 @@ def materialize_research_design_intent(
 
 
 def materialize_research_prediction_plan(
-    decision: ResearchDesignerDecision,
+    claim_set: HypothesisClaimSet,
+    design_intent: ResearchDesignIntent,
     *,
-    candidate_id: str,
-    design_intent_id: str,
     research_designer_invocation_id: str,
     prediction_contract_version: str,
+    ontology_version: str,
+    ontology_fingerprint: str,
+    include_claim_set_id: bool = True,
 ) -> ResearchPredictionPlan | None:
-    if decision.decision_type != ResearchDesignerDecisionType.DESIGN:
-        raise ValueError("Only DESIGN decisions can materialize an authoritative ResearchPredictionPlan")
-    predictions = decision.predictions or ()
-    if not predictions:
-        return None
-    independent_variables = decision.independent_variables or ()
-    if len(independent_variables) != 1:
-        raise ValueError("ResearchPredictionPlan requires exactly one independent variable")
+    claim_outcomes = tuple(sorted((item.outcome for item in claim_set.claims), key=lambda item: item.value))
+    design_outcomes = tuple(sorted(design_intent.dependent_outcomes, key=lambda item: item.value))
+    if claim_set.candidate_id != design_intent.candidate_id:
+        raise ValueError("HypothesisClaimSet candidate_id must match the authoritative ResearchDesignIntent")
+    if claim_set.independent_variable not in design_intent.independent_variables:
+        raise ValueError("HypothesisClaimSet independent_variable must be covered by the authoritative ResearchDesignIntent")
+    if claim_outcomes != design_outcomes:
+        raise ValueError(
+            "ResearchDesignIntent dependent_outcomes must match the authoritative HypothesisClaimSet outcomes exactly"
+        )
+    if claim_set.claim_aggregation != HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED:
+        raise ValueError("Unsupported HypothesisClaimSet claim_aggregation")
     return ResearchPredictionPlan(
         id=new_id(),
-        candidate_id=candidate_id,
-        design_intent_id=design_intent_id,
+        candidate_id=claim_set.candidate_id,
+        design_intent_id=design_intent.id,
         research_designer_invocation_id=research_designer_invocation_id,
         prediction_contract_version=prediction_contract_version,
-        ontology_version=decision.ontology_version or "",
-        ontology_fingerprint=decision.ontology_fingerprint or "",
-        independent_variable=independent_variables[0],
-        predictions=predictions,
+        ontology_version=ontology_version,
+        ontology_fingerprint=ontology_fingerprint,
+        independent_variable=claim_set.independent_variable,
+        predictions=claim_set.claims,
+        hypothesis_claim_set_id=claim_set.id if include_claim_set_id else None,
+        prediction_aggregation_rule=PredictionAggregationRule.ALL_PREDICTIONS_REQUIRED,
     )
 
 
@@ -485,6 +552,7 @@ class GovernedResearchDesigner:
 
         context = build_research_designer_context(
             candidate=candidate,
+            hypothesis_claim_set=self._store.get_hypothesis_claim_set_by_candidate_id(candidate.id),
             candidate_feasibility_decision_id=candidate_feasibility_decision_id,
             ontology=self._ontology,
         )
@@ -495,6 +563,7 @@ class GovernedResearchDesigner:
             invocation = ResearchDesignerInvocation(
                 id=new_id(),
                 candidate_id=candidate_id,
+                hypothesis_claim_set_id=context.hypothesis_claim_set_id,
                 candidate_snapshot_json=candidate_to_json(candidate),
                 candidate_feasibility_decision_id=candidate_feasibility_decision_id,
                 prompt_version=getattr(self._designer, "prompt_version", "unknown"),
@@ -520,21 +589,46 @@ class GovernedResearchDesigner:
         if valid and decision.decision_type == ResearchDesignerDecisionType.DESIGN:
             design_intent = materialize_research_design_intent(decision, candidate_id=candidate_id)
             design_intent_id = design_intent.id
-            prediction_contract_version = (
-                self._ontology.prediction_contract_version
-                or RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
-            )
-            prediction_plan = materialize_research_prediction_plan(
-                decision,
-                candidate_id=candidate_id,
-                design_intent_id=design_intent.id,
-                research_designer_invocation_id=invocation_id,
-                prediction_contract_version=prediction_contract_version,
-            )
+            if self._ontology.prediction_contract_version is not None:
+                prediction_contract_version = (
+                    self._ontology.prediction_contract_version
+                    or RESEARCH_PREDICTION_PLAN_CONTRACT_VERSION
+                )
+                if context.hypothesis_claim_set is not None:
+                    prediction_plan = materialize_research_prediction_plan(
+                        context.hypothesis_claim_set,
+                        design_intent,
+                        research_designer_invocation_id=invocation_id,
+                        prediction_contract_version=prediction_contract_version,
+                        ontology_version=self._ontology.version,
+                        ontology_fingerprint=self._ontology.fingerprint,
+                    )
+                elif decision.predictions:
+                    prediction_plan = materialize_research_prediction_plan(
+                        HypothesisClaimSet(
+                            id=new_id(),
+                            candidate_id=candidate_id,
+                            hypothesis_scientist_invocation_id="historical-v2",
+                            independent_variable=(decision.independent_variables or ())[0],
+                            independent_variable_direction=ExpectedDirection.INCREASE,
+                            claims=decision.predictions or (),
+                            claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+                            claim_contract_version="historical_v2_prediction_bridge",
+                            ontology_version=self._ontology.version,
+                            ontology_fingerprint=self._ontology.fingerprint,
+                        ),
+                        design_intent,
+                        research_designer_invocation_id=invocation_id,
+                        prediction_contract_version=prediction_contract_version,
+                        ontology_version=decision.ontology_version or "",
+                        ontology_fingerprint=decision.ontology_fingerprint or "",
+                        include_claim_set_id=False,
+                    )
 
         invocation = ResearchDesignerInvocation(
             id=invocation_id,
             candidate_id=candidate_id,
+            hypothesis_claim_set_id=context.hypothesis_claim_set_id,
             candidate_snapshot_json=candidate_to_json(candidate),
             candidate_feasibility_decision_id=candidate_feasibility_decision_id,
             prompt_version=self._designer.prompt_version,
@@ -613,6 +707,47 @@ class FakeResearchDesigner:
             )
 
         ontology_is_v2 = context.design_ontology_version == "research_design_ontology_v2"
+        ontology_is_v3 = context.design_ontology_version == "research_design_ontology_v3"
+        if ontology_is_v3:
+            claim_set = context.hypothesis_claim_set
+            if claim_set is None:
+                return ResearchDesignerDecision(
+                    id=new_id(),
+                    candidate_id=context.candidate_id,
+                    decision_type=ResearchDesignerDecisionType.NO_VALID_DESIGN,
+                    no_valid_design_reason=(
+                        "The bounded V3 contract requires an authoritative HypothesisClaimSet."
+                    ),
+                    provider=self.provider,
+                    model=self.model,
+                    prompt_version=self.prompt_version,
+                    ontology_version=context.design_ontology_version,
+                    ontology_fingerprint=context.design_ontology_fingerprint,
+                )
+            return ResearchDesignerDecision(
+                id=new_id(),
+                candidate_id=context.candidate_id,
+                decision_type=ResearchDesignerDecisionType.DESIGN,
+                design_kind=ResearchDesignKind.PARAMETER_SENSITIVITY,
+                independent_variables=(claim_set.independent_variable,),
+                dependent_outcomes=tuple(item.outcome for item in claim_set.claims),
+                controls=(DesignVariable.LOOKBACK,),
+                comparison_intent=ComparisonIntent.CONTRAST_PARAMETER_LEVELS,
+                analysis_intent=AnalysisIntent.SENSITIVITY_ANALYSIS,
+                falsification_condition=(
+                    "The hypothesis is falsified if tightening the signal threshold fails to produce "
+                    "the complete claimed directional outcome pattern under fixed controls."
+                ),
+                rationale=(
+                    "Translate the authoritative directional claim set into one bounded parameter-sensitivity "
+                    "design that varies signal_threshold while holding lookback fixed."
+                ),
+                provider=self.provider,
+                model=self.model,
+                prompt_version=self.prompt_version,
+                ontology_version=context.design_ontology_version,
+                ontology_fingerprint=context.design_ontology_fingerprint,
+            )
         if ontology_is_v2:
             trade_decrease = any(
                 token in text

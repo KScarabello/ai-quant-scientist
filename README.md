@@ -49,12 +49,13 @@ Supervised end-to-end cycle:
 
 `ResearchBrief`
 -> `HypothesisScientist`
+-> authoritative `HypothesisClaimSet`
 -> `ResearchCandidate`
 -> `GovernedResearchIntake`
 -> explicit candidate-feasibility authorization
--> `ResearchDesigner` V2
+-> `ResearchDesigner` V3
 -> authoritative `ResearchDesignIntent`
--> precommitted `ResearchPredictionPlan`
+-> deterministic `ResearchPredictionPlan` from frozen claims
 -> deterministic `SpecMaterializer` V2
 -> `InitialExperimentPlan`
 -> explicit human acceptance of the whole plan
@@ -100,11 +101,12 @@ It may not:
 Prompt status:
 - `v1` preserved as the original live-tested prompt
 - `v2` preserved as the hardened requirement-contract prompt
-- `v3` current default candidate-feasibility boundary prompt
+- `v3` preserved as the historical candidate-feasibility boundary prompt
+- `v4` current default prompt with authoritative structured claim semantics
 
 Current adapter defaults:
 - model: `gpt-5.6-terra`
-- prompt version: `v3`
+- prompt version: `v4`
 
 ### Research Designer
 
@@ -112,7 +114,7 @@ The Research Designer is now implemented and bounded.
 
 It may:
 - propose one bounded `ResearchDesignIntent`
-- propose exactly one directional prediction per selected dependent outcome under V2
+- translate one authoritative `HypothesisClaimSet` into one bounded design under V3
 - return `NO_VALID_DESIGN` when the candidate cannot be responsibly expressed under the bounded ontology
 
 It may not:
@@ -127,14 +129,15 @@ It may not:
 
 Current adapter defaults:
 - model: `gpt-5.6-terra`
-- prompt version: `v2`
+- prompt version: `v3`
 
 Current boundary:
 - runs only after an explicit `READY_FOR_SPEC` authorization
+- receives the authoritative candidate-side `HypothesisClaimSet`
 - receives a deterministic AI-safe design ontology snapshot with version and fingerprint
 - persists every invocation
-- leaves Research Designer V1 frozen for historical reproducibility
-- stops at `ResearchDesignIntent` plus `ResearchPredictionPlan`; only the separate supervised cycle may pass that exact intent into deterministic materialization
+- leaves Research Designer V1 and V2 frozen for historical reproducibility
+- stops at `ResearchDesignIntent`; deterministic software then constructs `ResearchPredictionPlan` from the frozen claim set plus complete design coverage
 
 ### Research Critic
 
@@ -160,6 +163,8 @@ Core invariants:
 - Capability matching is deterministic and fail-closed.
 - `ResultEvaluator` owns `PROMOTE` / `ITERATE` / `REJECT`.
 - `READY_FOR_SPEC` means broad prerequisites exist; it does not authorize execution.
+- Canonical structured scientific claims, not free prose, are the authoritative downstream hypothesis semantics.
+- Research Designer must completely cover the authoritative claim set and may not invent, remove, or rewrite directions.
 - Exact reproducibility-critical values come from deterministic policy, not AI-authored intent.
 - Structured predictions are frozen before execution.
 - Planned comparison conditions are precommitted before execution.
@@ -187,6 +192,7 @@ Core invariants:
 - `V0.13B`: bounded Research Designer V1, deterministic design ontology, prompt V1, governed READY_FOR_SPEC-only design service, append-only invocation persistence, and schema `v9`
 - `V0.14`: first supervised end-to-end scientist cycle connecting brief -> hypothesis -> candidate feasibility -> design -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
 - `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10`
+- `V0.15.1`: canonical candidate-side scientific claims, Research Designer V3 complete-coverage validation, deterministic claim-to-prediction projection, and schema `v11`
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -201,6 +207,7 @@ Current candidate contract:
 - primitive canonical `required_fields`
 - bounded `PriorCandidateSummary`
 - deterministic AI-safe requirement ontology snapshot with version and fingerprint
+- authoritative `HypothesisClaimSet` with bounded directional claim semantics
 - historical legacy tool snapshots remain readable
 
 Semantic boundary:
@@ -208,6 +215,7 @@ Semantic boundary:
 - `DataRequirement` means prerequisite input data needed before deterministic execution or analysis.
 - `ToolRequirement` means a broad deterministic tool class needed before deterministic design can proceed.
 - New AI-authored candidates normally leave `required_parameters=None`.
+- For the current directional experiment path, the structured claim set is authoritative and prose is non-authoritative narrative.
 - Exact parameter grids, strategy rules, execution settings, and other frozen condition details belong after `READY_FOR_SPEC`.
 
 ## Research Critic
@@ -231,9 +239,10 @@ Current registered production capability:
   - `supported_parameters`: `signal_threshold`, `lookback`
   - `supported_tool_kinds`: `BACKTEST_EXECUTION`
 
-There are now three relevant deterministic layers:
+There are now four relevant deterministic layers:
 
 - candidate feasibility: broad data/tool-class availability
+- scientific intent coverage: exact preservation of the authoritative claim set
 - condition feasibility: exact stub payload support for each precommitted condition
 - plan execution: deterministic ordered execution and comparison of all required conditions
 - verdict evaluation: deterministic comparison of precommitted expected direction versus observed direction
@@ -245,13 +254,14 @@ There is now one supervised orchestration layer:
 
 ## Persistence
 
-Current schema version: `v10`
+Current schema version: `v11`
 
 SQLite persists authoritative history for:
 
 - research runs, specs, revisions, attempts, results, evaluations, and critic invocations
 - research candidates and candidate-feasibility decisions
 - hypothesis scientist invocations
+- hypothesis claim sets
 - research designer invocations
 - research design intents
 - research prediction plans
@@ -270,7 +280,7 @@ SQLite persists authoritative history for:
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `533 passed`
+- result: `552 passed`
 
 Relevant scientist artifact note:
 
@@ -290,13 +300,20 @@ PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --p
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15 interfaces.
+There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15.1 interfaces.
 
 Live supervised cycle workflow:
 
 1. Run preparation once and note the printed `proposal_id`.
-2. Inspect that exact persisted proposal, plan, and precommitted prediction mapping.
+2. Inspect that exact persisted proposal, canonical claim set, plan, and precommitted prediction mapping.
 3. Execute only with `--proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute`.
+
+Historical negative evidence:
+
+- proposal `2f641366-3e40-4aa3-90df-4423ba0fff65` is `DO NOT ACCEPT`
+- it was a real V0.15 / Research Designer V2 preparation artifact that narrowed a two-outcome hypothesis to `trade_count` only
+- it was never accepted or executed
+- it remains valuable governance evidence and must not receive a fabricated claim set or verdict
 
 ## Current Limitations / Future Work
 
@@ -317,4 +334,5 @@ Historical evidence remains in the repository, but it should not be mistaken for
 - `V0.13B` adds the bounded AI layer that may author `ResearchDesignIntent` but still cannot control exact reproducibility-critical values.
 - `V0.14` is complete and frozen historical evidence of the first supervised end-to-end run. Attempts on Saturday, August 22, 2026 correctly blocked twice before the approved proposal `7d4c04d5-9f36-49bc-ab15-8cd630f10999` reached human acceptance and deterministic execution, observing `trade_count` `4 -> 4` and `sharpe` `1.0 -> 0.75`.
 - That historical `V0.14` execution does not receive a retrospective `V0.15` verdict because it did not persist a machine-readable precommitted prediction plan before execution.
+- The first live `V0.15` preparation artifact, proposal `2f641366-3e40-4aa3-90df-4423ba0fff65`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Research Designer V2 narrowed the candidate’s scientific intent instead of covering it completely.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.
