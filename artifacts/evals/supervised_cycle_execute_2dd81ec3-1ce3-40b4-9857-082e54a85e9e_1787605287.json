@@ -1,0 +1,174 @@
+{
+  "timestamp": 1787605287,
+  "mode": "accept_and_execute",
+  "requested_proposal_id": "2dd81ec3-1ce3-40b4-9857-082e54a85e9e",
+  "hypothesis_scientist_invocation_id": "5521402a-110d-4788-97dc-4ba08a8ba246",
+  "research_designer_invocation_id": "ff299a14-735f-4e26-9824-8189c19c313d",
+  "candidate_id": "683f4a2d-731b-42f4-884b-7ee5aeb1c05d",
+  "hypothesis_claim_set_id": "ce1393b9-0800-4a7a-bb00-12236deb17f4",
+  "canonical_structured_scientific_claims": {
+    "id": "ce1393b9-0800-4a7a-bb00-12236deb17f4",
+    "independent_variable": "signal_threshold",
+    "independent_variable_direction": "INCREASE",
+    "claim_aggregation": "ALL_CLAIMS_REQUIRED",
+    "claim_contract_version": "hypothesis_claim_set_v1",
+    "ontology_version": "hypothesis_claim_ontology_v1",
+    "ontology_fingerprint": "23f6c4019ea3ffebc56a3486c19d4da0b733c4c08c7d8b4d18769945a26afcd3",
+    "claims": [
+      {
+        "outcome": "sharpe",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE"
+      }
+    ]
+  },
+  "candidate_feasibility_decision": {
+    "id": "da4cc9f4-2e4c-47d3-a6ad-b99622dc3194",
+    "status": "READY_FOR_SPEC",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53",
+    "satisfied_ids": [
+      "synthetic_parametric_input",
+      "deterministic_backtest_execution"
+    ],
+    "unsatisfied_ids": [],
+    "reason_codes": []
+  },
+  "research_design_intent_id": "d35b8f6f-4206-40e4-bd72-d8ab24163656",
+  "research_prediction_plan_id": "376c7395-ceaa-498a-85a3-455ceb3a86c4",
+  "prediction_contract_version": "research_prediction_plan_v1",
+  "structured_predictions": {
+    "id": "376c7395-ceaa-498a-85a3-455ceb3a86c4",
+    "hypothesis_claim_set_id": "ce1393b9-0800-4a7a-bb00-12236deb17f4",
+    "independent_variable": "signal_threshold",
+    "prediction_contract_version": "research_prediction_plan_v1",
+    "ontology_version": "research_design_ontology_v3",
+    "ontology_fingerprint": "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183",
+    "prediction_aggregation_rule": "ALL_PREDICTIONS_REQUIRED",
+    "predictions": [
+      {
+        "outcome": "sharpe",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE"
+      }
+    ]
+  },
+  "initial_experiment_plan_id": "fadfbda3-fc85-4665-9a2c-3a208d02c54f",
+  "materialization_proposal_id": "2dd81ec3-1ce3-40b4-9857-082e54a85e9e",
+  "exact_materialized_conditions": [
+    {
+      "condition_id": "820914f2-5211-4b5d-83f6-b1579ff9117d",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.0
+      }
+    },
+    {
+      "condition_id": "60f0946a-8e27-4acf-b3d1-3fa84bb4f9c1",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.5
+      }
+    }
+  ],
+  "preparation_outcome": "PROPOSED",
+  "preparation_message": "Loaded exact persisted proposal for explicit acceptance/execution.",
+  "human_acceptance_occurred": true,
+  "execution_outcome": "COMPLETED",
+  "execution_message": "Deterministic execution completed and persisted both a contrast result and a scientific verdict.",
+  "execution_records": [
+    {
+      "condition_id": "820914f2-5211-4b5d-83f6-b1579ff9117d",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "status": "COMPLETED",
+      "metrics": {
+        "lookback": 20,
+        "net_pnl": 12.5,
+        "score": 10.0,
+        "sharpe": 1.0,
+        "signal_threshold": 2.0,
+        "trade_count": 4
+      },
+      "tool_name": "stub_backtester"
+    },
+    {
+      "condition_id": "60f0946a-8e27-4acf-b3d1-3fa84bb4f9c1",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "status": "COMPLETED",
+      "metrics": {
+        "lookback": 20,
+        "net_pnl": 9.38,
+        "score": 7.5,
+        "sharpe": 0.75,
+        "signal_threshold": 2.5,
+        "trade_count": 4
+      },
+      "tool_name": "stub_backtester"
+    }
+  ],
+  "contrast_result": {
+    "id": "adec991c-4cb3-4900-8338-17b7efe10307",
+    "plan_id": "fadfbda3-fc85-4665-9a2c-3a208d02c54f",
+    "independent_variable": "signal_threshold",
+    "baseline_parameter_value": 2.0,
+    "comparator_parameter_value": 2.5,
+    "outcomes": [
+      {
+        "outcome": "sharpe",
+        "baseline_value": 1.0,
+        "comparator_value": 0.75,
+        "delta": -0.25
+      },
+      {
+        "outcome": "trade_count",
+        "baseline_value": 4.0,
+        "comparator_value": 4.0,
+        "delta": 0.0
+      }
+    ]
+  },
+  "scientific_verdict": {
+    "id": "2a4faabc-3477-4c47-a033-78177514b603",
+    "prediction_plan_id": "376c7395-ceaa-498a-85a3-455ceb3a86c4",
+    "design_intent_id": "d35b8f6f-4206-40e4-bd72-d8ab24163656",
+    "experiment_plan_id": "fadfbda3-fc85-4665-9a2c-3a208d02c54f",
+    "contrast_result_id": "adec991c-4cb3-4900-8338-17b7efe10307",
+    "verdict_policy_version": "directional_scientific_verdict_policy_v1",
+    "verdict_policy_fingerprint": "ab9ef36c5044599e901928be15b446fd08a6078bf17a4136a6c36f995c63daee",
+    "overall_status": "FALSIFIED",
+    "per_outcome_verdicts": [
+      {
+        "outcome": "sharpe",
+        "expected_direction": "INCREASE",
+        "observed_direction": "DECREASE",
+        "baseline_value": 1.0,
+        "comparator_value": 0.75,
+        "delta": -0.25,
+        "result": "FAIL"
+      },
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE",
+        "observed_direction": "NO_CHANGE",
+        "baseline_value": 4.0,
+        "comparator_value": 4.0,
+        "delta": 0.0,
+        "result": "FAIL"
+      }
+    ]
+  }
+}

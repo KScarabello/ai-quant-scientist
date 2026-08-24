@@ -44,6 +44,8 @@ from ai_quant_scientist.models.hypothesis_scientist import (
     HypothesisScientistInvocation,
     PriorCandidateSummary,
     ResearchBrief,
+    ResearchScope,
+    ResearchScopeOutcomeAggregation,
 )
 from ai_quant_scientist.models.design import DesignOutcome, DesignVariable, ExpectedDirection, OutcomePrediction
 from ai_quant_scientist.services.hypothesis_prompts import (
@@ -64,6 +66,7 @@ from ai_quant_scientist.services.hypothesis_scientist import (
     generate_candidate,
     materialize_hypothesis_claim_set,
     materialize_research_candidate,
+    validate_research_brief_for_scientist,
 )
 from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
 from ai_quant_scientist.services.scientist_requirement_ontology import (
@@ -80,6 +83,14 @@ def _synth_brief(**kw) -> ResearchBrief:
     return ResearchBrief.create(
         research_question=kw.get("research_question", "Does signal_threshold control trade frequency?"),
         asset_class_focus=kw.get("asset_class_focus", "SYNTHETIC"),
+        research_scope=kw.get(
+            "research_scope",
+            {
+                "independent_variable": "signal_threshold",
+                "requested_outcomes": ["trade_count", "sharpe"],
+                "outcome_aggregation": "ALL_OUTCOMES_REQUIRED",
+            },
+        ),
     )
 
 
@@ -147,6 +158,60 @@ def test_brief_optional_fields():
         "abc123def456abc123def456abc123def456abc123def456abc123def456abcd"
         in b.prior_candidate_fingerprints
     )
+
+
+def test_brief_historical_without_scope_remains_readable():
+    b = ResearchBrief.create(
+        research_question="Historical brief without canonical scope.",
+        research_scope=None,
+    )
+    assert b.research_scope is None
+
+
+def test_research_scope_valid_minimal():
+    scope = ResearchScope.create(
+        independent_variable="signal_threshold",
+        requested_outcomes=["trade_count", "sharpe"],
+        outcome_aggregation="ALL_OUTCOMES_REQUIRED",
+    )
+    assert scope.contract_version == "research_scope_v1"
+    assert [item.value for item in scope.requested_outcomes] == ["sharpe", "trade_count"]
+
+
+def test_research_scope_rejects_empty_outcomes():
+    with pytest.raises(ValueError, match="at least one requested outcome"):
+        ResearchScope.create(
+            independent_variable="signal_threshold",
+            requested_outcomes=[],
+            outcome_aggregation="ALL_OUTCOMES_REQUIRED",
+        )
+
+
+def test_research_scope_rejects_duplicate_outcome():
+    with pytest.raises(ValueError, match="must not repeat outcomes"):
+        ResearchScope.create(
+            independent_variable="signal_threshold",
+            requested_outcomes=["trade_count", "trade_count"],
+            outcome_aggregation="ALL_OUTCOMES_REQUIRED",
+        )
+
+
+def test_research_scope_rejects_unsupported_outcome():
+    with pytest.raises(ValueError, match="does not support SCORE"):
+        ResearchScope.create(
+            independent_variable="signal_threshold",
+            requested_outcomes=["score"],
+            outcome_aggregation="ALL_OUTCOMES_REQUIRED",
+        )
+
+
+def test_research_scope_rejects_unsupported_independent_variable():
+    with pytest.raises(ValueError, match="independent_variable is unsupported"):
+        ResearchScope.create(
+            independent_variable="lookback",
+            requested_outcomes=["trade_count"],
+            outcome_aggregation="ALL_OUTCOMES_REQUIRED",
+        )
 
 
 def test_brief_rejects_mismatched_prior_fingerprint_lists():
@@ -256,6 +321,7 @@ def test_prompt_v1_available():
     assert "v2" in available_versions()
     assert "v3" in available_versions()
     assert "v4" in available_versions()
+    assert "v5" in available_versions()
 
 
 def test_prompt_v1_contains_core_instructions():
@@ -300,6 +366,13 @@ def test_prompt_v4_introduces_authoritative_claim_contract():
     assert "ALL_CLAIMS_REQUIRED" in p
 
 
+def test_prompt_v5_introduces_caller_owned_research_scope_contract():
+    p = get_scientist_instructions("v5")
+    assert "ResearchScope is the authoritative caller-owned material scientific scope" in p
+    assert "Do NOT add an outcome outside requested_outcomes" in p
+    assert "Do NOT omit a requested outcome" in p
+
+
 def test_prompt_versions_exact_hashes_unchanged():
     assert hashlib.sha256(get_scientist_instructions("v1").encode("utf-8")).hexdigest() == (
         "34693e305202cae2ee96f84d328bdbd53e8cee8f65765afb9a3c0f35614ec37e"
@@ -312,6 +385,9 @@ def test_prompt_versions_exact_hashes_unchanged():
     )
     assert hashlib.sha256(get_scientist_instructions("v4").encode("utf-8")).hexdigest() == (
         "71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef"
+    )
+    assert hashlib.sha256(get_scientist_instructions("v5").encode("utf-8")).hexdigest() == (
+        "568a07e7467df49401e97120735d0ed650458d0ececb4a8b5cdd33c2e694d3dd"
     )
 
 
@@ -364,6 +440,158 @@ def test_v4_missing_directional_claim_fails_closed():
     valid, errors = HypothesisProposalValidator().validate(decision, brief)
     assert not valid
     assert "outcome_claims" in errors
+
+
+def test_v5_requires_research_scope_before_provider_invocation():
+    brief = ResearchBrief.create(research_question="Does signal_threshold control trade frequency?", research_scope=None)
+    with pytest.raises(ValueError, match="requires caller-owned ResearchScope"):
+        validate_research_brief_for_scientist(brief, prompt_version="v5")
+
+
+def test_scope_fidelity_exact_match_passes():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v5"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid
+    assert errors == {}
+
+
+def test_scope_fidelity_rejects_broadening_before_authoritative_persistence():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v5"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.NET_PNL,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert errors["research_scope_outcomes_extra"] == (
+        "Authoritative claims must not add outcomes outside ResearchScope: ['net_pnl']"
+    )
+
+
+def test_scope_fidelity_rejects_narrowing():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v5"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert errors["research_scope_outcomes_missing"] == (
+        "Authoritative claims must include every ResearchScope outcome: missing ['sharpe']"
+    )
+
+
+def test_scope_fidelity_rejects_wrong_independent_variable():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v5"),
+        independent_variable=DesignVariable.LOOKBACK,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "research_scope_independent_variable" in errors
+
+
+def test_scope_fidelity_rejects_wrong_aggregation():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(brief, prompt_version="v5"),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation="SOME_OUTCOMES_OPTIONAL",  # type: ignore[arg-type]
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert not valid
+    assert "claim_aggregation" in errors
+
+
+def test_prose_extra_metric_does_not_become_authoritative_claim():
+    brief = _synth_brief()
+    decision = replace(
+        _propose_decision(
+            brief,
+            prompt_version="v5",
+            rationale="Trade count and Sharpe should improve; net_pnl may also rise as a non-authoritative side observation.",
+        ),
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        independent_variable_direction=ExpectedDirection.INCREASE,
+        outcome_claims=(
+            OutcomePrediction(
+                outcome=DesignOutcome.TRADE_COUNT,
+                expected_direction=ExpectedDirection.DECREASE,
+            ),
+            OutcomePrediction(
+                outcome=DesignOutcome.SHARPE,
+                expected_direction=ExpectedDirection.INCREASE,
+            ),
+        ),
+        claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+    )
+    valid, errors = HypothesisProposalValidator().validate(decision, brief)
+    assert valid
+    assert errors == {}
 
 
 def test_valid_no_hypothesis_passes():
@@ -764,6 +992,7 @@ def test_save_and_retrieve_propose_invocation(tmp_path):
     snapshot = json.loads(r.research_brief_snapshot)
     parsed = json.loads(r.parsed_decision_json)
     assert snapshot["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
+    assert snapshot["research_scope"]["requested_outcomes"] == ["sharpe", "trade_count"]
     assert parsed["ontology_version"] == REQUIREMENT_ONTOLOGY_VERSION
     assert parsed["ontology_fingerprint"] == snapshot["requirement_ontology"]["fingerprint"]
     assert r.resulting_claim_set_id is not None
@@ -774,7 +1003,7 @@ def test_save_and_retrieve_propose_invocation(tmp_path):
 
 def test_save_and_retrieve_no_hypothesis_invocation(tmp_path):
     store = _store(tmp_path)
-    brief = ResearchBrief.create(research_question="general explore markets underspecified")
+    brief = _synth_brief(research_question="general explore markets underspecified")
     scientist = FakeHypothesisScientist()
     inv, candidate = generate_candidate(scientist, brief, store)
     assert candidate is None
@@ -809,7 +1038,7 @@ def test_invalid_decision_persisted_with_validation_failure(tmp_path):
     assert retrieved[0].validation_status == "INVALID"
 
 
-def test_generate_candidate_v4_persists_claim_set_atomically(tmp_path, monkeypatch):
+def test_generate_candidate_v5_persists_claim_set_atomically(tmp_path, monkeypatch):
     store = _store(tmp_path)
     brief = _synth_brief()
     scientist = FakeHypothesisScientist()
@@ -843,6 +1072,53 @@ def test_generate_candidate_v4_persists_claim_set_atomically(tmp_path, monkeypat
         assert conn.execute("SELECT COUNT(*) FROM research_candidates").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM hypothesis_scientist_invocations").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM hypothesis_claim_sets").fetchone()[0] == 0
+
+
+def test_generate_candidate_v5_broadening_rejected_before_authoritative_candidate_persistence(tmp_path):
+    store = _store(tmp_path)
+    brief = _synth_brief()
+
+    class BroadeningScientist:
+        provider = "fake"
+        model = "bad"
+        prompt_version = "v5"
+
+        def generate(self, b):
+            ontology = build_requirement_ontology_snapshot()
+            return HypothesisScientistDecision(
+                id="broadening",
+                decision_type=HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS,
+                research_brief_id=b.id,
+                hypothesis_statement="Threshold increases net pnl as well.",
+                hypothesis_rationale="Badly broadened scope.",
+                requirements_snapshot=requirements_to_json((
+                    DataRequirement(requirement_id="d", data_kind=DataKind.SYNTHETIC_PARAMETRIC),
+                    ToolRequirement(requirement_id="t", tool_kind=ToolKind.BACKTEST_EXECUTION),
+                )),
+                independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+                independent_variable_direction=ExpectedDirection.INCREASE,
+                outcome_claims=(
+                    OutcomePrediction(outcome=DesignOutcome.TRADE_COUNT, expected_direction=ExpectedDirection.DECREASE),
+                    OutcomePrediction(outcome=DesignOutcome.SHARPE, expected_direction=ExpectedDirection.INCREASE),
+                    OutcomePrediction(outcome=DesignOutcome.NET_PNL, expected_direction=ExpectedDirection.INCREASE),
+                ),
+                claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
+                provider=self.provider,
+                model=self.model,
+                prompt_version=self.prompt_version,
+                ontology_version=ontology.version,
+                ontology_fingerprint=ontology.fingerprint,
+            )
+
+    inv, candidate = generate_candidate(BroadeningScientist(), brief, store)
+    assert candidate is None
+    assert inv.validation_status == "INVALID"
+    errors = json.loads(inv.validation_errors_json)
+    assert "research_scope_outcomes_extra" in errors
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM research_candidates").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM hypothesis_claim_sets").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM hypothesis_scientist_invocations").fetchone()[0] == 1
 
 
 def test_invocations_immutable(tmp_path):
@@ -926,7 +1202,7 @@ def test_harness_runs_fake_scientist():
 def test_harness_defaults_to_scientist_prompt_version():
     cases = load_cases_from_file("evals/scientist_v1.json")
     result = ScientistEvalSuite(cases[:1]).run(FakeHypothesisScientist())[0]
-    assert result.prompt_version == "v4"
+    assert result.prompt_version == "v5"
 
 
 def test_harness_no_api_calls(monkeypatch):
@@ -1064,10 +1340,21 @@ def test_brief_payload_includes_requirement_ontology_without_capability_availabi
     payload = brief_to_payload(_synth_brief())
     payload_str = json.dumps(payload, sort_keys=True)
     assert "requirement_ontology" in payload
+    assert payload["research_scope"]["requested_outcomes"] == ["sharpe", "trade_count"]
     assert payload["requirement_ontology"]["version"] == REQUIREMENT_ONTOLOGY_VERSION
     assert "stub_backtester_v1" not in payload_str
     assert "enabled" not in payload_str
     assert "registry_fingerprint" not in payload_str
+
+
+def test_brief_payload_omits_research_scope_for_historical_brief():
+    payload = brief_to_payload(
+        ResearchBrief.create(
+            research_question="Historical brief without canonical scope.",
+            research_scope=None,
+        )
+    )
+    assert "research_scope" not in payload
 
 
 def test_eval_metadata_not_in_brief_payload():
@@ -1251,6 +1538,18 @@ def test_openai_adapter_propose_hypothesis():
         not isinstance(r, DataRequirement) or r.required_parameters is None
         for r in reqs
     )
+
+
+def test_openai_adapter_v5_requires_scope_before_provider_call():
+    client = MagicMock()
+    brief = ResearchBrief.create(
+        research_question="Does signal_threshold control trade frequency?",
+        research_scope=None,
+    )
+    scientist = OpenAIHypothesisScientist(client=client)
+    with pytest.raises(ValueError, match="requires caller-owned ResearchScope"):
+        scientist.generate(brief)
+    client.responses.parse.assert_not_called()
 
 
 def test_openai_adapter_no_hypothesis():

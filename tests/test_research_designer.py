@@ -45,7 +45,11 @@ from ai_quant_scientist.models.research_designer import (
     ResearchDesignerDecision,
     ResearchDesignerDecisionType,
 )
-from ai_quant_scientist.models.hypothesis_scientist import ResearchBrief
+from ai_quant_scientist.models.hypothesis_scientist import (
+    ResearchBrief,
+    ResearchScope,
+    ResearchScopeOutcomeAggregation,
+)
 from ai_quant_scientist.services.openai_research_designer import OpenAIResearchDesigner
 from ai_quant_scientist.services.research_design_ontology import (
     RESEARCH_DESIGN_ONTOLOGY_VERSION,
@@ -191,6 +195,11 @@ def _persist_v4_candidate_and_claim_set(store: SQLiteStore):
             "and improve risk-adjusted performance?"
         ),
         asset_class_focus="SYNTHETIC",
+        research_scope=ResearchScope.create(
+            independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+            requested_outcomes=(DesignOutcome.TRADE_COUNT, DesignOutcome.SHARPE),
+            outcome_aggregation=ResearchScopeOutcomeAggregation.ALL_OUTCOMES_REQUIRED,
+        ),
     )
     invocation, candidate = generate_candidate(FakeHypothesisScientist(), brief, store)
     assert candidate is not None

@@ -17,7 +17,7 @@ from ..models.hypothesis_scientist import (
 )
 from ..models.research import new_id
 from ..services.hypothesis_prompts import get_scientist_instructions
-from ..services.hypothesis_scientist import brief_to_payload
+from ..services.hypothesis_scientist import brief_to_payload, validate_research_brief_for_scientist
 from ..services.scientist_requirement_ontology import build_requirement_ontology_snapshot
 
 try:
@@ -26,7 +26,7 @@ except Exception:
     OpenAI = None  # type: ignore
 
 DEFAULT_MODEL = os.getenv("AI_QUANT_SCIENTIST_MODEL", "gpt-5.6-terra")
-DEFAULT_PROMPT_VERSION = "v4"
+DEFAULT_PROMPT_VERSION = "v5"
 DEFAULT_REASONING = "medium"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 ALL_CANONICAL_FIELD_NAMES = tuple(sorted({
@@ -92,6 +92,7 @@ class OpenAIHypothesisScientist:
     def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
         if self._client is None:
             raise RuntimeError("OpenAI client not configured")
+        validate_research_brief_for_scientist(brief, prompt_version=self.prompt_version)
 
         from pydantic import BaseModel, ConfigDict
         from typing import Literal
@@ -126,7 +127,7 @@ class OpenAIHypothesisScientist:
             label: str = ""
             model_config = ConfigDict(extra="forbid")
 
-        if self.prompt_version == "v4":
+        if self.prompt_version in {"v4", "v5"}:
             class OutcomeClaimSchema(BaseModel):
                 outcome: Literal["trade_count", "net_pnl", "sharpe"]
                 expected_direction: Literal["INCREASE", "DECREASE"]

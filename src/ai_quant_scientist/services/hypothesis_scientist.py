@@ -27,6 +27,7 @@ from ..models.hypothesis_scientist import (
     HypothesisScientistInvocation,
     PriorCandidateSummary,
     ResearchBrief,
+    ResearchScopeOutcomeAggregation,
 )
 from ..models.research import new_id
 from .hypothesis_claim_ontology import build_hypothesis_claim_ontology_snapshot
@@ -169,6 +170,43 @@ class HypothesisProposalValidator:
             elif decision.claim_aggregation != HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED:
                 errors["claim_aggregation"] = "Unsupported claim_aggregation under the bounded V0.15.1 contract"
 
+        if brief.research_scope is not None:
+            scope = brief.research_scope
+            if decision.decision_type == HypothesisScientistDecisionType.PROPOSE_HYPOTHESIS:
+                if decision.independent_variable is not None and decision.independent_variable != scope.independent_variable:
+                    errors["research_scope_independent_variable"] = (
+                        "Authoritative claims must preserve the caller-owned ResearchScope independent_variable exactly"
+                    )
+                claim_outcomes = decision.outcome_claims or ()
+                if claim_outcomes:
+                    scope_outcomes = tuple(sorted(scope.requested_outcomes, key=lambda item: item.value))
+                    decision_outcomes = tuple(sorted((item.outcome for item in claim_outcomes), key=lambda item: item.value))
+                    if decision_outcomes != scope_outcomes:
+                        missing = sorted(
+                            set(item.value for item in scope_outcomes)
+                            - set(item.value for item in decision_outcomes)
+                        )
+                        extra = sorted(
+                            set(item.value for item in decision_outcomes)
+                            - set(item.value for item in scope_outcomes)
+                        )
+                        if missing:
+                            errors["research_scope_outcomes_missing"] = (
+                                f"Authoritative claims must include every ResearchScope outcome: missing {missing}"
+                            )
+                        if extra:
+                            errors["research_scope_outcomes_extra"] = (
+                                f"Authoritative claims must not add outcomes outside ResearchScope: {extra}"
+                            )
+                if (
+                    scope.outcome_aggregation == ResearchScopeOutcomeAggregation.ALL_OUTCOMES_REQUIRED
+                    and decision.claim_aggregation is not None
+                    and decision.claim_aggregation != HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED
+                ):
+                    errors["research_scope_aggregation"] = (
+                        "ResearchScope ALL_OUTCOMES_REQUIRED must map to HypothesisClaimSet ALL_CLAIMS_REQUIRED"
+                    )
+
         # AI must not have supplied governance fields (enforced by schema, belt-and-suspenders)
         # The decision model does not even have id/source/created_at for the candidate
 
@@ -233,6 +271,11 @@ def materialize_hypothesis_claim_set(
     )
 
 
+def validate_research_brief_for_scientist(brief: ResearchBrief, *, prompt_version: str) -> None:
+    if prompt_version == "v5" and brief.research_scope is None:
+        raise ValueError("Hypothesis Scientist V5 requires caller-owned ResearchScope before provider invocation")
+
+
 # ─── Brief serialization ──────────────────────────────────────────────────────
 
 def brief_to_json(brief: ResearchBrief) -> str:
@@ -245,6 +288,7 @@ def brief_to_json(brief: ResearchBrief) -> str:
         "instrument_focus": list(brief.instrument_focus) if brief.instrument_focus else None,
         "methodological_constraints": list(brief.methodological_constraints) if brief.methodological_constraints else None,
         "exclusions": list(brief.exclusions) if brief.exclusions else None,
+        "research_scope": None if brief.research_scope is None else brief.research_scope.to_payload(),
         "prior_candidate_fingerprints": list(brief.prior_candidate_fingerprints) if brief.prior_candidate_fingerprints else None,
         "prior_candidate_summaries": [
             {
@@ -281,6 +325,8 @@ def brief_to_payload(brief: ResearchBrief) -> dict:
         payload["methodological_constraints"] = list(brief.methodological_constraints)
     if brief.exclusions:
         payload["exclusions"] = list(brief.exclusions)
+    if brief.research_scope is not None:
+        payload["research_scope"] = brief.research_scope.to_payload()
     if brief.prior_candidate_summaries:
         payload["prior_candidate_summaries"] = [
             {
@@ -310,6 +356,7 @@ def generate_candidate(
     Fails closed: invalid AI output is recorded but no candidate is created.
     No automatic GovernedResearchIntake submission.
     """
+    validate_research_brief_for_scientist(brief, prompt_version=scientist.prompt_version)
     decision = scientist.generate(brief)
 
     validator = HypothesisProposalValidator()
@@ -396,7 +443,7 @@ class FakeHypothesisScientist:
 
     provider = "fake"
     model = "fake-v1"
-    prompt_version = "v4"
+    prompt_version = "v5"
 
     def generate(self, brief: ResearchBrief) -> HypothesisScientistDecision:
         from ..capabilities.models import DataKind, AssetClass, Resolution
@@ -459,15 +506,20 @@ class FakeHypothesisScientist:
             requirements_snapshot=requirements_to_json(tuple(reqs)),
             independent_variable=DesignVariable.SIGNAL_THRESHOLD,
             independent_variable_direction=ExpectedDirection.INCREASE,
-            outcome_claims=(
+            outcome_claims=tuple(
                 OutcomePrediction(
-                    outcome=DesignOutcome.TRADE_COUNT,
-                    expected_direction=ExpectedDirection.DECREASE,
-                ),
-                OutcomePrediction(
-                    outcome=DesignOutcome.SHARPE,
-                    expected_direction=ExpectedDirection.INCREASE,
-                ),
+                    outcome=outcome,
+                    expected_direction=(
+                        ExpectedDirection.DECREASE
+                        if outcome == DesignOutcome.TRADE_COUNT
+                        else ExpectedDirection.INCREASE
+                    ),
+                )
+                for outcome in (
+                    brief.research_scope.requested_outcomes
+                    if brief.research_scope is not None
+                    else (DesignOutcome.TRADE_COUNT, DesignOutcome.SHARPE)
+                )
             ),
             claim_aggregation=HypothesisClaimAggregation.ALL_CLAIMS_REQUIRED,
             provider=self.provider,

@@ -48,7 +48,9 @@ Research Designer path after explicit `READY_FOR_SPEC` authorization:
 Supervised end-to-end cycle:
 
 `ResearchBrief`
+-> caller-owned `ResearchScope`
 -> `HypothesisScientist`
+-> deterministic scope-fidelity validation
 -> authoritative `HypothesisClaimSet`
 -> `ResearchCandidate`
 -> `GovernedResearchIntake`
@@ -102,11 +104,18 @@ Prompt status:
 - `v1` preserved as the original live-tested prompt
 - `v2` preserved as the hardened requirement-contract prompt
 - `v3` preserved as the historical candidate-feasibility boundary prompt
-- `v4` current default prompt with authoritative structured claim semantics
+- `v4` preserved as the historical canonical-claim prompt
+- `v5` current default prompt with caller-owned `ResearchScope` fidelity and authoritative structured claim semantics
 
 Current adapter defaults:
 - model: `gpt-5.6-terra`
-- prompt version: `v4`
+- prompt version: `v5`
+
+Current boundary:
+- caller/application owns `ResearchScope`
+- `ResearchScope` fixes the independent variable and material outcome set before the Scientist runs
+- the Scientist owns expected direction and rationale for every in-scope outcome
+- deterministic software rejects any broadened, narrowed, or mismatched authoritative claim set before candidate persistence
 
 ### Research Designer
 
@@ -164,6 +173,8 @@ Core invariants:
 - `ResultEvaluator` owns `PROMOTE` / `ITERATE` / `REJECT`.
 - `READY_FOR_SPEC` means broad prerequisites exist; it does not authorize execution.
 - Canonical structured scientific claims, not free prose, are the authoritative downstream hypothesis semantics.
+- Caller-owned `ResearchScope` is the authoritative upstream question boundary for the supervised path.
+- `ResearchScope` coverage must equal `HypothesisClaimSet` coverage, which must equal `ResearchDesignIntent` coverage and `ResearchPredictionPlan` coverage.
 - Research Designer must completely cover the authoritative claim set and may not invent, remove, or rewrite directions.
 - Exact reproducibility-critical values come from deterministic policy, not AI-authored intent.
 - Structured predictions are frozen before execution.
@@ -193,6 +204,7 @@ Core invariants:
 - `V0.14`: first supervised end-to-end scientist cycle connecting brief -> hypothesis -> candidate feasibility -> design -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
 - `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10`
 - `V0.15.1`: canonical candidate-side scientific claims, Research Designer V3 complete-coverage validation, deterministic claim-to-prediction projection, and schema `v11`
+- `V0.15.2`: caller-owned canonical `ResearchScope`, Hypothesis Scientist Prompt `v5`, deterministic scope-fidelity validation, and no schema bump
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -200,6 +212,7 @@ For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
 Current candidate contract:
 
+- caller-owned `ResearchScope` with contract version `research_scope_v1`
 - canonical `ToolKind`
 - exact new-authoritative tool matching
 - no fuzzy matching
@@ -212,11 +225,13 @@ Current candidate contract:
 
 Semantic boundary:
 
+- `ResearchScope` owns the independent variable and material outcome set for the current supervised path.
 - `DataRequirement` means prerequisite input data needed before deterministic execution or analysis.
 - `ToolRequirement` means a broad deterministic tool class needed before deterministic design can proceed.
 - New AI-authored candidates normally leave `required_parameters=None`.
-- For the current directional experiment path, the structured claim set is authoritative and prose is non-authoritative narrative.
+- For the current directional experiment path, the authoritative `HypothesisClaimSet` must exactly cover `ResearchScope`, while prose remains non-authoritative narrative.
 - Exact parameter grids, strategy rules, execution settings, and other frozen condition details belong after `READY_FOR_SPEC`.
+- `hypothesis_claim_ontology_v1` remains unchanged; `ResearchScope` is a separate caller-side contract rather than a claim-ontology revision.
 
 ## Research Critic
 
@@ -259,6 +274,7 @@ Current schema version: `v11`
 SQLite persists authoritative history for:
 
 - research runs, specs, revisions, attempts, results, evaluations, and critic invocations
+- caller-authored `ResearchScope` inside the authoritative `research_brief_snapshot`
 - research candidates and candidate-feasibility decisions
 - hypothesis scientist invocations
 - hypothesis claim sets
@@ -280,7 +296,7 @@ SQLite persists authoritative history for:
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `552 passed`
+- result: `569 passed`
 
 Relevant scientist artifact note:
 
@@ -300,7 +316,7 @@ PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --p
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15.1 interfaces.
+There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15.2 interfaces.
 
 Live supervised cycle workflow:
 
@@ -314,6 +330,10 @@ Historical negative evidence:
 - it was a real V0.15 / Research Designer V2 preparation artifact that narrowed a two-outcome hypothesis to `trade_count` only
 - it was never accepted or executed
 - it remains valuable governance evidence and must not receive a fabricated claim set or verdict
+- proposal `2cea1a89-afa5-4ace-abca-3dbda86ded82` is also `DO NOT ACCEPT`
+- it was a real V0.15.1 preparation artifact where Hypothesis Scientist V4 broadened the caller's question by adding canonical `net_pnl`
+- it was never accepted or executed
+- it remains valuable scope-integrity evidence and must not receive a fabricated `ResearchScope` or verdict
 
 ## Current Limitations / Future Work
 
@@ -335,4 +355,5 @@ Historical evidence remains in the repository, but it should not be mistaken for
 - `V0.14` is complete and frozen historical evidence of the first supervised end-to-end run. Attempts on Saturday, August 22, 2026 correctly blocked twice before the approved proposal `7d4c04d5-9f36-49bc-ab15-8cd630f10999` reached human acceptance and deterministic execution, observing `trade_count` `4 -> 4` and `sharpe` `1.0 -> 0.75`.
 - That historical `V0.14` execution does not receive a retrospective `V0.15` verdict because it did not persist a machine-readable precommitted prediction plan before execution.
 - The first live `V0.15` preparation artifact, proposal `2f641366-3e40-4aa3-90df-4423ba0fff65`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Research Designer V2 narrowed the candidate’s scientific intent instead of covering it completely.
+- The first live `V0.15.1` preparation artifact, proposal `2cea1a89-afa5-4ace-abca-3dbda86ded82`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Hypothesis Scientist V4 broadened the caller's scientific scope by adding `net_pnl`.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.

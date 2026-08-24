@@ -19,10 +19,15 @@ def utcnow() -> datetime:
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 MAX_PRIOR_CANDIDATE_SUMMARIES = 5
 HYPOTHESIS_CLAIM_SET_CONTRACT_VERSION = "hypothesis_claim_set_v1"
+RESEARCH_SCOPE_CONTRACT_VERSION = "research_scope_v1"
 
 
 class HypothesisClaimAggregation(str, Enum):
     ALL_CLAIMS_REQUIRED = "ALL_CLAIMS_REQUIRED"
+
+
+class ResearchScopeOutcomeAggregation(str, Enum):
+    ALL_OUTCOMES_REQUIRED = "ALL_OUTCOMES_REQUIRED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +52,76 @@ class PriorCandidateSummary:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class ResearchScope:
+    """Caller-owned canonical material scientific scope for one ResearchBrief."""
+
+    independent_variable: DesignVariable
+    requested_outcomes: tuple[DesignOutcome, ...]
+    outcome_aggregation: ResearchScopeOutcomeAggregation
+    contract_version: str = RESEARCH_SCOPE_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.independent_variable, DesignVariable):
+            raise ValueError(f"Invalid ResearchScope independent_variable: {self.independent_variable!r}")
+        if self.independent_variable != DesignVariable.SIGNAL_THRESHOLD:
+            raise ValueError("ResearchScope independent_variable is unsupported by the bounded V0.15.2 contract")
+        if not self.requested_outcomes:
+            raise ValueError("ResearchScope requires at least one requested outcome")
+        if any(not isinstance(item, DesignOutcome) for item in self.requested_outcomes):
+            raise ValueError("ResearchScope requested_outcomes must be DesignOutcome entries")
+        if any(item == DesignOutcome.SCORE for item in self.requested_outcomes):
+            raise ValueError("ResearchScope does not support SCORE as a material requested outcome")
+        if len(set(self.requested_outcomes)) != len(self.requested_outcomes):
+            raise ValueError("ResearchScope requested_outcomes must not repeat outcomes")
+        if not isinstance(self.outcome_aggregation, ResearchScopeOutcomeAggregation):
+            raise ValueError(f"Invalid ResearchScope outcome_aggregation: {self.outcome_aggregation!r}")
+        if self.outcome_aggregation != ResearchScopeOutcomeAggregation.ALL_OUTCOMES_REQUIRED:
+            raise ValueError("ResearchScope outcome_aggregation is unsupported by the bounded V0.15.2 contract")
+        if self.contract_version != RESEARCH_SCOPE_CONTRACT_VERSION:
+            raise ValueError("ResearchScope contract_version must match the bounded V0.15.2 contract")
+        object.__setattr__(
+            self,
+            "requested_outcomes",
+            tuple(sorted(self.requested_outcomes, key=lambda item: item.value)),
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "independent_variable": self.independent_variable.value,
+            "requested_outcomes": [item.value for item in self.requested_outcomes],
+            "outcome_aggregation": self.outcome_aggregation.value,
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        independent_variable: DesignVariable | str,
+        requested_outcomes: list[DesignOutcome | str],
+        outcome_aggregation: ResearchScopeOutcomeAggregation | str,
+        contract_version: str = RESEARCH_SCOPE_CONTRACT_VERSION,
+    ) -> "ResearchScope":
+        return cls(
+            independent_variable=(
+                independent_variable
+                if isinstance(independent_variable, DesignVariable)
+                else DesignVariable(independent_variable)
+            ),
+            requested_outcomes=tuple(
+                item if isinstance(item, DesignOutcome) else DesignOutcome(item)
+                for item in requested_outcomes
+            ),
+            outcome_aggregation=(
+                outcome_aggregation
+                if isinstance(outcome_aggregation, ResearchScopeOutcomeAggregation)
+                else ResearchScopeOutcomeAggregation(outcome_aggregation)
+            ),
+            contract_version=contract_version,
+        )
+
+
 # ─── ResearchBrief ────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +137,7 @@ class ResearchBrief:
     instrument_focus: tuple[str, ...] | None = None
     methodological_constraints: tuple[str, ...] | None = None
     exclusions: tuple[str, ...] | None = None
+    research_scope: ResearchScope | None = None
     prior_candidate_fingerprints: tuple[str, ...] | None = None
     prior_candidate_summaries: tuple[PriorCandidateSummary, ...] | None = None
     source: str = "manual"
@@ -97,6 +173,7 @@ class ResearchBrief:
         instrument_focus: list[str] | None = None,
         methodological_constraints: list[str] | None = None,
         exclusions: list[str] | None = None,
+        research_scope: ResearchScope | dict[str, object] | None = None,
         prior_candidate_fingerprints: list[str] | None = None,
         prior_candidate_summaries: list[PriorCandidateSummary | dict[str, str | None]] | None = None,
         source: str = "manual",
@@ -107,6 +184,13 @@ class ResearchBrief:
                 s if isinstance(s, PriorCandidateSummary) else PriorCandidateSummary(**s)
                 for s in prior_candidate_summaries
             )
+        scope = None
+        if research_scope is not None:
+            scope = (
+                research_scope
+                if isinstance(research_scope, ResearchScope)
+                else ResearchScope.create(**research_scope)
+            )
         return cls(
             id=new_id(),
             research_question=research_question,
@@ -114,6 +198,7 @@ class ResearchBrief:
             instrument_focus=tuple(instrument_focus) if instrument_focus else None,
             methodological_constraints=tuple(methodological_constraints) if methodological_constraints else None,
             exclusions=tuple(exclusions) if exclusions else None,
+            research_scope=scope,
             prior_candidate_fingerprints=tuple(prior_candidate_fingerprints) if prior_candidate_fingerprints else None,
             prior_candidate_summaries=summaries,
             source=source,

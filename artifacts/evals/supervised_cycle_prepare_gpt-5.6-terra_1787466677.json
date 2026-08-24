@@ -1,0 +1,195 @@
+{
+  "timestamp": 1787466677,
+  "mode": "prepare",
+  "models": {
+    "hypothesis_scientist": "gpt-5.6-terra",
+    "research_designer": "gpt-5.6-terra"
+  },
+  "prompt_versions": {
+    "hypothesis_scientist": "v4",
+    "research_designer": "v3"
+  },
+  "brief": {
+    "id": "05d931a8-4b2e-4e92-9bf6-ed7d62b942bd",
+    "research_question": "For this bounded synthetic smoke test, does making a signal threshold stricter change trade frequency and risk-adjusted performance for the same synthetic strategy logic when a synthetic-parametric dataset is treated as the prerequisite input?",
+    "asset_class_focus": "SYNTHETIC",
+    "instrument_focus": null,
+    "methodological_constraints": [
+      "Treat the synthetic-parametric dataset as the prerequisite input for this smoke test.",
+      "Do not require a separate synthetic-data-generation tool for this bounded fixture.",
+      "Do not require particular primitive synthetic data fields at candidate-feasibility time.",
+      "Leave required_fields unset unless a primitive input field is strictly unavoidable for broad feasibility.",
+      "Do not assert required_parameters for this smoke test.",
+      "Use deterministic backtest execution outputs and the downstream deterministic contrast calculation as the measurement path.",
+      "Do not require a separate statistical-analysis tool for this bounded fixture.",
+      "Do not invent any tool prerequisite other than BACKTEST_EXECUTION.",
+      "Do not assume real market data or live trading capabilities.",
+      "Focus on a single falsifiable hypothesis that can be expressed as a parameter-sensitivity design without exact execution values."
+    ],
+    "exclusions": [
+      "Do not propose exact execution parameter values.",
+      "Do not mention capability IDs.",
+      "Do not assume autonomous execution approval."
+    ],
+    "source": "live_supervised_cycle_v1"
+  },
+  "hypothesis_scientist_invocation_id": "1ff88231-9b30-42c3-a620-e751731dad1d",
+  "hypothesis_decision": {
+    "claim_aggregation": "ALL_CLAIMS_REQUIRED",
+    "claim_contract_version": "hypothesis_claim_set_v1",
+    "claim_ontology_fingerprint": "23f6c4019ea3ffebc56a3486c19d4da0b733c4c08c7d8b4d18769945a26afcd3",
+    "claim_ontology_version": "hypothesis_claim_ontology_v1",
+    "decision_type": "PROPOSE_HYPOTHESIS",
+    "hypothesis_rationale": "A stricter threshold admits only observations with stronger modeled signals, which should reduce participation frequency while concentrating trades in higher expected-quality opportunities; if the synthetic signal-quality relationship is sufficiently monotonic, this concentration should improve both aggregate profitability and risk-adjusted performance.",
+    "hypothesis_statement": "For the same strategy logic applied to the synthetic-parametric input dataset, increasing the signal threshold will decrease trade count while increasing net PnL and Sharpe.",
+    "independent_variable": "signal_threshold",
+    "independent_variable_direction": "INCREASE",
+    "no_hypothesis_reason": null,
+    "ontology_fingerprint": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "ontology_version": "requirement_ontology_v2",
+    "outcome_claims": [
+      {
+        "expected_direction": "INCREASE",
+        "outcome": "net_pnl"
+      },
+      {
+        "expected_direction": "INCREASE",
+        "outcome": "sharpe"
+      },
+      {
+        "expected_direction": "DECREASE",
+        "outcome": "trade_count"
+      }
+    ],
+    "requirements_snapshot": "[{\"asset_class\":\"SYNTHETIC\",\"data_kind\":\"SYNTHETIC_PARAMETRIC\",\"end_date\":null,\"instruments\":null,\"label\":\"\",\"point_in_time_required\":false,\"required_fields\":null,\"required_parameters\":null,\"requirement_id\":\"synthetic_parametric_input\",\"resolution\":\"N/A\",\"start_date\":null,\"type\":\"DataRequirement\"},{\"label\":\"Deterministic backtest execution for the synthetic smoke test\",\"requirement_id\":\"deterministic_backtest_execution\",\"tool_kind\":\"BACKTEST_EXECUTION\",\"type\":\"ToolRequirement\"}]"
+  },
+  "candidate_id": "c23dfb4e-0d08-433d-a6bf-f29a7c562655",
+  "hypothesis_claim_set_id": "bae6bca3-34d7-4e91-aa41-10e1dccc0bc6",
+  "canonical_structured_scientific_claims": {
+    "id": "bae6bca3-34d7-4e91-aa41-10e1dccc0bc6",
+    "independent_variable": "signal_threshold",
+    "independent_variable_direction": "INCREASE",
+    "claim_aggregation": "ALL_CLAIMS_REQUIRED",
+    "claim_contract_version": "hypothesis_claim_set_v1",
+    "ontology_version": "hypothesis_claim_ontology_v1",
+    "ontology_fingerprint": "23f6c4019ea3ffebc56a3486c19d4da0b733c4c08c7d8b4d18769945a26afcd3",
+    "claims": [
+      {
+        "outcome": "net_pnl",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "sharpe",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE"
+      }
+    ]
+  },
+  "candidate_feasibility_decision": {
+    "id": "c8c0315d-6970-4996-9ea8-0a97c874e798",
+    "status": "READY_FOR_SPEC",
+    "registry_version": "capability_registry_v1",
+    "registry_fingerprint": "be41e1bf7e9b4b84fb4e8353631da67486ee5b7f84f6fa43eeb52aa3dd754a53",
+    "satisfied_ids": [
+      "synthetic_parametric_input",
+      "deterministic_backtest_execution"
+    ],
+    "unsatisfied_ids": [],
+    "reason_codes": []
+  },
+  "research_designer_invocation_id": "2184da60-6be0-43ec-a7af-ddfb9ac16758",
+  "designer_decision": {
+    "analysis_intent": "SENSITIVITY_ANALYSIS",
+    "comparison_intent": "CONTRAST_PARAMETER_LEVELS",
+    "controls": [
+      "lookback"
+    ],
+    "decision_type": "DESIGN",
+    "dependent_outcomes": [
+      "net_pnl",
+      "sharpe",
+      "trade_count"
+    ],
+    "design_kind": "PARAMETER_SENSITIVITY",
+    "falsification_condition": "The hypothesis is falsified if increasing the signal threshold does not produce the jointly claimed pattern of decreased trade count and increased net PnL and Sharpe under the fixed lookback context.",
+    "independent_variables": [
+      "signal_threshold"
+    ],
+    "model": "gpt-5.6-terra",
+    "no_valid_design_reason": null,
+    "ontology_fingerprint": "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183",
+    "ontology_version": "research_design_ontology_v3",
+    "predictions": null,
+    "prompt_version": "v3",
+    "provider": "openai",
+    "rationale": "A parameter-sensitivity comparison of signal-threshold levels, while holding lookback fixed, fully covers all authoritative outcomes and permits assessment of the complete claimed response pattern."
+  },
+  "ontology_versions": {
+    "hypothesis_scientist": "requirement_ontology_v2",
+    "research_designer": "research_design_ontology_v3"
+  },
+  "ontology_fingerprints": {
+    "hypothesis_scientist": "832885f4763e40b8a379c8c9c475484651b0a0f1c7fb01305d3d37fe4172c917",
+    "research_designer": "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183"
+  },
+  "research_design_intent_id": "e929e422-0d95-4bf6-aad7-da1b8e04996f",
+  "research_prediction_plan_id": "87035142-13dc-45a2-8655-dc78204d5b7b",
+  "prediction_contract_version": "research_prediction_plan_v1",
+  "structured_predictions": {
+    "id": "87035142-13dc-45a2-8655-dc78204d5b7b",
+    "hypothesis_claim_set_id": "bae6bca3-34d7-4e91-aa41-10e1dccc0bc6",
+    "independent_variable": "signal_threshold",
+    "prediction_contract_version": "research_prediction_plan_v1",
+    "ontology_version": "research_design_ontology_v3",
+    "ontology_fingerprint": "792528b090a549609e03484afdee4ea661ae247e9affe9416e62aae1f7b99183",
+    "prediction_aggregation_rule": "ALL_PREDICTIONS_REQUIRED",
+    "predictions": [
+      {
+        "outcome": "net_pnl",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "sharpe",
+        "expected_direction": "INCREASE"
+      },
+      {
+        "outcome": "trade_count",
+        "expected_direction": "DECREASE"
+      }
+    ]
+  },
+  "initial_experiment_plan_id": "cba51f64-b3ce-4c18-9193-7d725d879c22",
+  "materialization_proposal_id": "2cea1a89-afa5-4ace-abca-3dbda86ded82",
+  "exact_materialized_conditions": [
+    {
+      "condition_id": "40bfad56-9a89-421a-875c-5046e094f0d7",
+      "ordinal": 1,
+      "role": "BASELINE",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.0
+      }
+    },
+    {
+      "condition_id": "c4b6092c-496f-4501-8162-259bcb279d4f",
+      "ordinal": 2,
+      "role": "COMPARATOR",
+      "selected_capability_id": "stub_backtester_v1",
+      "exact_parameters": {
+        "lookback": 20,
+        "signal_threshold": 2.5
+      }
+    }
+  ],
+  "preparation_outcome": "AWAITING_HUMAN_ACCEPTANCE",
+  "preparation_message": "Preparation completed. Explicit human acceptance is required before execution.",
+  "human_acceptance_occurred": false,
+  "execution_outcome": null,
+  "execution_message": null,
+  "execution_records": [],
+  "contrast_result": null
+}

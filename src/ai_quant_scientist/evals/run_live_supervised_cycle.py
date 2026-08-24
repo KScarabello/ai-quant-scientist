@@ -17,7 +17,12 @@ from typing import Any, List
 
 from ai_quant_scientist.capabilities import build_v1_registry
 from ai_quant_scientist.models.design import InitialExperimentPlanProposalStatus
-from ai_quant_scientist.models.hypothesis_scientist import ResearchBrief
+from ai_quant_scientist.models.design import DesignOutcome, DesignVariable
+from ai_quant_scientist.models.hypothesis_scientist import (
+    ResearchBrief,
+    ResearchScope,
+    ResearchScopeOutcomeAggregation,
+)
 from ai_quant_scientist.services.openai_hypothesis_scientist import OpenAIHypothesisScientist
 from ai_quant_scientist.services.openai_research_designer import OpenAIResearchDesigner
 from ai_quant_scientist.services.supervised_research_cycle import (
@@ -43,7 +48,7 @@ def _json_safe(obj: Any):
 class _UnusedScientist:
     provider = "unused"
     model = "unused"
-    prompt_version = "v4"
+    prompt_version = "v5"
 
     def generate(self, brief):
         raise AssertionError("Acceptance/execution mode must not invoke Hypothesis Scientist")
@@ -84,6 +89,11 @@ def build_supported_supervised_cycle_brief() -> ResearchBrief:
             "Do not mention capability IDs.",
             "Do not assume autonomous execution approval.",
         ],
+        research_scope=ResearchScope.create(
+            independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+            requested_outcomes=[DesignOutcome.TRADE_COUNT, DesignOutcome.SHARPE],
+            outcome_aggregation=ResearchScopeOutcomeAggregation.ALL_OUTCOMES_REQUIRED,
+        ),
         source="live_supervised_cycle_v1",
     )
 
@@ -125,7 +135,7 @@ def _run_preparation(
 ) -> str:
     store = SQLiteStore(db_path)
     registry = build_v1_registry()
-    scientist = OpenAIHypothesisScientist(model=model, prompt_version="v4")
+    scientist = OpenAIHypothesisScientist(model=model, prompt_version="v5")
     designer = OpenAIResearchDesigner(model=model, prompt_version="v3")
     cycle = SupervisedResearchCycle(
         store=store,
@@ -256,8 +266,12 @@ def _build_preparation_artifact(
                 "instrument_focus": brief.instrument_focus,
                 "methodological_constraints": brief.methodological_constraints,
                 "exclusions": brief.exclusions,
+                "research_scope": None if brief.research_scope is None else brief.research_scope.to_payload(),
                 "source": brief.source,
             }
+        ),
+        "canonical_research_scope": (
+            None if brief.research_scope is None else brief.research_scope.to_payload()
         ),
         "hypothesis_scientist_invocation_id": hypothesis_invocation.id,
         "hypothesis_decision": _parsed_json_object(hypothesis_invocation.parsed_decision_json),
@@ -305,6 +319,7 @@ def _build_preparation_artifact(
         "execution_message": None,
         "execution_records": [],
         "contrast_result": None,
+        "scientific_verdict": None,
     }
 
 

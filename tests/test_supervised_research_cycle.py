@@ -35,6 +35,8 @@ from ai_quant_scientist.models.hypothesis_scientist import (
     HypothesisScientistDecisionType,
     HypothesisScientistInvocation,
     ResearchBrief,
+    ResearchScope,
+    ResearchScopeOutcomeAggregation,
 )
 from ai_quant_scientist.models.research import new_id
 from ai_quant_scientist.capabilities.models import (
@@ -88,6 +90,14 @@ def _store(tmp_path) -> SQLiteStore:
 
 def _registry() -> CapabilityRegistry:
     return build_v1_registry()
+
+
+def _scope(*outcomes: DesignOutcome) -> ResearchScope:
+    return ResearchScope.create(
+        independent_variable=DesignVariable.SIGNAL_THRESHOLD,
+        requested_outcomes=outcomes or (DesignOutcome.TRADE_COUNT, DesignOutcome.SHARPE),
+        outcome_aggregation=ResearchScopeOutcomeAggregation.ALL_OUTCOMES_REQUIRED,
+    )
 
 
 class _CountingScientist(FakeHypothesisScientist):
@@ -300,6 +310,7 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
 
     assert preparation.status == SupervisedResearchCyclePreparationStatus.AWAITING_HUMAN_ACCEPTANCE
     assert preparation.candidate_id is not None
+    assert preparation.hypothesis_claim_set_id is not None
     assert preparation.candidate_feasibility_decision_id is not None
     assert preparation.research_design_intent_id is not None
     assert preparation.research_prediction_plan_id is not None
@@ -309,12 +320,14 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
     assert designer.called == 1
 
     candidate = store.get_research_candidate(preparation.candidate_id)
+    claim_set = store.get_hypothesis_claim_set(preparation.hypothesis_claim_set_id)
     feasibility = store.get_feasibility_decision(preparation.candidate_feasibility_decision_id)
     intents = store.list_research_design_intents(preparation.candidate_id)
     plan = store.get_initial_experiment_plan(preparation.initial_experiment_plan_id)
     proposal = store.get_initial_experiment_plan_proposal(preparation.materialization_proposal_id)
     prediction_plan = store.get_research_prediction_plan(preparation.research_prediction_plan_id)
     assert candidate is not None
+    assert claim_set is not None
     assert feasibility is not None
     assert plan is not None
     assert proposal is not None
@@ -326,6 +339,14 @@ def test_supervised_cycle_end_to_end_prepares_accepts_executes_and_persists(tmp_
     assert plan.research_prediction_plan_id == preparation.research_prediction_plan_id
     assert proposal.design_intent_id == preparation.research_design_intent_id
     assert prediction_plan.design_intent_id == preparation.research_design_intent_id
+    assert brief.research_scope is not None
+    assert {item.value for item in brief.research_scope.requested_outcomes} == {"trade_count", "sharpe"}
+    assert {item.outcome.value for item in claim_set.claims} == {"trade_count", "sharpe"}
+    assert {item.value for item in intents[0].dependent_outcomes} == {"trade_count", "sharpe"}
+    assert {item.outcome.value for item in prediction_plan.predictions} == {"trade_count", "sharpe"}
+    assert brief.research_scope.independent_variable == claim_set.independent_variable
+    assert claim_set.independent_variable in intents[0].independent_variables
+    assert prediction_plan.independent_variable == claim_set.independent_variable
     assert len(plan.ordered_conditions) == 2
     baseline, comparator = plan.ordered_conditions
     assert baseline.ordinal == 1
@@ -378,7 +399,10 @@ def test_no_hypothesis_stops_before_intake_and_design(tmp_path):
         scientist=scientist,
         designer=designer,
     )
-    brief = ResearchBrief.create(research_question="General explore the space in an underspecified way.")
+    brief = ResearchBrief.create(
+        research_question="General explore the space in an underspecified way.",
+        research_scope=_scope(),
+    )
 
     result = cycle.prepare(brief)
 
@@ -406,6 +430,7 @@ def test_blocked_capability_stops_before_design(tmp_path):
         research_question="Does MES order-book imbalance predict one-second futures returns?",
         asset_class_focus="FUTURES",
         instrument_focus=["MES"],
+        research_scope=_scope(DesignOutcome.TRADE_COUNT),
     )
 
     result = cycle.prepare(brief)
@@ -735,6 +760,9 @@ def test_supervised_cycle_integration_preserves_prompt_and_ontology_hashes():
     assert hashlib.sha256(get_scientist_instructions("v4").encode("utf-8")).hexdigest() == (
         "71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef"
     )
+    assert hashlib.sha256(get_scientist_instructions("v5").encode("utf-8")).hexdigest() == (
+        "568a07e7467df49401e97120735d0ed650458d0ececb4a8b5cdd33c2e694d3dd"
+    )
     assert hashlib.sha256(get_research_designer_instructions("v1").encode("utf-8")).hexdigest() == (
         "8744692f166fdb6058a4597abb6bcbad17489817efc1879c3506643e1d922fac"
     )
@@ -771,6 +799,9 @@ def test_supported_live_fixture_constrains_v1_prerequisite_path():
     assert "2.5" not in text
     assert "20" not in text
     assert "stub_backtester_v1" not in text
+    assert brief.research_scope is not None
+    assert brief.research_scope.independent_variable == DesignVariable.SIGNAL_THRESHOLD
+    assert [item.value for item in brief.research_scope.requested_outcomes] == ["sharpe", "trade_count"]
 
 
 def test_supported_fake_candidate_keeps_candidate_feasibility_broad(tmp_path):
@@ -820,12 +851,14 @@ def test_live_runner_preparation_mode_creates_one_plan_and_zero_conditions(tmp_p
 
     payload = json.loads(open(out, "r", encoding="utf-8").read())
     assert payload["mode"] == "prepare"
+    assert payload["canonical_research_scope"]["requested_outcomes"] == ["sharpe", "trade_count"]
     assert payload["preparation_outcome"] == SupervisedResearchCyclePreparationStatus.AWAITING_HUMAN_ACCEPTANCE.value
     assert payload["research_prediction_plan_id"] is not None
     assert payload["structured_predictions"] is not None
     assert payload["materialization_proposal_id"] is not None
     assert scientist.called == 1
     assert designer.called == 1
+    assert payload["scientific_verdict"] is None
     with store.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM research_candidates").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM research_design_intents").fetchone()[0] == 1
@@ -1138,6 +1171,7 @@ def test_preparation_artifact_reconstruction_uses_exact_invocation_ids_not_lates
 
     assert artifact["hypothesis_scientist_invocation_id"] == original_hypothesis.id
     assert artifact["research_designer_invocation_id"] == original_designer.id
+    assert artifact["canonical_research_scope"]["requested_outcomes"] == ["sharpe", "trade_count"]
     assert artifact["hypothesis_decision"]["decision_type"] == "PROPOSE_HYPOTHESIS"
     assert artifact["designer_decision"]["decision_type"] == "DESIGN"
     assert artifact["research_prediction_plan_id"] == preparation.research_prediction_plan_id
