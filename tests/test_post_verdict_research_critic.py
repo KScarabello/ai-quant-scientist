@@ -737,7 +737,7 @@ def test_post_verdict_critic_prompt_hash_is_stable():
     )
 
 
-def test_v11_to_v12_migration_adds_post_verdict_tables_without_fabrication(tmp_path):
+def test_v11_to_v13_migration_adds_post_verdict_and_continuation_tables_without_fabrication(tmp_path):
     db = Path(tmp_path) / "v11.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -797,10 +797,16 @@ def test_v11_to_v12_migration_adds_post_verdict_tables_without_fabrication(tmp_p
 
     store = SQLiteStore(db)
     with store.connect() as conn2:
-        assert conn2.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 12
+        assert conn2.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 13
         tables = [row[0] for row in conn2.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         assert "post_verdict_critic_invocations" in tables
         assert "post_verdict_research_intents" in tables
+        assert "research_continuation_authorizations" in tables
+        assert "research_continuation_invocations" in tables
+        assert "adaptive_hypothesis_lineages" in tables
         assert conn2.execute("SELECT COUNT(*) FROM post_verdict_critic_invocations").fetchone()[0] == 0
         assert conn2.execute("SELECT COUNT(*) FROM post_verdict_research_intents").fetchone()[0] == 0
+        assert conn2.execute("SELECT COUNT(*) FROM research_continuation_authorizations").fetchone()[0] == 0
+        assert conn2.execute("SELECT COUNT(*) FROM research_continuation_invocations").fetchone()[0] == 0
+        assert conn2.execute("SELECT COUNT(*) FROM adaptive_hypothesis_lineages").fetchone()[0] == 0
         assert conn2.execute("SELECT id FROM scientific_verdicts WHERE id = 'verdict-1'").fetchone()[0] == "verdict-1"

@@ -1411,7 +1411,7 @@ def test_live_runner_requires_allow_live_api():
         )
 
 
-def test_v8_to_v12_migration_adds_research_designer_invocations_and_preserves_v15_1_tables(tmp_path):
+def test_v8_to_v13_migration_adds_research_designer_invocations_and_continuation_tables(tmp_path):
     db = Path(tmp_path) / "v8.sqlite"
     conn = sqlite3.connect(db)
     conn.executescript(
@@ -1453,7 +1453,7 @@ def test_v8_to_v12_migration_adds_research_designer_invocations_and_preserves_v1
     store = SQLiteStore(db)
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert version == 12
+        assert version == 13
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
@@ -1468,9 +1468,12 @@ def test_v8_to_v12_migration_adds_research_designer_invocations_and_preserves_v1
         assert "scientific_verdicts" in tables
         assert "post_verdict_critic_invocations" in tables
         assert "post_verdict_research_intents" in tables
+        assert "research_continuation_authorizations" in tables
+        assert "research_continuation_invocations" in tables
+        assert "adaptive_hypothesis_lineages" in tables
 
 
-def test_fresh_v12_db_has_research_designer_and_prediction_tables(tmp_path):
+def test_fresh_v13_db_has_research_designer_prediction_and_continuation_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as connection:
         version = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
@@ -1480,12 +1483,15 @@ def test_fresh_v12_db_has_research_designer_and_prediction_tables(tmp_path):
         intent_columns = [
             row[1] for row in connection.execute("PRAGMA table_info(research_design_intents)").fetchall()
         ]
-    assert version == 12
+    assert version == 13
     assert "research_designer_invocations" in tables
     assert "hypothesis_claim_sets" in tables
     assert "research_prediction_plans" in tables
     assert "scientific_verdicts" in tables
     assert "post_verdict_critic_invocations" in tables
     assert "post_verdict_research_intents" in tables
+    assert "research_continuation_authorizations" in tables
+    assert "research_continuation_invocations" in tables
+    assert "adaptive_hypothesis_lineages" in tables
     assert "ontology_version" in intent_columns
     assert "ontology_fingerprint" in intent_columns

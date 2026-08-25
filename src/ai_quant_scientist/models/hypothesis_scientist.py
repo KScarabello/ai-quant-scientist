@@ -1,6 +1,8 @@
 """Domain models for the bounded Hypothesis Scientist."""
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -330,3 +332,46 @@ class HypothesisClaimSet:
             "claims",
             tuple(sorted(self.claims, key=lambda item: item.outcome.value)),
         )
+
+
+def hypothesis_claim_signature_payload(
+    *,
+    independent_variable: DesignVariable,
+    independent_variable_direction: ExpectedDirection,
+    claims: tuple[OutcomePrediction, ...],
+    claim_aggregation: HypothesisClaimAggregation,
+) -> dict[str, object]:
+    ordered_claims = tuple(sorted(claims, key=lambda item: item.outcome.value))
+    return {
+        "independent_variable": independent_variable.value,
+        "independent_variable_direction": independent_variable_direction.value,
+        "claims": [
+            {
+                "outcome": item.outcome.value,
+                "expected_direction": item.expected_direction.value,
+            }
+            for item in ordered_claims
+        ],
+        "claim_aggregation": claim_aggregation.value,
+    }
+
+
+def compute_hypothesis_claim_signature(
+    *,
+    independent_variable: DesignVariable,
+    independent_variable_direction: ExpectedDirection,
+    claims: tuple[OutcomePrediction, ...],
+    claim_aggregation: HypothesisClaimAggregation,
+) -> str:
+    canon = json.dumps(
+        hypothesis_claim_signature_payload(
+            independent_variable=independent_variable,
+            independent_variable_direction=independent_variable_direction,
+            claims=claims,
+            claim_aggregation=claim_aggregation,
+        ),
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()

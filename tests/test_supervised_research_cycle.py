@@ -1214,10 +1214,10 @@ def test_acceptance_artifact_reloads_persisted_state_and_reports_exact_records(t
     assert artifact["scientific_verdict"] is not None
 
 
-def test_schema_remains_v12(tmp_path):
+def test_schema_remains_v13(tmp_path):
     store = _store(tmp_path)
     with store.connect() as conn:
-        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 12
+        assert conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0] == 13
 
 
 def test_registry_truth_remains_unchanged():

@@ -502,13 +502,13 @@ def test_fresh_v5_db_has_all_tables(tmp_path):
         assert t in tables
 
 
-def test_v5_migration_idempotent(tmp_path):
+def test_v13_migration_idempotent(tmp_path):
     # Fresh DBs initialize directly to the current schema version.
     store1 = SQLiteStore(tmp_path / "t.db")
     store2 = SQLiteStore(tmp_path / "t.db")
     with store2.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 12
+        assert ver == 13
 
 
 # ─── no network calls ─────────────────────────────────────────────────────────

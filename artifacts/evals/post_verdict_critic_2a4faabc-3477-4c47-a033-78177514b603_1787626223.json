@@ -1,0 +1,44 @@
+{
+  "critic_invocation_id": "726dd54f-f3ae-4d61-9a38-374c694c7156",
+  "critic_prompt_hash": "7c7d4f32853ff2e8425fb63e4b786be73c42b9badd4ab39eee75c696c2d0b8e0",
+  "critic_prompt_version": "post_verdict_research_critic_v1",
+  "decision": "CONTINUE",
+  "diagnosis": "The deterministic contrast falsified both required claims: Sharpe declined as the threshold increased, while trade count did not change. This pattern is consistent with the proposed selection mechanism not operating as assumed in the tested comparison: the threshold change may not have altered executed trades, and/or the observations excluded by the stricter setting may have contributed positively to risk-adjusted performance. These are plausible explanations, not replacements for the authoritative verdict.",
+  "frozen_hypothesis_claims": [
+    {
+      "expected_direction": "INCREASE",
+      "outcome": "sharpe"
+    },
+    {
+      "expected_direction": "DECREASE",
+      "outcome": "trade_count"
+    }
+  ],
+  "mode": "post_verdict_critic",
+  "next_step_rationale": "A scope-preserving mechanism-focused follow-up may be warranted to determine whether the observed lack of trading-frequency response and adverse Sharpe response reflect a locally insensitive strategy response or a failure of the assumed signal-selection mechanism. Such reasoning remains confined to the existing signal-threshold independent variable and the existing Sharpe and trade-count outcomes, without asserting a new directional hypothesis or specifying an executable design.",
+  "no_downstream_action_occurred": {
+    "hypothesis_scientist_invoked": false,
+    "initial_experiment_executor_invoked": false,
+    "lifecycle_transition_invoked": false,
+    "research_designer_invoked": false,
+    "result_evaluator_invoked": false,
+    "revision_planner_invoked": false,
+    "scientific_verdict_evaluator_invoked": false,
+    "spec_materializer_invoked": false
+  },
+  "post_verdict_research_intent_id": "41fa6e89-be44-4fe0-bdbe-fe0f7cb0ac7e",
+  "prior_overall_verdict": "FALSIFIED",
+  "research_scope": {
+    "contract_version": "research_scope_v1",
+    "independent_variable": "signal_threshold",
+    "outcome_aggregation": "ALL_OUTCOMES_REQUIRED",
+    "requested_outcomes": [
+      "sharpe",
+      "trade_count"
+    ]
+  },
+  "reused_existing_authoritative_intent": false,
+  "revision_kind": "MECHANISM_REVISION",
+  "scientific_verdict_id": "2a4faabc-3477-4c47-a033-78177514b603",
+  "timestamp": 1787626223
+}

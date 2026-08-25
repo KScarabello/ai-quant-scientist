@@ -3,10 +3,10 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.16` implementation changes verified on `2026-08-25` Arizona project-local time
-- Schema version: `v12`
+- Working tree status: contains uncommitted `V0.17` implementation changes verified on `2026-08-25` Arizona project-local time
+- Schema version: `v13`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `591 passed`
+- Verified test count: `615 passed`
 - Date: `2026-08-25` (Arizona project-local verification date)
 
 Primary evidence:
@@ -88,6 +88,16 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/models/post_verdict_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `tests/test_post_verdict_research_critic.py`
 - Post-verdict Critic may not author the next hypothesis, broaden `ResearchScope`, choose exact values, or trigger downstream Scientist/Designer/materialization/execution/lifecycle services.
   Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic_prompts.py`, `tests/test_post_verdict_research_critic.py`
+- Governed adaptive continuation is now a separate V0.17 boundary: an exact `PostVerdictResearchIntent` may create one pending `ResearchContinuationAuthorization`, requires explicit authorization before any provider call, and permits exactly one adaptive Hypothesis Scientist `v6` attempt.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/services/research_continuation.py`, `tests/test_research_continuation.py`
+- Adaptive continuation preserves the exact caller-owned `ResearchScope`, carries explicit `POST_VERDICT_ADAPTIVE` / generation-2 lineage, and remains transparently non-independent of prior evidence.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `tests/test_research_continuation.py`
+- Continuation Scientist context is bounded minimum lineage only: exact frozen scope, parent `HypothesisClaimSet`, parent verdict status, Critic diagnosis/rationale, authorization metadata. Raw contrast payloads, exact `2.0` / `2.5` / `20` experiment values, and capability IDs are excluded.
+  Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `tests/test_research_continuation.py`
+- Continuation attempt budgeting is now storage-backed and fail-closed: reservation occurs before provider invocation, authorization becomes consumed on the first attempt, failed/no-hypothesis outcomes persist, and retries make zero provider calls.
+  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `src/ai_quant_scientist/services/research_continuation.py`, `tests/test_research_continuation.py`
+- V0.17 success persists only new adaptive `ResearchCandidate` / `HypothesisClaimSet` authority plus explicit lineage; it does not create a new design, prediction plan, experiment plan, contrast result, scientific verdict, or lifecycle transition.
+  Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_research_continuation.py`
 - Historical `V0.14` plans and contrast results remain readable but never receive fabricated retrospective `V0.15` prediction plans or scientific verdicts.
   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `tests/test_scientific_verdict.py`
 - `SupervisedResearchCycle` now connects the existing scientist, feasibility, design, materialization, acceptance, and execution components into one governed supervised workflow without adding autonomous authority.
@@ -146,6 +156,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_hypothesis_scientist.py`, `tests/test_supervised_research_cycle.py`
 - `V0.16`: one bounded post-verdict Critic invocation, immutable `PostVerdictResearchIntent`, guarded live diagnostic runner, and schema `v12`.
   Evidence: `src/ai_quant_scientist/models/post_verdict_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/services/openai_post_verdict_research_critic.py`, `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_post_verdict_research_critic.py`
+- `V0.17`: governed adaptive hypothesis continuation with explicit continuation authorization, Hypothesis Scientist Prompt `v6`, bounded continuation context, deterministic novelty/scope validation, adaptive lineage persistence, guarded live continuation runner, and schema `v13`.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/services/openai_research_continuation.py`, `src/ai_quant_scientist/evals/run_live_research_continuation.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_research_continuation.py`
 
 ## Current AI Components
 
@@ -164,9 +176,9 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/evals/critic_eval.py`, `tests/test_context_plumbing.py`
 
 ### Hypothesis Scientist
-- Prompt history now has immutable `v1`, preserved hardened `v2`, preserved boundary-cleanup `v3`, preserved canonical-claim `v4`, and current scope-fidelity `v5`; default adapter prompt is `v5`.
+- Prompt history now has immutable `v1`, preserved hardened `v2`, preserved boundary-cleanup `v3`, preserved canonical-claim `v4`, current supervised-path scope-fidelity `v5`, and new adaptive-continuation `v6`; the ordinary ResearchBrief adapter default remains `v5`.
   Evidence: `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`
-- Frozen Prompt `v4` hash remains `71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef`; Prompt `v5` hash is `568a07e7467df49401e97120735d0ed650458d0ececb4a8b5cdd33c2e694d3dd`.
+- Frozen Prompt `v4` hash remains `71f7e593b93ec6568f123209e9183483c6e19e7affbc3824f507dfdf992861ef`; Prompt `v5` hash remains `568a07e7467df49401e97120735d0ed650458d0ececb4a8b5cdd33c2e694d3dd`; adaptive continuation Prompt `v6` hash is `3633a0407bb66b1b1229de01bd297b31bb547b4466766fdbdc0fde34652259d1`.
   Evidence: `tests/test_hypothesis_scientist.py`, `tests/test_supervised_research_cycle.py`
 - Authority boundary remains exactly one bounded hypothesis or `NO_HYPOTHESIS`; no feasibility claims, no `ResearchSpec`, no research execution.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`
@@ -184,12 +196,24 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/registry.py`
 - Authoritative candidate persistence is now atomic for the current scoped path: invocation, candidate, and claim set either persist together or fail together, and any scope-fidelity violation leaves candidate/claim persistence empty.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_hypothesis_scientist.py`
-- Invocation persistence now lives inside overall schema `v12`.
+- Invocation persistence now lives inside overall schema `v13`.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Eval harness remains `12` cases in `evals/scientist_v1.json`.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `evals/scientist_v1.json`
 - Observability now includes exact requirement objects, canonical `tool_kind`, ontology provenance, prompt provenance, and human-only eval metadata separation; historical/manual `required_parameters` remain observable when present.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `tests/test_hypothesis_scientist.py`
+
+### Adaptive Continuation
+- V0.17 continuation is explicitly adaptive rather than independent discovery: it starts from frozen `ScientificVerdict` plus bounded Critic intent, preserves the exact `ResearchScope`, and may produce exactly one new generation-2 hypothesis or `NO_HYPOTHESIS`.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/services/research_continuation.py`
+- `ResearchContinuationAuthorization` is first-class immutable governed state with `PENDING`, `AUTHORIZED`, and `CONSUMED` semantics.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- Novelty is enforced deterministically for `MECHANISM_REVISION` by canonical claim signature only; prose wording alone cannot satisfy continuation novelty.
+  Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/research_continuation.py`, `tests/test_research_continuation.py`
+- Successful continuation persists `AdaptiveHypothesisLineage` linking child candidate / claim set to continuation authorization, parent verdict, parent claim set, parent candidate, and frozen `ResearchScope`.
+  Evidence: `src/ai_quant_scientist/models/research_continuation.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
+- V0.17 intentionally stops before Research Designer / materialization. It does not yet solve whether a same-scope adaptive hypothesis maps to a scientifically novel experiment under the current stub materializer.
+  Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/services/spec_materialization.py`
 
 ### Research Designer
 - Research Designer V3 is now the current supervised-cycle path: immutable Prompt `v3`, deterministic ontology `research_design_ontology_v3`, strict complete-coverage output contract, and append-only invocation persistence.
@@ -248,8 +272,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `tests/test_scientific_verdict.py`
 - SQLite schema/persistence: runs, specs, evaluations, critic invocations, candidates, feasibility decisions, scientist invocations, designer invocations, design intents, research prediction plans, historical single-spec materialization records, initial experiment plans, ordered conditions, condition executions, deterministic contrast results, and scientific verdicts.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
-- SQLite now also persists post-verdict Critic invocations and immutable post-verdict research intents.
-  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_post_verdict_research_critic.py`
+- SQLite now also persists post-verdict Critic invocations, immutable post-verdict research intents, continuation authorizations, continuation invocation attempts, and adaptive hypothesis lineages.
+  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_post_verdict_research_critic.py`, `tests/test_research_continuation.py`
 
 ## Current Production Capabilities
 - Production registry truth is still intentionally sparse.
@@ -310,8 +334,12 @@ Evidence:
   Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787605203.json`, `artifacts/evals/supervised_cycle_execute_2dd81ec3-1ce3-40b4-9857-082e54a85e9e_1787605287.json`
 - That live `V0.15.2` deterministic verdict is `FALSIFIED`: `trade_count` observed `4 -> 4` (`NO_CHANGE`, `FAIL`) and `sharpe` observed `1.0 -> 0.75` (`DECREASE`, `FAIL`).
   Evidence: `artifacts/evals/supervised_cycle_execute_2dd81ec3-1ce3-40b4-9857-082e54a85e9e_1787605287.json`
-- No V0.16 live diagnostic has been run yet. The new path is implemented and deterministically tested, but the guarded live post-verdict Critic runner remains unexecuted historical-future work.
-  Evidence: `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`
+- First live `V0.16` post-verdict diagnostic completed on Tuesday, August 25, 2026: scientific verdict `2a4faabc-3477-4c47-a033-78177514b603` produced Critic invocation `726dd54f-f3ae-4d61-9a38-374c694c7156` and immutable `PostVerdictResearchIntent` `41fa6e89-be44-4fe0-bdbe-fe0f7cb0ac7e` with decision `CONTINUE` and `revision_kind` `MECHANISM_REVISION`.
+  Evidence: `artifacts/evals/post_verdict_critic_2a4faabc-3477-4c47-a033-78177514b603_1787626223.json`
+- That live V0.16 diagnostic intentionally stopped after persisting the exact Critic provenance. No downstream Scientist, Designer, materializer, executor, verdict evaluator, result evaluator, revision planner, or lifecycle transition occurred.
+  Evidence: `artifacts/evals/post_verdict_critic_2a4faabc-3477-4c47-a033-78177514b603_1787626223.json`, `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`
+- No live `V0.17` continuation preparation or generation has been run. The guarded continuation runner is implemented but remains unexecuted.
+  Evidence: `src/ai_quant_scientist/evals/run_live_research_continuation.py`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -332,23 +360,27 @@ These are useful live observations, not statistically exhaustive model evaluatio
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
-2. `V0.16` is still supervised only; there is still no autonomous iterative chaining from `PostVerdictResearchIntent` into Scientist, Designer, revision, replication, or holdout stages.
-   Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+2. `V0.17` is still supervised only; there is still no autonomous iterative chaining from `PostVerdictResearchIntent` into continuation Scientist, Designer, revision, replication, or holdout stages.
+   Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 3. `V0.13A.1` / `V0.13B` / `V0.14` / `V0.15` / `V0.15.1` / `V0.15.2` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
    Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
-4. Deterministic verdicts now feed into one bounded post-verdict Critic only; they still do not automatically feed into lifecycle promotion, replication execution, revision planning, or a new hypothesis call.
-   Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+4. Adaptive continuation now allows one governed post-verdict hypothesis call, but still does not automatically feed into design, experiment execution, lifecycle promotion, replication execution, or autonomous revision chains.
+   Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+5. V0.17 adaptive hypothesis generation does not yet guarantee experiment novelty or evidence independence for a future second experiment under the current deterministic stub materializer; that remains a future design problem.
+   Evidence: `src/ai_quant_scientist/services/research_continuation.py`, `src/ai_quant_scientist/services/spec_materialization.py`
 
 ## Current Milestone
-`V0.16 - Post-Verdict Critic`
+`V0.17 - Governed Adaptive Hypothesis Continuation`
 
 Status:
 - Implemented in the working tree on `2026-08-25` Arizona project-local time
 - Stub-only by design; no autonomous chaining
-- Connects exact frozen `ScientificVerdict` -> provenance validation over `ResearchScope` / `HypothesisClaimSet` / `ResearchDesignIntent` / `ResearchPredictionPlan` / `InitialExperimentPlan` / contrast -> one bounded post-verdict Critic call -> immutable `PostVerdictResearchIntent` -> stop
+- Connects exact frozen `ScientificVerdict` -> one bounded post-verdict Critic call -> immutable `PostVerdictResearchIntent` -> explicit `ResearchContinuationAuthorization` -> one bounded adaptive Hypothesis Scientist `v6` attempt -> deterministic scope/novelty validation -> new adaptive `ResearchCandidate` plus `HypothesisClaimSet` or `NO_HYPOTHESIS` -> stop
 - Leaves `V0.14` frozen historical evidence, preserves frozen Research Designer V1/V2 prompt+ontology behavior unchanged, and preserves the rejected V0.15 and V0.15.1 proposals `2f641366-3e40-4aa3-90df-4423ba0fff65` and `2cea1a89-afa5-4ace-abca-3dbda86ded82` as unexecuted negative governance evidence
-- Preserves the fully governed live `V0.15.2` verdict chain unchanged; V0.16 adds only post-verdict Critic provenance plus immutable post-verdict research intent
-- Persists post-verdict Critic invocations and immutable post-verdict research intents under schema `v12`
+- Preserves the fully governed live `V0.15.2` verdict chain unchanged; V0.16 adds only post-verdict Critic provenance plus immutable post-verdict research intent, and V0.17 adds only explicit continuation authorization / attempt / adaptive lineage
+- Persists post-verdict Critic invocations, immutable post-verdict research intents, continuation authorizations, continuation attempt provenance, and adaptive lineage under schema `v13`
+- Preserves the live V0.16 diagnostic evidence exactly: verdict `2a4faabc-3477-4c47-a033-78177514b603`, Critic invocation `726dd54f-f3ae-4d61-9a38-374c694c7156`, and post-verdict intent `41fa6e89-be44-4fe0-bdbe-fe0f7cb0ac7e`
+- Stops before Research Designer / materialization / execution / verdict for the adaptive child hypothesis; same-experiment novelty remains intentionally unresolved in this milestone
 - Preserves historical revision Critic prompts `v1` / `v2` / `v3`, unchanged `RevisionPlanner` V1, frozen Hypothesis Scientist / Research Designer / ontology artifacts, and truthful sparse production capability reality
 
 ## Files To Read First
@@ -363,6 +395,10 @@ Status:
 - `src/ai_quant_scientist/models/design.py`
 - `src/ai_quant_scientist/services/spec_materialization.py`
 - `src/ai_quant_scientist/services/scientific_verdict.py`
+- `src/ai_quant_scientist/models/research_continuation.py`
+- `src/ai_quant_scientist/services/research_continuation.py`
+- `src/ai_quant_scientist/services/openai_research_continuation.py`
+- `src/ai_quant_scientist/evals/run_live_research_continuation.py`
 - `src/ai_quant_scientist/models/post_verdict_critic.py`
 - `src/ai_quant_scientist/services/post_verdict_research_critic_prompts.py`
 - `src/ai_quant_scientist/services/post_verdict_research_critic.py`

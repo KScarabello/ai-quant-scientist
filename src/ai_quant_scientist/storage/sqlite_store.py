@@ -70,10 +70,18 @@ from ..models.post_verdict_critic import (
     PostVerdictResearchIntent,
     PostVerdictRevisionKind,
 )
+from ..models.research_continuation import (
+    AdaptiveHypothesisLineage,
+    ResearchContinuationAttemptStatus,
+    ResearchContinuationAuthorization,
+    ResearchContinuationAuthorizationStatus,
+    ResearchContinuationInvocation,
+    ResearchContinuationOrigin,
+)
 from ..models.research_designer import ResearchDesignerInvocation
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 class SQLiteStore:
@@ -520,6 +528,72 @@ class SQLiteStore:
                     FOREIGN KEY (research_prediction_plan_id) REFERENCES research_prediction_plans(id),
                     FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id),
                     FOREIGN KEY (critic_invocation_id) REFERENCES post_verdict_critic_invocations(id)
+                );
+                CREATE TABLE IF NOT EXISTS research_continuation_authorizations (
+                    id TEXT PRIMARY KEY,
+                    post_verdict_research_intent_id TEXT NOT NULL UNIQUE,
+                    parent_scientific_verdict_id TEXT NOT NULL,
+                    parent_hypothesis_claim_set_id TEXT NOT NULL,
+                    parent_candidate_id TEXT NOT NULL,
+                    research_scope_snapshot_json TEXT NOT NULL,
+                    research_scope_fingerprint TEXT NOT NULL,
+                    allowed_revision_kind TEXT NOT NULL,
+                    generation_number INTEGER NOT NULL,
+                    origin TEXT NOT NULL,
+                    authorization_status TEXT NOT NULL,
+                    contract_version TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    authorized_at TEXT,
+                    FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                    FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                    FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                    FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
+                );
+                CREATE TABLE IF NOT EXISTS research_continuation_invocations (
+                    id TEXT PRIMARY KEY,
+                    continuation_authorization_id TEXT NOT NULL UNIQUE,
+                    post_verdict_research_intent_id TEXT NOT NULL,
+                    parent_scientific_verdict_id TEXT NOT NULL,
+                    context_version TEXT NOT NULL,
+                    prompt_version TEXT,
+                    provider TEXT,
+                    model TEXT,
+                    context_snapshot_json TEXT NOT NULL,
+                    raw_response TEXT,
+                    parsed_decision_json TEXT,
+                    attempt_status TEXT NOT NULL,
+                    validation_errors_json TEXT,
+                    resulting_candidate_id TEXT,
+                    resulting_claim_set_id TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                    FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                    FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                    FOREIGN KEY (resulting_candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (resulting_claim_set_id) REFERENCES hypothesis_claim_sets(id)
+                );
+                CREATE TABLE IF NOT EXISTS adaptive_hypothesis_lineages (
+                    id TEXT PRIMARY KEY,
+                    candidate_id TEXT NOT NULL UNIQUE,
+                    hypothesis_claim_set_id TEXT NOT NULL UNIQUE,
+                    continuation_authorization_id TEXT NOT NULL UNIQUE,
+                    post_verdict_research_intent_id TEXT NOT NULL,
+                    parent_scientific_verdict_id TEXT NOT NULL,
+                    parent_hypothesis_claim_set_id TEXT NOT NULL,
+                    parent_candidate_id TEXT NOT NULL,
+                    origin TEXT NOT NULL,
+                    generation_number INTEGER NOT NULL,
+                    research_scope_snapshot_json TEXT NOT NULL,
+                    research_scope_fingerprint TEXT NOT NULL,
+                    contract_version TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                    FOREIGN KEY (hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                    FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                    FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                    FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                    FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                    FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
                 );
                 """
             )
@@ -997,6 +1071,144 @@ class SQLiteStore:
                             FOREIGN KEY (research_prediction_plan_id) REFERENCES research_prediction_plans(id),
                             FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id),
                             FOREIGN KEY (critic_invocation_id) REFERENCES post_verdict_critic_invocations(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS research_continuation_authorizations (
+                            id TEXT PRIMARY KEY,
+                            post_verdict_research_intent_id TEXT NOT NULL UNIQUE,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            parent_hypothesis_claim_set_id TEXT NOT NULL,
+                            parent_candidate_id TEXT NOT NULL,
+                            research_scope_snapshot_json TEXT NOT NULL,
+                            research_scope_fingerprint TEXT NOT NULL,
+                            allowed_revision_kind TEXT NOT NULL,
+                            generation_number INTEGER NOT NULL,
+                            origin TEXT NOT NULL,
+                            authorization_status TEXT NOT NULL,
+                            contract_version TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            authorized_at TEXT,
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS research_continuation_invocations (
+                            id TEXT PRIMARY KEY,
+                            continuation_authorization_id TEXT NOT NULL UNIQUE,
+                            post_verdict_research_intent_id TEXT NOT NULL,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            context_version TEXT NOT NULL,
+                            prompt_version TEXT,
+                            provider TEXT,
+                            model TEXT,
+                            context_snapshot_json TEXT NOT NULL,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            attempt_status TEXT NOT NULL,
+                            validation_errors_json TEXT,
+                            resulting_candidate_id TEXT,
+                            resulting_claim_set_id TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (resulting_candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (resulting_claim_set_id) REFERENCES hypothesis_claim_sets(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS adaptive_hypothesis_lineages (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL UNIQUE,
+                            hypothesis_claim_set_id TEXT NOT NULL UNIQUE,
+                            continuation_authorization_id TEXT NOT NULL UNIQUE,
+                            post_verdict_research_intent_id TEXT NOT NULL,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            parent_hypothesis_claim_set_id TEXT NOT NULL,
+                            parent_candidate_id TEXT NOT NULL,
+                            origin TEXT NOT NULL,
+                            generation_number INTEGER NOT NULL,
+                            research_scope_snapshot_json TEXT NOT NULL,
+                            research_scope_fingerprint TEXT NOT NULL,
+                            contract_version TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
+                        );
+                        """
+                    )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
+                elif v == 12:
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS research_continuation_authorizations (
+                            id TEXT PRIMARY KEY,
+                            post_verdict_research_intent_id TEXT NOT NULL UNIQUE,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            parent_hypothesis_claim_set_id TEXT NOT NULL,
+                            parent_candidate_id TEXT NOT NULL,
+                            research_scope_snapshot_json TEXT NOT NULL,
+                            research_scope_fingerprint TEXT NOT NULL,
+                            allowed_revision_kind TEXT NOT NULL,
+                            generation_number INTEGER NOT NULL,
+                            origin TEXT NOT NULL,
+                            authorization_status TEXT NOT NULL,
+                            contract_version TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            authorized_at TEXT,
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS research_continuation_invocations (
+                            id TEXT PRIMARY KEY,
+                            continuation_authorization_id TEXT NOT NULL UNIQUE,
+                            post_verdict_research_intent_id TEXT NOT NULL,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            context_version TEXT NOT NULL,
+                            prompt_version TEXT,
+                            provider TEXT,
+                            model TEXT,
+                            context_snapshot_json TEXT NOT NULL,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            attempt_status TEXT NOT NULL,
+                            validation_errors_json TEXT,
+                            resulting_candidate_id TEXT,
+                            resulting_claim_set_id TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (resulting_candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (resulting_claim_set_id) REFERENCES hypothesis_claim_sets(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS adaptive_hypothesis_lineages (
+                            id TEXT PRIMARY KEY,
+                            candidate_id TEXT NOT NULL UNIQUE,
+                            hypothesis_claim_set_id TEXT NOT NULL UNIQUE,
+                            continuation_authorization_id TEXT NOT NULL UNIQUE,
+                            post_verdict_research_intent_id TEXT NOT NULL,
+                            parent_scientific_verdict_id TEXT NOT NULL,
+                            parent_hypothesis_claim_set_id TEXT NOT NULL,
+                            parent_candidate_id TEXT NOT NULL,
+                            origin TEXT NOT NULL,
+                            generation_number INTEGER NOT NULL,
+                            research_scope_snapshot_json TEXT NOT NULL,
+                            research_scope_fingerprint TEXT NOT NULL,
+                            contract_version TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (candidate_id) REFERENCES research_candidates(id),
+                            FOREIGN KEY (hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (continuation_authorization_id) REFERENCES research_continuation_authorizations(id),
+                            FOREIGN KEY (post_verdict_research_intent_id) REFERENCES post_verdict_research_intents(id),
+                            FOREIGN KEY (parent_scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (parent_hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (parent_candidate_id) REFERENCES research_candidates(id)
                         );
                         """
                     )
@@ -3398,6 +3610,465 @@ class SQLiteStore:
         if row is None:
             return None
         return self.get_post_verdict_research_intent(row["id"])
+
+    def save_research_continuation_authorization(
+        self,
+        authorization: ResearchContinuationAuthorization,
+    ) -> ResearchContinuationAuthorization:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO research_continuation_authorizations
+                   (id, post_verdict_research_intent_id, parent_scientific_verdict_id,
+                    parent_hypothesis_claim_set_id, parent_candidate_id,
+                    research_scope_snapshot_json, research_scope_fingerprint,
+                    allowed_revision_kind, generation_number, origin,
+                    authorization_status, contract_version, created_at, authorized_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    authorization.id,
+                    authorization.post_verdict_research_intent_id,
+                    authorization.parent_scientific_verdict_id,
+                    authorization.parent_hypothesis_claim_set_id,
+                    authorization.parent_candidate_id,
+                    self._dumps(authorization.research_scope_payload()),
+                    authorization.research_scope_fingerprint,
+                    authorization.allowed_revision_kind.value,
+                    authorization.generation_number,
+                    authorization.origin.value,
+                    authorization.authorization_status.value,
+                    authorization.contract_version,
+                    authorization.created_at.isoformat(),
+                    None if authorization.authorized_at is None else authorization.authorized_at.isoformat(),
+                ),
+            )
+        return authorization
+
+    def update_research_continuation_authorization(
+        self,
+        authorization: ResearchContinuationAuthorization,
+    ) -> None:
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """UPDATE research_continuation_authorizations
+                   SET post_verdict_research_intent_id = ?,
+                       parent_scientific_verdict_id = ?,
+                       parent_hypothesis_claim_set_id = ?,
+                       parent_candidate_id = ?,
+                       research_scope_snapshot_json = ?,
+                       research_scope_fingerprint = ?,
+                       allowed_revision_kind = ?,
+                       generation_number = ?,
+                       origin = ?,
+                       authorization_status = ?,
+                       contract_version = ?,
+                       created_at = ?,
+                       authorized_at = ?
+                   WHERE id = ?""",
+                (
+                    authorization.post_verdict_research_intent_id,
+                    authorization.parent_scientific_verdict_id,
+                    authorization.parent_hypothesis_claim_set_id,
+                    authorization.parent_candidate_id,
+                    self._dumps(authorization.research_scope_payload()),
+                    authorization.research_scope_fingerprint,
+                    authorization.allowed_revision_kind.value,
+                    authorization.generation_number,
+                    authorization.origin.value,
+                    authorization.authorization_status.value,
+                    authorization.contract_version,
+                    authorization.created_at.isoformat(),
+                    None if authorization.authorized_at is None else authorization.authorized_at.isoformat(),
+                    authorization.id,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(
+                f"ResearchContinuationAuthorization not found for update: {authorization.id!r}"
+            )
+
+    def get_research_continuation_authorization(
+        self,
+        authorization_id: str,
+    ) -> ResearchContinuationAuthorization | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_continuation_authorizations WHERE id = ?",
+                (authorization_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchContinuationAuthorization(
+            id=row["id"],
+            post_verdict_research_intent_id=row["post_verdict_research_intent_id"],
+            parent_scientific_verdict_id=row["parent_scientific_verdict_id"],
+            parent_hypothesis_claim_set_id=row["parent_hypothesis_claim_set_id"],
+            parent_candidate_id=row["parent_candidate_id"],
+            research_scope_snapshot=self._loads(row["research_scope_snapshot_json"]),
+            research_scope_fingerprint=row["research_scope_fingerprint"],
+            allowed_revision_kind=PostVerdictRevisionKind(row["allowed_revision_kind"]),
+            generation_number=row["generation_number"],
+            origin=ResearchContinuationOrigin(row["origin"]),
+            authorization_status=ResearchContinuationAuthorizationStatus(row["authorization_status"]),
+            contract_version=row["contract_version"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            authorized_at=(
+                None if row["authorized_at"] is None else datetime.fromisoformat(row["authorized_at"])
+            ),
+        )
+
+    def get_research_continuation_authorization_by_post_verdict_research_intent_id(
+        self,
+        post_verdict_research_intent_id: str,
+    ) -> ResearchContinuationAuthorization | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM research_continuation_authorizations WHERE post_verdict_research_intent_id = ?",
+                (post_verdict_research_intent_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_research_continuation_authorization(row["id"])
+
+    def try_reserve_research_continuation_invocation(
+        self,
+        invocation: ResearchContinuationInvocation,
+    ) -> bool:
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """UPDATE research_continuation_authorizations
+                   SET authorization_status = ?
+                   WHERE id = ? AND authorization_status = ?""",
+                (
+                    ResearchContinuationAuthorizationStatus.CONSUMED.value,
+                    invocation.continuation_authorization_id,
+                    ResearchContinuationAuthorizationStatus.AUTHORIZED.value,
+                ),
+            )
+            if cursor.rowcount != 1:
+                return False
+            conn.execute(
+                """INSERT INTO research_continuation_invocations
+                   (id, continuation_authorization_id, post_verdict_research_intent_id,
+                    parent_scientific_verdict_id, context_version, prompt_version,
+                    provider, model, context_snapshot_json, raw_response,
+                    parsed_decision_json, attempt_status, validation_errors_json,
+                    resulting_candidate_id, resulting_claim_set_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.continuation_authorization_id,
+                    invocation.post_verdict_research_intent_id,
+                    invocation.parent_scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.attempt_status.value,
+                    invocation.validation_errors_json,
+                    invocation.resulting_candidate_id,
+                    invocation.resulting_claim_set_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+        return True
+
+    def update_research_continuation_invocation(
+        self,
+        invocation: ResearchContinuationInvocation,
+    ) -> None:
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """UPDATE research_continuation_invocations
+                   SET continuation_authorization_id = ?,
+                       post_verdict_research_intent_id = ?,
+                       parent_scientific_verdict_id = ?,
+                       context_version = ?,
+                       prompt_version = ?,
+                       provider = ?,
+                       model = ?,
+                       context_snapshot_json = ?,
+                       raw_response = ?,
+                       parsed_decision_json = ?,
+                       attempt_status = ?,
+                       validation_errors_json = ?,
+                       resulting_candidate_id = ?,
+                       resulting_claim_set_id = ?,
+                       created_at = ?
+                   WHERE id = ?""",
+                (
+                    invocation.continuation_authorization_id,
+                    invocation.post_verdict_research_intent_id,
+                    invocation.parent_scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.attempt_status.value,
+                    invocation.validation_errors_json,
+                    invocation.resulting_candidate_id,
+                    invocation.resulting_claim_set_id,
+                    invocation.created_at.isoformat(),
+                    invocation.id,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(
+                f"ResearchContinuationInvocation not found for update: {invocation.id!r}"
+            )
+
+    def get_research_continuation_invocation(
+        self,
+        invocation_id: str,
+    ) -> ResearchContinuationInvocation | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_continuation_invocations WHERE id = ?",
+                (invocation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ResearchContinuationInvocation(
+            id=row["id"],
+            continuation_authorization_id=row["continuation_authorization_id"],
+            post_verdict_research_intent_id=row["post_verdict_research_intent_id"],
+            parent_scientific_verdict_id=row["parent_scientific_verdict_id"],
+            context_version=row["context_version"],
+            prompt_version=row["prompt_version"],
+            provider=row["provider"],
+            model=row["model"],
+            context_snapshot_json=row["context_snapshot_json"],
+            raw_response=row["raw_response"],
+            parsed_decision_json=row["parsed_decision_json"],
+            attempt_status=ResearchContinuationAttemptStatus(row["attempt_status"]),
+            validation_errors_json=row["validation_errors_json"],
+            resulting_candidate_id=row["resulting_candidate_id"],
+            resulting_claim_set_id=row["resulting_claim_set_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_research_continuation_invocation_by_authorization_id(
+        self,
+        continuation_authorization_id: str,
+    ) -> ResearchContinuationInvocation | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM research_continuation_invocations WHERE continuation_authorization_id = ?",
+                (continuation_authorization_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_research_continuation_invocation(row["id"])
+
+    def save_adaptive_hypothesis_lineage(
+        self,
+        lineage: AdaptiveHypothesisLineage,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO adaptive_hypothesis_lineages
+                   (id, candidate_id, hypothesis_claim_set_id, continuation_authorization_id,
+                    post_verdict_research_intent_id, parent_scientific_verdict_id,
+                    parent_hypothesis_claim_set_id, parent_candidate_id, origin,
+                    generation_number, research_scope_snapshot_json, research_scope_fingerprint,
+                    contract_version, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    lineage.id,
+                    lineage.candidate_id,
+                    lineage.hypothesis_claim_set_id,
+                    lineage.continuation_authorization_id,
+                    lineage.post_verdict_research_intent_id,
+                    lineage.parent_scientific_verdict_id,
+                    lineage.parent_hypothesis_claim_set_id,
+                    lineage.parent_candidate_id,
+                    lineage.origin.value,
+                    lineage.generation_number,
+                    self._dumps(lineage.research_scope_payload()),
+                    lineage.research_scope_fingerprint,
+                    lineage.contract_version,
+                    lineage.created_at.isoformat(),
+                ),
+            )
+
+    def get_adaptive_hypothesis_lineage_by_candidate_id(
+        self,
+        candidate_id: str,
+    ) -> AdaptiveHypothesisLineage | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM adaptive_hypothesis_lineages WHERE candidate_id = ?",
+                (candidate_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return AdaptiveHypothesisLineage(
+            id=row["id"],
+            candidate_id=row["candidate_id"],
+            hypothesis_claim_set_id=row["hypothesis_claim_set_id"],
+            continuation_authorization_id=row["continuation_authorization_id"],
+            post_verdict_research_intent_id=row["post_verdict_research_intent_id"],
+            parent_scientific_verdict_id=row["parent_scientific_verdict_id"],
+            parent_hypothesis_claim_set_id=row["parent_hypothesis_claim_set_id"],
+            parent_candidate_id=row["parent_candidate_id"],
+            origin=ResearchContinuationOrigin(row["origin"]),
+            generation_number=row["generation_number"],
+            research_scope_snapshot=self._loads(row["research_scope_snapshot_json"]),
+            research_scope_fingerprint=row["research_scope_fingerprint"],
+            contract_version=row["contract_version"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def save_research_continuation_success_bundle(
+        self,
+        *,
+        invocation: ResearchContinuationInvocation,
+        candidate,
+        claim_set: HypothesisClaimSet,
+        lineage: AdaptiveHypothesisLineage,
+    ) -> None:
+        if invocation.resulting_candidate_id != candidate.id:
+            raise ValueError(
+                "ResearchContinuationInvocation resulting_candidate_id must match the authoritative ResearchCandidate"
+            )
+        if invocation.resulting_claim_set_id != claim_set.id:
+            raise ValueError(
+                "ResearchContinuationInvocation resulting_claim_set_id must match the authoritative HypothesisClaimSet"
+            )
+        if claim_set.candidate_id != candidate.id:
+            raise ValueError("HypothesisClaimSet candidate_id must match the authoritative ResearchCandidate")
+        if claim_set.hypothesis_scientist_invocation_id != invocation.id:
+            raise ValueError(
+                "HypothesisClaimSet hypothesis_scientist_invocation_id must match the continuation invocation id"
+            )
+        if lineage.candidate_id != candidate.id or lineage.hypothesis_claim_set_id != claim_set.id:
+            raise ValueError("AdaptiveHypothesisLineage must point to the authoritative child candidate and claim set")
+        with self.connect() as conn:
+            from ..capabilities.serialization import (
+                compute_candidate_fingerprint,
+                requirements_to_json,
+            )
+
+            fingerprint = compute_candidate_fingerprint(
+                candidate.hypothesis_statement,
+                candidate.hypothesis_rationale,
+                candidate.requirements,
+            )
+            conn.execute(
+                """INSERT INTO research_candidates
+                   (id, hypothesis_statement, hypothesis_rationale, source,
+                    requirements_json, candidate_fingerprint, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    candidate.id,
+                    candidate.hypothesis_statement,
+                    candidate.hypothesis_rationale,
+                    candidate.source,
+                    requirements_to_json(candidate.requirements),
+                    fingerprint,
+                    candidate.created_at.isoformat(),
+                ),
+            )
+            conn.execute(
+                """INSERT INTO hypothesis_scientist_invocations
+                   (id, research_brief_id, research_brief_snapshot, prompt_version,
+                    provider, model, raw_response, parsed_decision_json,
+                    validation_status, validation_errors_json, resulting_candidate_id,
+                    resulting_claim_set_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.continuation_authorization_id,
+                    invocation.context_snapshot_json,
+                    invocation.prompt_version or "v6",
+                    invocation.provider,
+                    invocation.model,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    "VALID",
+                    invocation.validation_errors_json,
+                    invocation.resulting_candidate_id,
+                    invocation.resulting_claim_set_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+            conn.execute(
+                """INSERT INTO hypothesis_claim_sets
+                   (id, candidate_id, hypothesis_scientist_invocation_id, independent_variable,
+                    independent_variable_direction, claims_json, claim_aggregation,
+                    claim_contract_version, ontology_version, ontology_fingerprint, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    claim_set.id,
+                    claim_set.candidate_id,
+                    claim_set.hypothesis_scientist_invocation_id,
+                    claim_set.independent_variable.value,
+                    claim_set.independent_variable_direction.value,
+                    self._dumps(
+                        [
+                            {
+                                "outcome": item.outcome.value,
+                                "expected_direction": item.expected_direction.value,
+                            }
+                            for item in claim_set.claims
+                        ]
+                    ),
+                    claim_set.claim_aggregation.value,
+                    claim_set.claim_contract_version,
+                    claim_set.ontology_version,
+                    claim_set.ontology_fingerprint,
+                    claim_set.created_at.isoformat(),
+                ),
+            )
+            conn.execute(
+                """UPDATE research_continuation_invocations
+                   SET raw_response = ?,
+                       parsed_decision_json = ?,
+                       attempt_status = ?,
+                       validation_errors_json = ?,
+                       resulting_candidate_id = ?,
+                       resulting_claim_set_id = ?
+                   WHERE id = ?""",
+                (
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.attempt_status.value,
+                    invocation.validation_errors_json,
+                    invocation.resulting_candidate_id,
+                    invocation.resulting_claim_set_id,
+                    invocation.id,
+                ),
+            )
+            conn.execute(
+                """INSERT INTO adaptive_hypothesis_lineages
+                   (id, candidate_id, hypothesis_claim_set_id, continuation_authorization_id,
+                    post_verdict_research_intent_id, parent_scientific_verdict_id,
+                    parent_hypothesis_claim_set_id, parent_candidate_id, origin,
+                    generation_number, research_scope_snapshot_json, research_scope_fingerprint,
+                    contract_version, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    lineage.id,
+                    lineage.candidate_id,
+                    lineage.hypothesis_claim_set_id,
+                    lineage.continuation_authorization_id,
+                    lineage.post_verdict_research_intent_id,
+                    lineage.parent_scientific_verdict_id,
+                    lineage.parent_hypothesis_claim_set_id,
+                    lineage.parent_candidate_id,
+                    lineage.origin.value,
+                    lineage.generation_number,
+                    self._dumps(lineage.research_scope_payload()),
+                    lineage.research_scope_fingerprint,
+                    lineage.contract_version,
+                    lineage.created_at.isoformat(),
+                ),
+            )
 
     # ─── Research designer invocations ───────────────────────────────────────
 

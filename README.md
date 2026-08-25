@@ -70,6 +70,10 @@ Post-verdict scientific learning boundary:
 exact `ScientificVerdict`
 -> one bounded `PostVerdictResearchCritic` invocation
 -> immutable `PostVerdictResearchIntent`
+-> explicit `ResearchContinuationAuthorization`
+-> one adaptive Hypothesis Scientist `v6` attempt
+-> deterministic scope/novelty validation
+-> new adaptive `ResearchCandidate` + `HypothesisClaimSet` OR `NO_HYPOTHESIS`
 -> stop
 
 Deterministic contrast-plan path after `ResearchDesignIntent`:
@@ -113,6 +117,7 @@ Prompt status:
 - `v3` preserved as the historical candidate-feasibility boundary prompt
 - `v4` preserved as the historical canonical-claim prompt
 - `v5` current default prompt with caller-owned `ResearchScope` fidelity and authoritative structured claim semantics
+- `v6` adaptive-continuation prompt used only after explicit post-verdict continuation authorization
 
 Current adapter defaults:
 - model: `gpt-5.6-terra`
@@ -179,6 +184,32 @@ It may not:
 
 The historical revision Critic and `RevisionPlanner` V1 remain unchanged.
 
+### Governed Adaptive Continuation
+
+V0.17 adds a separate governed adaptive continuation boundary.
+
+It may:
+- create an explicit pending continuation authorization from one exact `PostVerdictResearchIntent`
+- require a second explicit authorization step before any provider call
+- spend exactly one adaptive Hypothesis Scientist attempt under the frozen scope
+- persist either one new adaptive `ResearchCandidate` plus `HypothesisClaimSet` or terminal `NO_HYPOTHESIS`
+- preserve explicit lineage back to the parent verdict, claim set, candidate, and Critic intent
+
+It may not:
+- broaden or replace `ResearchScope`
+- call the Research Designer
+- materialize a new experiment
+- execute research
+- compute a verdict for the child hypothesis
+- automatically trigger Critic, revision, lifecycle, replication, or holdout work
+
+Current boundary:
+- `origin=POST_VERDICT_ADAPTIVE`, `generation_number=2`
+- bounded continuation context includes frozen `ResearchScope`, parent `HypothesisClaimSet`, parent verdict status, Critic diagnosis, and Critic rationale
+- raw contrast payloads, exact `2.0` / `2.5` / `20` experiment values, and capability IDs are excluded
+- novelty is enforced deterministically by canonical claim signature, not by prose similarity
+- retries after any first provider attempt make zero additional provider calls
+
 ## Deterministic Governance
 
 Core invariants:
@@ -200,6 +231,10 @@ Core invariants:
 - Deterministic software alone computes `SUPPORTED` / `FALSIFIED` from the persisted prediction plan and measured contrast result.
 - `SUPPORTED` / `FALSIFIED` applies only to the bounded precommitted contrast, not general market truth.
 - The post-verdict Critic may learn only from a frozen exact `FALSIFIED` verdict and may persist only diagnosis plus bounded next-research intent.
+- Adaptive continuation requires explicit human/governance authorization after the Critic intent and is transparently non-independent of the evidence that inspired it.
+- The adaptive continuation path preserves the exact caller-owned `ResearchScope` and may not invent a new one.
+- Adaptive continuation attempts are budgeted as exactly one provider call per authorization, with storage-backed reservation before invocation.
+- V0.17 stops after adaptive hypothesis generation and lineage persistence; it does not yet determine whether the child hypothesis maps to a scientifically novel second experiment.
 - Lifecycle promotion remains downstream and separate from condition sequencing.
 - `falsification_condition` is retained as non-authoritative scientific prose and is not parsed into governance thresholds.
 - No Critic, revision planner, Scientist, Designer, or lifecycle promotion is automatically invoked after verdict computation.
@@ -221,7 +256,8 @@ Core invariants:
 - `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10` (`COMPLETE / FROZEN`)
 - `V0.15.1`: canonical candidate-side scientific claims, Research Designer V3 complete-coverage validation, deterministic claim-to-prediction projection, and schema `v11` (`COMPLETE / FROZEN`)
 - `V0.15.2`: caller-owned canonical `ResearchScope`, Hypothesis Scientist Prompt `v5`, deterministic scope-fidelity validation, first fully governed live verdict, and no schema bump beyond `v11` (`COMPLETE / FROZEN`)
-- `V0.16`: one bounded post-verdict Critic invocation, immutable `PostVerdictResearchIntent`, schema `v12`, and no autonomous continuation
+- `V0.16`: one bounded post-verdict Critic invocation, immutable `PostVerdictResearchIntent`, schema `v12`, and no autonomous continuation (`COMPLETE / FROZEN`)
+- `V0.17`: governed adaptive hypothesis continuation with explicit continuation authorization, bounded continuation context, Hypothesis Scientist Prompt `v6`, deterministic novelty/scope validation, adaptive lineage persistence, and schema `v13`
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -249,6 +285,7 @@ Semantic boundary:
 - For the current directional experiment path, the authoritative `HypothesisClaimSet` must exactly cover `ResearchScope`, while prose remains non-authoritative narrative.
 - Exact parameter grids, strategy rules, execution settings, and other frozen condition details belong after `READY_FOR_SPEC`.
 - `hypothesis_claim_ontology_v1` remains unchanged; `ResearchScope` is a separate caller-side contract rather than a claim-ontology revision.
+- The adaptive continuation path reuses the same bounded claim ontology; it does not add `NO_CHANGE`, and `hypothesis_claim_ontology_v1` remains unchanged with fingerprint `23f6c4019ea3ffebc56a3486c19d4da0b733c4c08c7d8b4d18769945a26afcd3`.
 
 ## Research Critic
 
@@ -286,7 +323,7 @@ There is now one supervised orchestration layer:
 
 ## Persistence
 
-Current schema version: `v12`
+Current schema version: `v13`
 
 SQLite persists authoritative history for:
 
@@ -309,13 +346,16 @@ SQLite persists authoritative history for:
 - deterministic scientific verdicts
 - post-verdict Critic invocations
 - immutable post-verdict research intents
+- continuation authorizations
+- continuation invocation attempts
+- adaptive hypothesis lineages
 
 ## Evals
 
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `591 passed`
+- result: `615 passed`
 
 Frozen live V0.15.2 evidence:
 
@@ -325,6 +365,15 @@ Frozen live V0.15.2 evidence:
 - contrast `adec991c-4cb3-4900-8338-17b7efe10307`
 - scientific verdict `2a4faabc-3477-4c47-a033-78177514b603`
 - overall `FALSIFIED`
+
+Frozen live V0.16 diagnostic evidence:
+
+- scientific verdict `2a4faabc-3477-4c47-a033-78177514b603`
+- Critic invocation `726dd54f-f3ae-4d61-9a38-374c694c7156`
+- post-verdict intent `41fa6e89-be44-4fe0-bdbe-fe0f7cb0ac7e`
+- decision `CONTINUE`
+- revision kind `MECHANISM_REVISION`
+- no downstream Scientist, Designer, materializer, executor, verdict, revision, or lifecycle action occurred
 
 Relevant scientist artifact note:
 
@@ -342,10 +391,12 @@ PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_
 PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --model gpt-5.6-terra --allow-live-api
 PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute
 PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_post_verdict_critic --scientific-verdict-id <EXACT_SCIENTIFIC_VERDICT_ID> --model gpt-5.6-terra --allow-live-api
+PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_research_continuation --post-verdict-intent-id <EXACT_POST_VERDICT_INTENT_ID> --prepare
+PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_research_continuation --continuation-authorization-id <EXACT_AUTHORIZATION_ID> --authorize-and-generate --model gpt-5.6-terra --allow-live-api
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated production CLI for autonomous continuation. The governed service APIs and guarded live diagnostic runners are the supported V0.15.2 / V0.16 interfaces.
+There is intentionally no dedicated production CLI for autonomous continuation. The governed service APIs and guarded live diagnostic runners are the supported V0.15.2 / V0.16 / V0.17 interfaces.
 
 Live supervised cycle workflow:
 
@@ -368,6 +419,8 @@ Historical negative evidence:
 
 - no autonomous loop
 - no autonomous iterative chaining from verdicts into Critic, Scientist, revision, replication, or holdout
+- no second adaptive experiment path yet; V0.17 stops before design/materialization/execution for the child hypothesis
+- no resolved same-experiment novelty policy yet for a future adaptive experiment under the current stub materializer
 - no generalized multi-capability exact materializer
 - no generalized multi-condition experiment DSL
 - no RAG or vector canonical memory
@@ -387,4 +440,6 @@ Historical evidence remains in the repository, but it should not be mistaken for
 - The first live `V0.15.1` preparation artifact, proposal `2cea1a89-afa5-4ace-abca-3dbda86ded82`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Hypothesis Scientist V4 broadened the caller's scientific scope by adding `net_pnl`.
 - The first fully governed live `V0.15.2` cycle is frozen successful evidence: proposal `2dd81ec3-1ce3-40b4-9857-082e54a85e9e` led to claim set `ce1393b9-0800-4a7a-bb00-12236deb17f4`, prediction plan `376c7395-ceaa-498a-85a3-455ceb3a86c4`, contrast `adec991c-4cb3-4900-8338-17b7efe10307`, and deterministic scientific verdict `2a4faabc-3477-4c47-a033-78177514b603` with overall status `FALSIFIED`.
 - That `V0.15.2` verdict is authoritative frozen evidence. `V0.16` may diagnose it once, but may not rewrite it, attach a new hypothesis to it, or trigger another experiment automatically.
+- The first live `V0.16` diagnostic is frozen evidence: verdict `2a4faabc-3477-4c47-a033-78177514b603` produced Critic invocation `726dd54f-f3ae-4d61-9a38-374c694c7156` and post-verdict intent `41fa6e89-be44-4fe0-bdbe-fe0f7cb0ac7e` with decision `CONTINUE` and `MECHANISM_REVISION`, and no downstream action occurred.
+- V0.17 adaptive continuation is implemented but has not been run live. Any future child hypothesis generated under V0.17 will be explicitly adaptive evidence lineage, not independent discovery, and must not receive retrospective attachment to the old `V0.15.2` experiment.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.

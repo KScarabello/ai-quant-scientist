@@ -1161,25 +1161,27 @@ def test_v5_to_v6_migration(tmp_path):
         assert "research_candidates" in tables
 
 
-def test_fresh_v12_db_has_all_tables(tmp_path):
+def test_fresh_v13_db_has_all_tables(tmp_path):
     store = SQLiteStore(tmp_path / "fresh.db")
     with store.connect() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-    assert ver == 12
+    assert ver == 13
     for t in ("hypothesis_scientist_invocations", "research_candidates", "feasibility_decisions",
               "hypothesis_claim_sets", "critic_invocations", "research_runs",
-              "post_verdict_critic_invocations", "post_verdict_research_intents"):
+              "post_verdict_critic_invocations", "post_verdict_research_intents",
+              "research_continuation_authorizations", "research_continuation_invocations",
+              "adaptive_hypothesis_lineages"):
         assert t in tables
 
 
-def test_v12_migration_idempotent(tmp_path):
+def test_v13_migration_idempotent(tmp_path):
     SQLiteStore(tmp_path / "t.db")
     SQLiteStore(tmp_path / "t.db")  # second open on current DB should stay current
     store = SQLiteStore(tmp_path / "t.db")
     with store.connect() as c:
         ver = c.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        assert ver == 12
+        assert ver == 13
 
 
 # ─── Eval harness ─────────────────────────────────────────────────────────────
