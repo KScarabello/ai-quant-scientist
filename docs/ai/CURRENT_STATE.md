@@ -3,11 +3,11 @@
 ## Last Verified State
 - Current branch: `main`
 - Current commit: `486f53207753f2eb672ccd9587694348f067a39f` (`improve hypothesis scientist eval observability`)
-- Working tree status: contains uncommitted `V0.15.2` implementation changes verified on `2026-08-24` Arizona project-local time
-- Schema version: `v11`
+- Working tree status: contains uncommitted `V0.16` implementation changes verified on `2026-08-25` Arizona project-local time
+- Schema version: `v12`
 - Verified test command: `PYTHONPATH=src pytest -q`
-- Verified test count: `569 passed`
-- Date: `2026-08-24` (Arizona project-local verification date)
+- Verified test count: `591 passed`
+- Date: `2026-08-25` (Arizona project-local verification date)
 
 Primary evidence:
 - `src/ai_quant_scientist/storage/sqlite_store.py`
@@ -84,6 +84,10 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/storage/sqlite_store.py`
 - Scientific verdicts are deterministic only: they consume the exact persisted prediction plan, experiment plan, and contrast result, and no AI may reinterpret the hypothesis after results exist.
   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `src/ai_quant_scientist/services/supervised_research_cycle.py`, `tests/test_scientific_verdict.py`
+- Post-verdict Critic is now a separate bounded V0.16 role: it may run once on an exact `FALSIFIED` scientific verdict, validate the full frozen provenance chain, and persist only diagnosis plus a non-executable `PostVerdictResearchIntent`.
+  Evidence: `src/ai_quant_scientist/models/post_verdict_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `tests/test_post_verdict_research_critic.py`
+- Post-verdict Critic may not author the next hypothesis, broaden `ResearchScope`, choose exact values, or trigger downstream Scientist/Designer/materialization/execution/lifecycle services.
+  Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic_prompts.py`, `tests/test_post_verdict_research_critic.py`
 - Historical `V0.14` plans and contrast results remain readable but never receive fabricated retrospective `V0.15` prediction plans or scientific verdicts.
   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `tests/test_scientific_verdict.py`
 - `SupervisedResearchCycle` now connects the existing scientist, feasibility, design, materialization, acceptance, and execution components into one governed supervised workflow without adding autonomous authority.
@@ -140,16 +144,20 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/hypothesis_claim_ontology.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/research_designer_prompts.py`, `src/ai_quant_scientist/services/research_design_ontology.py`, `src/ai_quant_scientist/services/research_designer.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_hypothesis_scientist.py`, `tests/test_research_designer.py`, `tests/test_supervised_research_cycle.py`
 - `V0.15.2`: caller-owned canonical `ResearchScope` (`research_scope_v1`), Hypothesis Scientist Prompt `v5`, deterministic scope-fidelity validation before candidate authority, exact `ResearchScope -> HypothesisClaimSet -> ResearchDesignIntent -> ResearchPredictionPlan -> ScientificVerdict` coverage preservation, and no schema bump beyond `v11`.
   Evidence: `src/ai_quant_scientist/models/hypothesis_scientist.py`, `src/ai_quant_scientist/services/hypothesis_prompts.py`, `src/ai_quant_scientist/services/hypothesis_scientist.py`, `src/ai_quant_scientist/services/openai_hypothesis_scientist.py`, `src/ai_quant_scientist/evals/run_live_supervised_cycle.py`, `tests/test_hypothesis_scientist.py`, `tests/test_supervised_research_cycle.py`
+- `V0.16`: one bounded post-verdict Critic invocation, immutable `PostVerdictResearchIntent`, guarded live diagnostic runner, and schema `v12`.
+  Evidence: `src/ai_quant_scientist/models/post_verdict_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/services/openai_post_verdict_research_critic.py`, `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`, `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_post_verdict_research_critic.py`
 
 ## Current AI Components
 
 ### Research Critic
-- Current candidate: `gpt-5.6-terra` + Prompt V3.
-  Evidence: `src/ai_quant_scientist/services/critic_prompts.py`
-- Authority is bounded to proposing one revision intent or `NO_USEFUL_REVISION`; it does not accept, apply, or execute revisions.
-  Evidence: `src/ai_quant_scientist/services/openai_research_critic.py`, `src/ai_quant_scientist/services/research_critic.py`
-- Deterministic planner boundary is active: AI proposes `parameter` + `direction` + `experiment_type`; `RevisionPlanner` chooses the exact value.
-  Evidence: `src/ai_quant_scientist/models/revision.py`, `src/ai_quant_scientist/services/revision_planner.py`
+- Historical revision Critic path remains implemented and unchanged: authority is bounded to proposing one revision intent or `NO_USEFUL_REVISION`, and `RevisionPlanner` V1 still chooses the exact value.
+  Evidence: `src/ai_quant_scientist/services/openai_research_critic.py`, `src/ai_quant_scientist/services/research_critic.py`, `src/ai_quant_scientist/services/revision_planner.py`
+- Historical Critic prompt caveat: `CURRENT_STATE` previously described Prompt `v3` as the current historical candidate, but the old OpenAI/Ollama adapters and old live runner still default to Prompt `v1` unless `prompt_version` is explicitly supplied.
+  Evidence: `src/ai_quant_scientist/services/openai_research_critic.py`, `src/ai_quant_scientist/services/ollama_research_critic.py`, `src/ai_quant_scientist/evals/run_live_critic_eval.py`
+- New V0.16 post-verdict Critic is a separate contract, not Critic Prompt `v4`: prompt version `post_verdict_research_critic_v1`, prompt hash `7c7d4f32853ff2e8425fb63e4b786be73c42b9badd4ab39eee75c696c2d0b8e0`.
+  Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic_prompts.py`, `tests/test_post_verdict_research_critic.py`
+- V0.16 authority is diagnosis, `CONTINUE` vs `STOP`, bounded `revision_kind`, and non-executable `next_step_rationale` only.
+  Evidence: `src/ai_quant_scientist/models/post_verdict_critic.py`, `src/ai_quant_scientist/services/post_verdict_research_critic.py`
 - Corrected repeatability findings remain recorded in repo artifacts.
   Evidence: `artifacts/evals/openai_eval_gpt-5.6-terra_repeats5_1787276724.json`, `artifacts/evals/openai_eval_gpt-5.6-terra_repeats5_1787276772.json`
 - Historical live-eval `revision_constraints=null` artifacts are historical only.
@@ -176,7 +184,7 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/capabilities/models.py`, `src/ai_quant_scientist/capabilities/registry.py`
 - Authoritative candidate persistence is now atomic for the current scoped path: invocation, candidate, and claim set either persist together or fail together, and any scope-fidelity violation leaves candidate/claim persistence empty.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_hypothesis_scientist.py`
-- Invocation persistence now lives inside overall schema `v11`.
+- Invocation persistence now lives inside overall schema `v12`.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
 - Eval harness remains `12` cases in `evals/scientist_v1.json`.
   Evidence: `src/ai_quant_scientist/evals/scientist_eval.py`, `evals/scientist_v1.json`
@@ -240,6 +248,8 @@ Governance keeps the scientist honest.
   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `tests/test_scientific_verdict.py`
 - SQLite schema/persistence: runs, specs, evaluations, critic invocations, candidates, feasibility decisions, scientist invocations, designer invocations, design intents, research prediction plans, historical single-spec materialization records, initial experiment plans, ordered conditions, condition executions, deterministic contrast results, and scientific verdicts.
   Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`
+- SQLite now also persists post-verdict Critic invocations and immutable post-verdict research intents.
+  Evidence: `src/ai_quant_scientist/storage/sqlite_store.py`, `tests/test_post_verdict_research_critic.py`
 
 ## Current Production Capabilities
 - Production registry truth is still intentionally sparse.
@@ -296,6 +306,12 @@ Evidence:
   Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787458529.json`, `tests/test_supervised_research_cycle.py`
 - First live `V0.15.1` preparation on Sunday, August 23, 2026 reached `AWAITING_HUMAN_ACCEPTANCE` with exact proposal `2cea1a89-afa5-4ace-abca-3dbda86ded82`, but it is `DO NOT ACCEPT`: Hypothesis Scientist V4 broadened the caller's intended two-outcome question by adding canonical `net_pnl`, so the proposal was correctly preserved as rejected scope-integrity evidence and remains unexecuted.
   Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787466677.json`, `tests/test_supervised_research_cycle.py`
+- First fully governed live `V0.15.2` cycle completed on Monday, August 24, 2026: proposal `2dd81ec3-1ce3-40b4-9857-082e54a85e9e`, claim set `ce1393b9-0800-4a7a-bb00-12236deb17f4`, prediction plan `376c7395-ceaa-498a-85a3-455ceb3a86c4`, contrast `adec991c-4cb3-4900-8338-17b7efe10307`, and scientific verdict `2a4faabc-3477-4c47-a033-78177514b603`.
+  Evidence: `artifacts/evals/supervised_cycle_prepare_gpt-5.6-terra_1787605203.json`, `artifacts/evals/supervised_cycle_execute_2dd81ec3-1ce3-40b4-9857-082e54a85e9e_1787605287.json`
+- That live `V0.15.2` deterministic verdict is `FALSIFIED`: `trade_count` observed `4 -> 4` (`NO_CHANGE`, `FAIL`) and `sharpe` observed `1.0 -> 0.75` (`DECREASE`, `FAIL`).
+  Evidence: `artifacts/evals/supervised_cycle_execute_2dd81ec3-1ce3-40b4-9857-082e54a85e9e_1787605287.json`
+- No V0.16 live diagnostic has been run yet. The new path is implemented and deterministically tested, but the guarded live post-verdict Critic runner remains unexecuted historical-future work.
+  Evidence: `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`
 
 These are useful live observations, not statistically exhaustive model evaluations.
 
@@ -316,25 +332,24 @@ These are useful live observations, not statistically exhaustive model evaluatio
 ## Open Architectural Issues
 1. Plain `pytest` still requires `PYTHONPATH=src`; this is tooling debt, not scientific architecture.
    Evidence: `pyproject.toml`
-2. `V0.15.2` is still supervised only; there is still no autonomous iterative chaining into Critic, revision, replication, or holdout stages after verdict computation.
-   Evidence: `src/ai_quant_scientist/services/supervised_research_cycle.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+2. `V0.16` is still supervised only; there is still no autonomous iterative chaining from `PostVerdictResearchIntent` into Scientist, Designer, revision, replication, or holdout stages.
+   Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 3. `V0.13A.1` / `V0.13B` / `V0.14` / `V0.15` / `V0.15.1` / `V0.15.2` remain synthetic-stub-only; there is no generalized multi-capability experiment materializer or exact validator for real research implementations.
    Evidence: `src/ai_quant_scientist/services/spec_materialization.py`, `src/ai_quant_scientist/capabilities/v1_registry.py`
-4. Deterministic verdicts do not yet feed into Critic, lifecycle promotion, replication, or revision planning; `SUPPORTED` / `FALSIFIED` is currently the terminal supervised truth boundary.
-   Evidence: `src/ai_quant_scientist/services/scientific_verdict.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
+4. Deterministic verdicts now feed into one bounded post-verdict Critic only; they still do not automatically feed into lifecycle promotion, replication execution, revision planning, or a new hypothesis call.
+   Evidence: `src/ai_quant_scientist/services/post_verdict_research_critic.py`, `src/ai_quant_scientist/orchestrator/orchestrator.py`
 
 ## Current Milestone
-`V0.15.2 - Canonical ResearchScope + Hypothesis Fidelity`
+`V0.16 - Post-Verdict Critic`
 
 Status:
-- Implemented in the working tree on `2026-08-24` Arizona project-local time
+- Implemented in the working tree on `2026-08-25` Arizona project-local time
 - Stub-only by design; no autonomous chaining
-- Connects `ResearchBrief` + caller-owned `ResearchScope` -> Hypothesis Scientist `v5` -> deterministic scope-fidelity validation -> authoritative `HypothesisClaimSet` -> candidate feasibility -> Research Designer V3 -> authoritative `ResearchDesignIntent` -> deterministic `ResearchPredictionPlan` projection -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result -> deterministic scientific verdict
+- Connects exact frozen `ScientificVerdict` -> provenance validation over `ResearchScope` / `HypothesisClaimSet` / `ResearchDesignIntent` / `ResearchPredictionPlan` / `InitialExperimentPlan` / contrast -> one bounded post-verdict Critic call -> immutable `PostVerdictResearchIntent` -> stop
 - Leaves `V0.14` frozen historical evidence, preserves frozen Research Designer V1/V2 prompt+ontology behavior unchanged, and preserves the rejected V0.15 and V0.15.1 proposals `2f641366-3e40-4aa3-90df-4423ba0fff65` and `2cea1a89-afa5-4ace-abca-3dbda86ded82` as unexecuted negative governance evidence
-- Live runner approval flow remains genuinely two-step: first prepare and inspect an exact persisted proposal ID plus prediction plan, then explicitly accept and execute that same proposal ID in a later separate command with zero AI calls.
-- Persists `ResearchScope` inside the authoritative `ResearchBrief` snapshot, Hypothesis Scientist invocations, authoritative `HypothesisClaimSet`, Research Designer invocations, authoritative `ResearchDesignIntent`, deterministic `ResearchPredictionPlan`, initial experiment plans, ordered conditions, exact condition-feasibility evidence, condition execution records, deterministic contrast results, and deterministic scientific verdicts
-- Requires explicit human acceptance before executing the whole precommitted plan
-- Preserves Hypothesis Scientist Prompt `v1` / `v2` / `v3` / `v4`, requirement ontology `v1` / `v2`, unchanged `hypothesis_claim_ontology_v1`, frozen Research Designer Prompt `v1` / `v2`, frozen Research Design Ontology `v1` / `v2`, Critic V3, `RevisionPlanner` V1, `SpecMaterializer` V2 baseline/comparator policy, and truthful sparse production capability reality
+- Preserves the fully governed live `V0.15.2` verdict chain unchanged; V0.16 adds only post-verdict Critic provenance plus immutable post-verdict research intent
+- Persists post-verdict Critic invocations and immutable post-verdict research intents under schema `v12`
+- Preserves historical revision Critic prompts `v1` / `v2` / `v3`, unchanged `RevisionPlanner` V1, frozen Hypothesis Scientist / Research Designer / ontology artifacts, and truthful sparse production capability reality
 
 ## Files To Read First
 - `src/ai_quant_scientist/services/supervised_research_cycle.py`
@@ -348,6 +363,11 @@ Status:
 - `src/ai_quant_scientist/models/design.py`
 - `src/ai_quant_scientist/services/spec_materialization.py`
 - `src/ai_quant_scientist/services/scientific_verdict.py`
+- `src/ai_quant_scientist/models/post_verdict_critic.py`
+- `src/ai_quant_scientist/services/post_verdict_research_critic_prompts.py`
+- `src/ai_quant_scientist/services/post_verdict_research_critic.py`
+- `src/ai_quant_scientist/services/openai_post_verdict_research_critic.py`
+- `src/ai_quant_scientist/evals/run_live_post_verdict_critic.py`
 - `src/ai_quant_scientist/capabilities/models.py`
 - `src/ai_quant_scientist/capabilities/registry.py`
 - `src/ai_quant_scientist/capabilities/serialization.py`

@@ -119,32 +119,11 @@ class ScientificVerdictEvaluator:
         experiment_plan,
         contrast_result: ParameterSensitivityContrastResult,
     ) -> None:
-        if experiment_plan.research_prediction_plan_id != prediction_plan.id:
-            raise ValueError("InitialExperimentPlan does not point to the requested ResearchPredictionPlan")
-        if prediction_plan.design_intent_id != experiment_plan.design_intent_id:
-            raise ValueError("ResearchPredictionPlan does not belong to the InitialExperimentPlan design intent")
-        if prediction_plan.candidate_id != experiment_plan.candidate_id:
-            raise ValueError("ResearchPredictionPlan does not belong to the InitialExperimentPlan candidate")
-        if prediction_plan.independent_variable != experiment_plan.independent_variable:
-            raise ValueError("ResearchPredictionPlan independent variable does not match the InitialExperimentPlan")
-        predicted_outcomes = {item.outcome for item in prediction_plan.predictions}
-        if predicted_outcomes != set(experiment_plan.dependent_outcomes):
-            raise ValueError(
-                "ResearchPredictionPlan predicted outcomes do not match the InitialExperimentPlan dependent outcomes"
-            )
-        if contrast_result.plan_id != experiment_plan.id:
-            raise ValueError("ParameterSensitivityContrastResult does not belong to the requested InitialExperimentPlan")
-        if contrast_result.independent_variable != experiment_plan.independent_variable:
-            raise ValueError("Contrast independent variable does not match the InitialExperimentPlan")
-        if contrast_result.baseline_condition_id != experiment_plan.ordered_conditions[0].id:
-            raise ValueError("Contrast baseline condition does not match the InitialExperimentPlan baseline")
-        if contrast_result.comparator_condition_id != experiment_plan.ordered_conditions[1].id:
-            raise ValueError("Contrast comparator condition does not match the InitialExperimentPlan comparator")
-        if contrast_result.comparator_parameter_value <= contrast_result.baseline_parameter_value:
-            raise ValueError(
-                "Contrast comparator parameter value must be greater than the baseline value for "
-                "directional verdict evaluation"
-            )
+        validate_prediction_plan_experiment_plan_contrast_linkage(
+            prediction_plan=prediction_plan,
+            experiment_plan=experiment_plan,
+            contrast_result=contrast_result,
+        )
 
     def _compute_verdict(
         self,
@@ -224,3 +203,37 @@ def _require_present(value, message: str):
     if value is None:
         raise KeyError(message)
     return value
+
+
+def validate_prediction_plan_experiment_plan_contrast_linkage(
+    *,
+    prediction_plan: ResearchPredictionPlan,
+    experiment_plan,
+    contrast_result: ParameterSensitivityContrastResult,
+) -> None:
+    if experiment_plan.research_prediction_plan_id != prediction_plan.id:
+        raise ValueError("InitialExperimentPlan does not point to the requested ResearchPredictionPlan")
+    if prediction_plan.design_intent_id != experiment_plan.design_intent_id:
+        raise ValueError("ResearchPredictionPlan does not belong to the InitialExperimentPlan design intent")
+    if prediction_plan.candidate_id != experiment_plan.candidate_id:
+        raise ValueError("ResearchPredictionPlan does not belong to the InitialExperimentPlan candidate")
+    if prediction_plan.independent_variable != experiment_plan.independent_variable:
+        raise ValueError("ResearchPredictionPlan independent variable does not match the InitialExperimentPlan")
+    predicted_outcomes = {item.outcome for item in prediction_plan.predictions}
+    if predicted_outcomes != set(experiment_plan.dependent_outcomes):
+        raise ValueError(
+            "ResearchPredictionPlan predicted outcomes do not match the InitialExperimentPlan dependent outcomes"
+        )
+    if contrast_result.plan_id != experiment_plan.id:
+        raise ValueError("ParameterSensitivityContrastResult does not belong to the requested InitialExperimentPlan")
+    if contrast_result.independent_variable != experiment_plan.independent_variable:
+        raise ValueError("Contrast independent variable does not match the InitialExperimentPlan")
+    if contrast_result.baseline_condition_id != experiment_plan.ordered_conditions[0].id:
+        raise ValueError("Contrast baseline condition does not match the InitialExperimentPlan baseline")
+    if contrast_result.comparator_condition_id != experiment_plan.ordered_conditions[1].id:
+        raise ValueError("Contrast comparator condition does not match the InitialExperimentPlan comparator")
+    if contrast_result.comparator_parameter_value <= contrast_result.baseline_parameter_value:
+        raise ValueError(
+            "Contrast comparator parameter value must be greater than the baseline value for "
+            "directional verdict evaluation"
+        )

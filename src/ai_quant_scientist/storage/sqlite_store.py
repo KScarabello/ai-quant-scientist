@@ -64,10 +64,16 @@ from ..models.hypothesis_scientist import (
     HypothesisClaimSet,
     HypothesisScientistInvocation,
 )
+from ..models.post_verdict_critic import (
+    PostVerdictCriticDecisionType,
+    PostVerdictCriticInvocation,
+    PostVerdictResearchIntent,
+    PostVerdictRevisionKind,
+)
 from ..models.research_designer import ResearchDesignerInvocation
 
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 class SQLiteStore:
@@ -472,6 +478,48 @@ class SQLiteStore:
                     FOREIGN KEY (design_intent_id) REFERENCES research_design_intents(id),
                     FOREIGN KEY (experiment_plan_id) REFERENCES initial_experiment_plans(id),
                     FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id)
+                );
+                CREATE TABLE IF NOT EXISTS post_verdict_critic_invocations (
+                    id TEXT PRIMARY KEY,
+                    scientific_verdict_id TEXT NOT NULL UNIQUE,
+                    context_version TEXT NOT NULL,
+                    prompt_version TEXT,
+                    provider TEXT,
+                    model TEXT,
+                    context_snapshot_json TEXT NOT NULL,
+                    raw_response TEXT,
+                    parsed_decision_json TEXT,
+                    validation_status TEXT,
+                    validation_errors_json TEXT,
+                    resulting_intent_id TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (scientific_verdict_id) REFERENCES scientific_verdicts(id)
+                );
+                CREATE TABLE IF NOT EXISTS post_verdict_research_intents (
+                    id TEXT PRIMARY KEY,
+                    scientific_verdict_id TEXT NOT NULL UNIQUE,
+                    research_brief_id TEXT NOT NULL,
+                    hypothesis_claim_set_id TEXT NOT NULL,
+                    research_design_intent_id TEXT NOT NULL,
+                    research_prediction_plan_id TEXT NOT NULL,
+                    contrast_result_id TEXT NOT NULL,
+                    critic_invocation_id TEXT NOT NULL UNIQUE,
+                    decision TEXT NOT NULL,
+                    revision_kind TEXT NOT NULL,
+                    diagnosis TEXT NOT NULL,
+                    next_step_rationale TEXT NOT NULL,
+                    prompt_version TEXT NOT NULL,
+                    contract_version TEXT NOT NULL,
+                    provider TEXT,
+                    model TEXT,
+                    research_scope_snapshot_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                    FOREIGN KEY (hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                    FOREIGN KEY (research_design_intent_id) REFERENCES research_design_intents(id),
+                    FOREIGN KEY (research_prediction_plan_id) REFERENCES research_prediction_plans(id),
+                    FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id),
+                    FOREIGN KEY (critic_invocation_id) REFERENCES post_verdict_critic_invocations(id)
                 );
                 """
             )
@@ -904,6 +952,54 @@ class SQLiteStore:
                         connection.execute(
                             "ALTER TABLE research_prediction_plans ADD COLUMN prediction_aggregation_rule TEXT NOT NULL DEFAULT 'ALL_PREDICTIONS_REQUIRED'"
                         )
+                    connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (11,))
+                elif v == 11:
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS post_verdict_critic_invocations (
+                            id TEXT PRIMARY KEY,
+                            scientific_verdict_id TEXT NOT NULL UNIQUE,
+                            context_version TEXT NOT NULL,
+                            prompt_version TEXT,
+                            provider TEXT,
+                            model TEXT,
+                            context_snapshot_json TEXT NOT NULL,
+                            raw_response TEXT,
+                            parsed_decision_json TEXT,
+                            validation_status TEXT,
+                            validation_errors_json TEXT,
+                            resulting_intent_id TEXT,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (scientific_verdict_id) REFERENCES scientific_verdicts(id)
+                        );
+                        CREATE TABLE IF NOT EXISTS post_verdict_research_intents (
+                            id TEXT PRIMARY KEY,
+                            scientific_verdict_id TEXT NOT NULL UNIQUE,
+                            research_brief_id TEXT NOT NULL,
+                            hypothesis_claim_set_id TEXT NOT NULL,
+                            research_design_intent_id TEXT NOT NULL,
+                            research_prediction_plan_id TEXT NOT NULL,
+                            contrast_result_id TEXT NOT NULL,
+                            critic_invocation_id TEXT NOT NULL UNIQUE,
+                            decision TEXT NOT NULL,
+                            revision_kind TEXT NOT NULL,
+                            diagnosis TEXT NOT NULL,
+                            next_step_rationale TEXT NOT NULL,
+                            prompt_version TEXT NOT NULL,
+                            contract_version TEXT NOT NULL,
+                            provider TEXT,
+                            model TEXT,
+                            research_scope_snapshot_json TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (scientific_verdict_id) REFERENCES scientific_verdicts(id),
+                            FOREIGN KEY (hypothesis_claim_set_id) REFERENCES hypothesis_claim_sets(id),
+                            FOREIGN KEY (research_design_intent_id) REFERENCES research_design_intents(id),
+                            FOREIGN KEY (research_prediction_plan_id) REFERENCES research_prediction_plans(id),
+                            FOREIGN KEY (contrast_result_id) REFERENCES parameter_sensitivity_contrast_results(id),
+                            FOREIGN KEY (critic_invocation_id) REFERENCES post_verdict_critic_invocations(id)
+                        );
+                        """
+                    )
                     connection.execute("UPDATE schema_version SET version = ? WHERE id = 1", (SCHEMA_VERSION,))
                 else:
                     raise RuntimeError(f"Unsupported schema version {v}")
@@ -1239,6 +1335,144 @@ class SQLiteStore:
             created_at=datetime.fromisoformat(row["created_at"]),
             completed_at=None if row["completed_at"] is None else datetime.fromisoformat(row["completed_at"]),
         )
+
+    def save_post_verdict_critic_invocation(
+        self,
+        invocation: PostVerdictCriticInvocation,
+    ) -> PostVerdictCriticInvocation:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO post_verdict_critic_invocations
+                   (id, scientific_verdict_id, context_version, prompt_version,
+                    provider, model, context_snapshot_json, raw_response,
+                    parsed_decision_json, validation_status, validation_errors_json,
+                    resulting_intent_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_intent_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+        return invocation
+
+    def try_create_post_verdict_critic_invocation(
+        self,
+        invocation: PostVerdictCriticInvocation,
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO post_verdict_critic_invocations
+                   (id, scientific_verdict_id, context_version, prompt_version,
+                    provider, model, context_snapshot_json, raw_response,
+                    parsed_decision_json, validation_status, validation_errors_json,
+                    resulting_intent_id, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    invocation.id,
+                    invocation.scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_intent_id,
+                    invocation.created_at.isoformat(),
+                ),
+            )
+        return cursor.rowcount == 1
+
+    def update_post_verdict_critic_invocation(
+        self,
+        invocation: PostVerdictCriticInvocation,
+    ) -> None:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE post_verdict_critic_invocations
+                   SET scientific_verdict_id = ?,
+                       context_version = ?,
+                       prompt_version = ?,
+                       provider = ?,
+                       model = ?,
+                       context_snapshot_json = ?,
+                       raw_response = ?,
+                       parsed_decision_json = ?,
+                       validation_status = ?,
+                       validation_errors_json = ?,
+                       resulting_intent_id = ?,
+                       created_at = ?
+                   WHERE id = ?""",
+                (
+                    invocation.scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_intent_id,
+                    invocation.created_at.isoformat(),
+                    invocation.id,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(
+                f"PostVerdictCriticInvocation not found for update: {invocation.id!r}"
+            )
+
+    def get_post_verdict_critic_invocation(self, invocation_id: str) -> PostVerdictCriticInvocation | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM post_verdict_critic_invocations WHERE id = ?",
+                (invocation_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return PostVerdictCriticInvocation(
+            id=row["id"],
+            scientific_verdict_id=row["scientific_verdict_id"],
+            context_version=row["context_version"],
+            prompt_version=row["prompt_version"],
+            provider=row["provider"],
+            model=row["model"],
+            context_snapshot_json=row["context_snapshot_json"],
+            raw_response=row["raw_response"],
+            parsed_decision_json=row["parsed_decision_json"],
+            validation_status=row["validation_status"],
+            validation_errors_json=row["validation_errors_json"],
+            resulting_intent_id=row["resulting_intent_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_post_verdict_critic_invocation_by_scientific_verdict_id(
+        self,
+        scientific_verdict_id: str,
+    ) -> PostVerdictCriticInvocation | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT id FROM post_verdict_critic_invocations WHERE scientific_verdict_id = ?",
+                (scientific_verdict_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_post_verdict_critic_invocation(row["id"])
 
     def record_audit_event(self, event: AuditEvent) -> AuditEvent:
         with self.connect() as connection:
@@ -3044,6 +3278,126 @@ class SQLiteStore:
         if row is None:
             return None
         return self.get_scientific_verdict(row["id"])
+
+    def save_post_verdict_bundle(
+        self,
+        *,
+        invocation: PostVerdictCriticInvocation,
+        intent: PostVerdictResearchIntent,
+    ) -> None:
+        if invocation.scientific_verdict_id != intent.scientific_verdict_id:
+            raise ValueError("PostVerdictCriticInvocation and PostVerdictResearchIntent must share scientific_verdict_id")
+        if invocation.id != intent.critic_invocation_id:
+            raise ValueError("PostVerdictResearchIntent critic_invocation_id must match the authoritative invocation")
+        if invocation.resulting_intent_id != intent.id:
+            raise ValueError("PostVerdictCriticInvocation resulting_intent_id must match the authoritative intent")
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """UPDATE post_verdict_critic_invocations
+                   SET scientific_verdict_id = ?,
+                       context_version = ?,
+                       prompt_version = ?,
+                       provider = ?,
+                       model = ?,
+                       context_snapshot_json = ?,
+                       raw_response = ?,
+                       parsed_decision_json = ?,
+                       validation_status = ?,
+                       validation_errors_json = ?,
+                       resulting_intent_id = ?,
+                       created_at = ?
+                   WHERE id = ?""",
+                (
+                    invocation.scientific_verdict_id,
+                    invocation.context_version,
+                    invocation.prompt_version,
+                    invocation.provider,
+                    invocation.model,
+                    invocation.context_snapshot_json,
+                    invocation.raw_response,
+                    invocation.parsed_decision_json,
+                    invocation.validation_status,
+                    invocation.validation_errors_json,
+                    invocation.resulting_intent_id,
+                    invocation.created_at.isoformat(),
+                    invocation.id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "PostVerdictCriticInvocation reservation must exist before saving the authoritative intent"
+                )
+            conn.execute(
+                """INSERT INTO post_verdict_research_intents
+                   (id, scientific_verdict_id, research_brief_id, hypothesis_claim_set_id,
+                    research_design_intent_id, research_prediction_plan_id, contrast_result_id,
+                    critic_invocation_id, decision, revision_kind, diagnosis,
+                    next_step_rationale, prompt_version, contract_version, provider,
+                    model, research_scope_snapshot_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    intent.id,
+                    intent.scientific_verdict_id,
+                    intent.research_brief_id,
+                    intent.hypothesis_claim_set_id,
+                    intent.research_design_intent_id,
+                    intent.research_prediction_plan_id,
+                    intent.contrast_result_id,
+                    intent.critic_invocation_id,
+                    intent.decision.value,
+                    intent.revision_kind.value,
+                    intent.diagnosis,
+                    intent.next_step_rationale,
+                    intent.prompt_version,
+                    intent.contract_version,
+                    intent.provider,
+                    intent.model,
+                    self._dumps(intent.research_scope_payload()),
+                    intent.created_at.isoformat(),
+                ),
+            )
+
+    def get_post_verdict_research_intent(self, intent_id: str) -> PostVerdictResearchIntent | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM post_verdict_research_intents WHERE id = ?",
+                (intent_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return PostVerdictResearchIntent(
+            id=row["id"],
+            scientific_verdict_id=row["scientific_verdict_id"],
+            research_brief_id=row["research_brief_id"],
+            hypothesis_claim_set_id=row["hypothesis_claim_set_id"],
+            research_design_intent_id=row["research_design_intent_id"],
+            research_prediction_plan_id=row["research_prediction_plan_id"],
+            contrast_result_id=row["contrast_result_id"],
+            critic_invocation_id=row["critic_invocation_id"],
+            decision=PostVerdictCriticDecisionType(row["decision"]),
+            revision_kind=PostVerdictRevisionKind(row["revision_kind"]),
+            diagnosis=row["diagnosis"],
+            next_step_rationale=row["next_step_rationale"],
+            prompt_version=row["prompt_version"],
+            contract_version=row["contract_version"],
+            provider=row["provider"],
+            model=row["model"],
+            research_scope_snapshot=self._loads(row["research_scope_snapshot_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_post_verdict_research_intent_by_scientific_verdict_id(
+        self,
+        scientific_verdict_id: str,
+    ) -> PostVerdictResearchIntent | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM post_verdict_research_intents WHERE scientific_verdict_id = ?",
+                (scientific_verdict_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self.get_post_verdict_research_intent(row["id"])
 
     # ─── Research designer invocations ───────────────────────────────────────
 

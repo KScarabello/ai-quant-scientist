@@ -65,6 +65,13 @@ Supervised end-to-end cycle:
 -> deterministic parameter-sensitivity contrast result
 -> deterministic scientific verdict
 
+Post-verdict scientific learning boundary:
+
+exact `ScientificVerdict`
+-> one bounded `PostVerdictResearchCritic` invocation
+-> immutable `PostVerdictResearchIntent`
+-> stop
+
 Deterministic contrast-plan path after `ResearchDesignIntent`:
 
 `ResearchDesignIntent`
@@ -150,19 +157,27 @@ Current boundary:
 
 ### Research Critic
 
-The Research Critic is implemented and separately bounded.
+Two separate Critic paths now exist:
+
+- historical revision Critic: measured results -> bounded revision intent -> deterministic `RevisionPlanner` V1
+- current post-verdict Critic: exact `FALSIFIED` scientific verdict -> diagnosis + bounded next-research intent -> stop
+
+The post-verdict Critic is implemented and separately bounded.
 
 It may:
-- propose one bounded revision intent
-- return `NO_USEFUL_REVISION`
+- diagnose a falsified bounded experiment from frozen evidence
+- return `CONTINUE` or `STOP`
+- emit exactly one bounded `revision_kind`
+- persist one immutable non-executable `PostVerdictResearchIntent`
 
 It may not:
-- choose exact numeric revision values
-- override evaluator authority
-- mutate accepted experiment plans
-- turn planned comparison conditions into revisions
+- author the next hypothesis
+- choose exact numeric execution values
+- broaden or replace `ResearchScope`
+- create a new design, plan, or execution command
+- override deterministic verdict authority
 
-`RevisionPlanner` V1 still deterministically chooses the exact revision value.
+The historical revision Critic and `RevisionPlanner` V1 remain unchanged.
 
 ## Deterministic Governance
 
@@ -184,9 +199,10 @@ Core invariants:
 - The AI does not see experiment results before prediction commitment.
 - Deterministic software alone computes `SUPPORTED` / `FALSIFIED` from the persisted prediction plan and measured contrast result.
 - `SUPPORTED` / `FALSIFIED` applies only to the bounded precommitted contrast, not general market truth.
+- The post-verdict Critic may learn only from a frozen exact `FALSIFIED` verdict and may persist only diagnosis plus bounded next-research intent.
 - Lifecycle promotion remains downstream and separate from condition sequencing.
 - `falsification_condition` is retained as non-authoritative scientific prose and is not parsed into governance thresholds.
-- No Critic, revision planner, or lifecycle promotion is automatically invoked after verdict computation.
+- No Critic, revision planner, Scientist, Designer, or lifecycle promotion is automatically invoked after verdict computation.
 
 ## Current Implemented Milestones
 
@@ -202,9 +218,10 @@ Core invariants:
 - `V0.13A.1`: deterministic contrast plan, precommitted baseline/comparator execution, append-only acceptance-time revalidation, restart-safe condition execution records, deterministic contrast result, and semantic closure for `PARAMETER_SENSITIVITY`
 - `V0.13B`: bounded Research Designer V1, deterministic design ontology, prompt V1, governed READY_FOR_SPEC-only design service, append-only invocation persistence, and schema `v9`
 - `V0.14`: first supervised end-to-end scientist cycle connecting brief -> hypothesis -> candidate feasibility -> design -> deterministic materialization -> explicit human acceptance -> deterministic execution -> contrast result
-- `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10`
-- `V0.15.1`: canonical candidate-side scientific claims, Research Designer V3 complete-coverage validation, deterministic claim-to-prediction projection, and schema `v11`
-- `V0.15.2`: caller-owned canonical `ResearchScope`, Hypothesis Scientist Prompt `v5`, deterministic scope-fidelity validation, and no schema bump
+- `V0.15`: precommitted directional predictions, Research Designer V2 plus design ontology V2, deterministic scientific verdict persistence, and schema `v10` (`COMPLETE / FROZEN`)
+- `V0.15.1`: canonical candidate-side scientific claims, Research Designer V3 complete-coverage validation, deterministic claim-to-prediction projection, and schema `v11` (`COMPLETE / FROZEN`)
+- `V0.15.2`: caller-owned canonical `ResearchScope`, Hypothesis Scientist Prompt `v5`, deterministic scope-fidelity validation, first fully governed live verdict, and no schema bump beyond `v11` (`COMPLETE / FROZEN`)
+- `V0.16`: one bounded post-verdict Critic invocation, immutable `PostVerdictResearchIntent`, schema `v12`, and no autonomous continuation
 
 For the detailed operational handoff, see `docs/ai/CURRENT_STATE.md`.
 
@@ -269,7 +286,7 @@ There is now one supervised orchestration layer:
 
 ## Persistence
 
-Current schema version: `v11`
+Current schema version: `v12`
 
 SQLite persists authoritative history for:
 
@@ -290,13 +307,24 @@ SQLite persists authoritative history for:
 - condition execution records
 - deterministic parameter-sensitivity contrast results
 - deterministic scientific verdicts
+- post-verdict Critic invocations
+- immutable post-verdict research intents
 
 ## Evals
 
 Verified deterministic suite:
 
 - command: `PYTHONPATH=src pytest -q`
-- result: `569 passed`
+- result: `591 passed`
+
+Frozen live V0.15.2 evidence:
+
+- proposal `2dd81ec3-1ce3-40b4-9857-082e54a85e9e`
+- claim set `ce1393b9-0800-4a7a-bb00-12236deb17f4`
+- prediction plan `376c7395-ceaa-498a-85a3-455ceb3a86c4`
+- contrast `adec991c-4cb3-4900-8338-17b7efe10307`
+- scientific verdict `2a4faabc-3477-4c47-a033-78177514b603`
+- overall `FALSIFIED`
 
 Relevant scientist artifact note:
 
@@ -313,10 +341,11 @@ PYTHONPATH=src python3 -m ai_quant_scientist.cli candidates
 PYTHONPATH=src python3 -m ai_quant_scientist.cli feasibility-history <candidate_id>
 PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --model gpt-5.6-terra --allow-live-api
 PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_supervised_cycle --proposal-id <EXACT_PROPOSAL_ID> --accept-and-execute
+PYTHONPATH=src python3 -m ai_quant_scientist.evals.run_live_post_verdict_critic --scientific-verdict-id <EXACT_SCIENTIFIC_VERDICT_ID> --model gpt-5.6-terra --allow-live-api
 PYTHONPATH=src pytest -q
 ```
 
-There is intentionally no dedicated production CLI for the supervised cycle yet. The governed service APIs and guarded live diagnostic runner are the supported V0.15.2 interfaces.
+There is intentionally no dedicated production CLI for autonomous continuation. The governed service APIs and guarded live diagnostic runners are the supported V0.15.2 / V0.16 interfaces.
 
 Live supervised cycle workflow:
 
@@ -338,7 +367,7 @@ Historical negative evidence:
 ## Current Limitations / Future Work
 
 - no autonomous loop
-- no autonomous iterative chaining from verdicts into Critic, revision, replication, or holdout
+- no autonomous iterative chaining from verdicts into Critic, Scientist, revision, replication, or holdout
 - no generalized multi-capability exact materializer
 - no generalized multi-condition experiment DSL
 - no RAG or vector canonical memory
@@ -356,4 +385,6 @@ Historical evidence remains in the repository, but it should not be mistaken for
 - That historical `V0.14` execution does not receive a retrospective `V0.15` verdict because it did not persist a machine-readable precommitted prediction plan before execution.
 - The first live `V0.15` preparation artifact, proposal `2f641366-3e40-4aa3-90df-4423ba0fff65`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Research Designer V2 narrowed the candidate’s scientific intent instead of covering it completely.
 - The first live `V0.15.1` preparation artifact, proposal `2cea1a89-afa5-4ace-abca-3dbda86ded82`, is frozen rejected evidence. It reached the human boundary but must remain unaccepted because Hypothesis Scientist V4 broadened the caller's scientific scope by adding `net_pnl`.
+- The first fully governed live `V0.15.2` cycle is frozen successful evidence: proposal `2dd81ec3-1ce3-40b4-9857-082e54a85e9e` led to claim set `ce1393b9-0800-4a7a-bb00-12236deb17f4`, prediction plan `376c7395-ceaa-498a-85a3-455ceb3a86c4`, contrast `adec991c-4cb3-4900-8338-17b7efe10307`, and deterministic scientific verdict `2a4faabc-3477-4c47-a033-78177514b603` with overall status `FALSIFIED`.
+- That `V0.15.2` verdict is authoritative frozen evidence. `V0.16` may diagnose it once, but may not rewrite it, attach a new hypothesis to it, or trigger another experiment automatically.
 - Historical single-spec materialization records and pre-fix scientist artifacts remain readable for audit purposes.
